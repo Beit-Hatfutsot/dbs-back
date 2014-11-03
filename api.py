@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask.ext.mongoengine import MongoEngine
 from flask.ext.security import Security, MongoEngineUserDatastore, \
     UserMixin, RoleMixin, login_required
@@ -10,6 +10,8 @@ from flask.ext.security.utils import encrypt_password, verify_password
 
 from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
+from  flask.ext.jwt import current_user
+
 
 
 # Create app
@@ -98,6 +100,16 @@ def home():
 @jwt_required()
 def private_space():
     return humanify({'access': 'private'})
+
+@app.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@app.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@jwt_required()
+def manage_user(user_id=None):
+    if request.method == 'GET':
+        user_obj = current_user
+        user_obj.id = str(user_obj.id)
+        return humanify({'id': user_obj.id,
+                         'email': user_obj.email})
 
 if __name__ == '__main__':
     app.run()
