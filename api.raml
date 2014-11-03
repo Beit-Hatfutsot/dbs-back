@@ -1,4 +1,4 @@
-#%RAML 0.8
+schemas:#%RAML 0.8
 baseUri: http://mocksvc.mulesoft.com/mocks/9a495536-2183-4b15-a248-8dd76468a9a3
 title: bh
 version: 0.1
@@ -6,7 +6,8 @@ mediaType:  application/json
 /user/{user_id}:
   description: User management
   get:
-    description: Get the user details by id
+    description: Get the user details by id. If no id is specified, but the request is signed by a valid JWT token,
+    return the user object corresponding to the token.
     responses:
       404:
         description: The specified user_id can not be found
@@ -15,14 +16,39 @@ mediaType:  application/json
         body:
           application/json:
             example: |
-              {"id": "5450b900ab97c91c7a26af2f",
-              "email": "dannybmail@gmail.com",
-              "mjs": {}
+              {  
+                "id": "5450b900ab97c91c7a26af2f",
+                "email": "dannybmail@gmail.com",
+                "mjs": "6450b900ab97c91c7a26af2f",
+                "full_name": "Danny Berger"
               }
               
   post:
     description: Create a new user
+    body:
+          application/json:
+            example: |
+              {  
+                "email": "dannybmail@gmail.com",
+                "full_name": "Danny Berger",
+                "cleartext_password": "it_is_dangerous"
+              }
   put:
-    description: Update details for an existing user  
+    description: Update details for an existing user
+    body:
+          application/json:
+            example: |
+              {  
+                "id": "5450b900ab97c91c7a26af2f",
+                "email": "dannybmail@gmail.com",
+                "full_name": "Danny Berger",
+                "cleartext_password": "it_is_dangerous"
+              }  
   delete:
-    description: Delete existing user  
+    description: Delete existing user
+    body:
+          application/json:
+            example: |
+              {  
+                "id": "5450b900ab97c91c7a26af2f"
+              }  
