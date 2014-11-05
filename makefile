@@ -2,7 +2,7 @@ virtual_env = /home/bhs/venv
 api = /home/bhs/api
 
 
-all: pull venv
+all: reload venv
 
 pull:
 	cd $(api) && git pull origin master
@@ -14,6 +14,6 @@ $(virtual_env)/bin/activate: requirements.txt
 	. $(virtual_env)/bin/activate; pip install --upgrade -r requirements.txt
 	touch $(virtual_env)/bin/activate
 
-reload: $(api)
+reload: pull
 	sudo service uwsgi reload
 	sudo service nginx reload
