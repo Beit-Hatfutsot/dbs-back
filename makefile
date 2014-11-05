@@ -16,4 +16,6 @@ $(virtual_env)/bin/activate: requirements.txt
 
 reload: pull
 	sudo service uwsgi reload
+
+reload_nginx:
 	sudo service nginx reload
