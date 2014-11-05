@@ -2,9 +2,9 @@ virtual_env = /home/bhs/venv
 api = /home/bhs/api
 
 
-all: $(api) venv
+all: pull venv
 
-$(api):
+pull:
 	cd $(api) && git pull origin master
 
 venv: $(virtual_env)/bin/activate
@@ -17,5 +17,3 @@ $(virtual_env)/bin/activate: requirements.txt
 reload: $(api)
 	sudo service uwsgi reload
 	sudo service nginx reload
-
-
