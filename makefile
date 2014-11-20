@@ -19,3 +19,6 @@ reload: pull
 
 reload_nginx:
 	sudo service nginx reload
+
+test:
+	(cd tests; py.test)
