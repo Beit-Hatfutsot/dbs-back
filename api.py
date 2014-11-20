@@ -12,22 +12,27 @@ from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
 from  flask.ext.jwt import current_user
 
+from utils import get_conf
+
 
 
 # Create app
 app = Flask(__name__)
 
+# Get configuration from file
+conf = get_conf()
+
 # Set app config
 app.config['DEBUG'] = True
-app.config['SECRET_KEY'] = 'glpjht9dPBXQe8mBS9XxDMGLIoHukbpvSNU0FpnZ'
-app.config['SECURITY_PASSWORD_HASH'] = 'pbkdf2_sha512'
-app.config['SECURITY_PASSWORD_SALT'] = 'pjht9dPBXQe8mB'
+app.config['SECRET_KEY'] = conf.secret_key
+app.config['SECURITY_PASSWORD_HASH'] = conf.security_password_hash
+app.config['SECURITY_PASSWORD_SALT'] = conf.security_password_salt
 app.config['JWT_EXPIRATION_DELTA'] = timedelta(days=1)
 
 # DB Config
-app.config['MONGODB_DB'] = 'bh'
-app.config['MONGODB_HOST'] = 'localhost'
-app.config['MONGODB_PORT'] = 27017
+app.config['MONGODB_DB'] = conf.db_name
+app.config['MONGODB_HOST'] = conf.db_host
+app.config['MONGODB_PORT'] = conf.db_port
 
 #allow CORS
 cors = CORS(app, origins=['*'], headers=['content-type', 'accept', 'Authorization'])
