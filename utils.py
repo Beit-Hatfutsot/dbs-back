@@ -1,4 +1,7 @@
+import logging
+
 import yaml
+
 
 class Struct:
     def __init__(self, **entries): 
@@ -39,4 +42,17 @@ def get_conf(config_file='/etc/bhs/config.yml'):
 
     except yaml.scanner.ScannerError, e:
         raise yaml.scanner.ScannerError(e.problem+str(e.problem_mark))
+
+def get_logger(app_name='bhs_api', fn='bhs_api.log'):
+    logger = logging.getLogger(app_name)
+    logger.setLevel(logging.DEBUG)
+    fh = logging.FileHandler(fn)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+    return logger
 

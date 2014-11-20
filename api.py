@@ -12,7 +12,7 @@ from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
 from  flask.ext.jwt import current_user
 
-from utils import get_conf
+from utils import get_conf, get_logger
 
 
 
@@ -34,6 +34,9 @@ app.config['MONGODB_DB'] = conf.db_name
 app.config['MONGODB_HOST'] = conf.db_host
 app.config['MONGODB_PORT'] = conf.db_port
 
+# Logging config
+logger = get_logger()
+
 #allow CORS
 cors = CORS(app, origins=['*'], headers=['content-type', 'accept', 'Authorization'])
 
@@ -43,16 +46,16 @@ jwt = JWT(app)
 def authenticate(username, password):
     user_obj = user_datastore.find_user(email=username)
     if not user_obj:
-        print 'User not found'
+        logger.debug('User %s not found' % username)
         return None
 
-    if username == user_obj.email and verify_password(password, user_obj.password):
-        
+    if verify_password(password, user_obj.password):
         # make user.id jsonifiable
         user_obj.id = str(user_obj.id)
         return user_obj
-
-    return None
+    else:
+        logger.debug('Wrong password for %s' %  username)
+        return None
 
 @jwt.user_handler
 def load_user(payload):
@@ -77,6 +80,7 @@ class User(db.Document, UserMixin):
 @app.before_first_request
 def create_user():
     if not user_datastore.get_user('dannybmail@gmail.com'):
+        logger.debug('Creating test user.')
         user_datastore.create_user(email='dannybmail@gmail.com', password=encrypt_password('password'))
 
 # Setup Flask-Security
@@ -98,7 +102,7 @@ def home():
         return humanify({'access': 'private'})
 
     except JWTError as e:
-        print e.description
+        logger.debug(e.description)
         return humanify({'access': 'public'})
 
 @app.route('/private')
@@ -117,4 +121,5 @@ def manage_user(user_id=None):
                          'email': user_obj.email})
 
 if __name__ == '__main__':
+    logger.debug('Starting api')
     app.run()
