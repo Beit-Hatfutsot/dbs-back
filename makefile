@@ -22,3 +22,6 @@ reload_nginx:
 
 test:
 	(cd tests; py.test)
+
+#love:
+#	$(info "Not with a computer, stupid!")

@@ -48,7 +48,9 @@ def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler(fn)
     ch = logging.StreamHandler()
-    ch.setLevel(logging.ERROR)
+    #ch.setLevel(logging.ERROR)
+    # Output in debug level to console while developing
+    ch.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
