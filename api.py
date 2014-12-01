@@ -176,6 +176,8 @@ def update_user(user_id, user_dict):
         enc_password = encrypt_password(user_dict['password'])
         user.password = enc_password
 
+    user.save()
+
     return {'updated': user,
             'id': user_id}
 
