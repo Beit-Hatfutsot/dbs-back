@@ -45,11 +45,12 @@ def test_user(client, request):
     route = '/user'
     new_email = 'shmakoziabr@example.com'
     new_password = 'kr0koftL!'
+
     print 'Creating test user %s' % username
     res = client.post('/user', data = json.dumps({'email': username,
                                                   'password': password}))
     parsed_res = res.json
-    assert parsed_res.has_key('created') and len(parsed_res['created']) > 0
+    assert parsed_res['email'] == username
 
     def get_generic_auth_header(username, password):
         data =  json.dumps({'username': username, 'password': password})
@@ -69,24 +70,24 @@ def test_user(client, request):
         res = client.get(route, headers=headers)
         return res.json
 
-    def user_email_change():
+    def user_email_change(new_email):
         data = json.dumps({'email': new_email})
         res = client.put(route, headers=headers, data=data)
         return res.json
-        
-    assert user_email_change()['updated']['email'] == new_email
-    assert user_get_self(new_email, password)['email'] == new_email
 
-    def test_password_change():
-        data = json.dumps({'email': new_email})
+    def user_password_change(new_password):
+        data = json.dumps({'password': new_password})
         res = client.put(route, headers=headers, data=data)
-        return res.json['updated']['email'] == new_email
-
-    assert test_email_change()
+        return res.json
 
     def delete_test_user():
         res = client.delete(route, headers=headers)
-        assert res.json.has_key('deleted')
+        assert res.json == {}
+
+    user_email_change(new_email)
+    assert user_get_self(new_email, password)['email'] == new_email
+    user_password_change(new_password)
+    assert user_get_self(new_email, new_password)['email'] == new_email
 
     request.addfinalizer(delete_test_user)
   
