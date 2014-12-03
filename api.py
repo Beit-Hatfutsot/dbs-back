@@ -96,6 +96,28 @@ def setup_users():
 user_datastore = MongoEngineUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
+
+# Stubs for custom error handlers
+@app.errorhandler(400)
+def custom_400(error):
+    response = humanify({'error': error.description})
+    return response, 400
+
+@app.errorhandler(403)
+def custom_403(error):
+    response = humanify({'error': error.description})
+    return response, 403
+
+@app.errorhandler(404)
+def custom_404(error):
+    response = humanify({'error': error.description})
+    return response, 404
+
+@app.errorhandler(409)
+def custom_409(error):
+    response = humanify({'error': error.description})
+    return response, 409
+
 def humanify(obj):
     'Adds newline to Json responses to make CLI debugging easier'
     resp = jsonify(obj)
