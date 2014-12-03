@@ -118,6 +118,7 @@ def custom_409(error):
     response = humanify({'error': error.description})
     return response, 409
 
+# Utility functions
 def humanify(obj):
     'Adds newline to Json responses to make CLI debugging easier'
     resp = jsonify(obj)
@@ -130,13 +131,23 @@ def is_admin(flask_user_obj):
     else:
         return False
 
+def mask_dict(from_dict, allowed_keys):
+    'Return only allowed keys'
+    rv = {}
+    for key in allowed_keys:
+        if from_dict.has_key(key):
+            rv[key] = from_dict[key]
+    return rv
+
+# User management
 def user_handler(user_id, method, data):
     if data:
         try:
             data = json.loads(data)
         except ValueError:
-            logger.debug('Could not decode JSON from data')
-            abort(400)
+            e_message = 'Could not decode JSON from data'
+            logger.debug(e_message)
+            abort(400, e_message)
 
     if method == 'GET':
         return humanify(get_user(user_id))
@@ -155,11 +166,17 @@ def _get_user_or_error(user_id):
     if user:
         return user
     else:
-        raise abort(404)
+        raise abort(404, 'User not found')
+
+def _clean_user(user_obj):
+    user_dict = json.loads(user_obj.to_json())
+    allowed_fields = ['_id', 'email']
+    masked_user_dict = mask_dict(user_dict, allowed_fields)
+    return masked_user_dict
 
 def get_user(user_id):
-    user = _get_user_or_error(user_id)
-    return json.loads(user.to_json())
+    user_obj = _get_user_or_error(user_id)
+    return _clean_user(user_obj)
 
 def delete_user(user_id):
     user = _get_user_or_error(user_id)
@@ -167,41 +184,41 @@ def delete_user(user_id):
         return {'error': 'God Mode!'}
     else:
         user.delete()
-        return {'deleted': user_id}
+        return {}
 
 def create_user(user_dict):
     try:
         email = user_dict['email']
         enc_password = encrypt_password(user_dict['password'])
     except KeyError as e:
-        logger.debug('%s key is missing from data' % e)
-        abort(400)
+        e_message = '%s key is missing from data' % e
+        logger.debug(e_message)
+        abort(400, e_message)
 
     user_exists = user_datastore.get_user(email)
     if user_exists:
-        logger.debug('User %s with email %s already exists' % (str(user_exists.id), email))
-        abort(409)
-        #return {'error': 'Email exists'}
+        e_message = 'User %s with email %s already exists' % (str(user_exists.id), email)
+        logger.debug(e_message)
+        abort(409, e_message)
 
     created = user_datastore.create_user(email=email,
                                         password=enc_password)
     # Add default role to a newly created user
     user_datastore.add_role_to_user(created, 'user')
 
-    return {'created': str(created.id)}
+    return _clean_user(created)
+
 
 def update_user(user_id, user_dict):
-    user = _get_user_or_error(user_id)
+    user_obj = _get_user_or_error(user_id)
     if 'email' in user_dict.keys():
-        user.email = user_dict['email']
+        user_obj.email = user_dict['email']
     if 'password' in user_dict.keys():
         enc_password = encrypt_password(user_dict['password'])
-        user.password = enc_password
+        user_obj.password = enc_password
 
-    user.save()
-
-    return {'updated': user,
-            'id': user_id}
+    user_obj.save()
+    return _clean_user(user_obj)
 
 
 # Views
