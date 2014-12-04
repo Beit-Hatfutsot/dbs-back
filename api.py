@@ -270,6 +270,25 @@ def manage_user(user_id=None):
         user_id = str(current_user.id)
         return user_handler(user_id, request.method, request.data)
 
+@app.route('/mjs/<user_id>', methods=['GET', 'PUT'])
+@jwt_required()
+def manage_jewish_story(user_id):
+    '''Logged in user may GET or PUT their mjs metadata (a list).
+    Each metadata member is a tuple of (id, collection_name).
+    A PUT request must include ALL the metadata, not just a new object!
+    The data is saved as a field in the user collection.
+    '''
+    pass
+
+@app.route('/upload', methods=['POST'])
+@jwt_required()
+def save_user_content():
+    '''Logged in user POSTs a multipart request that includes a binary
+    file and metadata.
+    The server stores the metadata in a ugc collection and uploads the file
+    to a bucket.
+    '''
+    pass
 
 if __name__ == '__main__':
     logger.debug('Starting api')
