@@ -1,11 +1,15 @@
 import logging
 
 import yaml
+import bson
 
 
 class Struct:
     def __init__(self, **entries): 
         self.__dict__.update(entries)
+
+def get_oid(id_str):
+    return bson.objectid.ObjectId(id_str)
 
 def get_conf(config_file='/etc/bhs/config.yml'):
     '''Read the configuration file and return config dict.

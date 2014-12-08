@@ -4,7 +4,7 @@ from datetime import timedelta
 import json
 
 from flask import Flask, jsonify, request, abort
-from flask.ext.mongoengine import MongoEngine
+from flask.ext.mongoengine import MongoEngine, ValidationError
 from flask.ext.security import Security, MongoEngineUserDatastore, \
     UserMixin, RoleMixin, login_required
 from flask.ext.security.utils import encrypt_password, verify_password
@@ -77,6 +77,9 @@ class User(db.Document, UserMixin):
     confirmed_at = db.DateTimeField()
     roles = db.ListField(db.ReferenceField(Role))
 
+class Mjs(db.Document):
+    mjs = db.ListField()
+
 # Ensure we have a user to test with
 @app.before_first_request
 def setup_users():
@@ -113,10 +116,20 @@ def custom_404(error):
     response = humanify({'error': error.description})
     return response, 404
 
+@app.errorhandler(405)
+def custom_405(error):
+    response = humanify({'error': error.description})
+    return response, 405
+
 @app.errorhandler(409)
 def custom_409(error):
     response = humanify({'error': error.description})
     return response, 409
+
+@app.errorhandler(500)
+def custom_500(error):
+    response = humanify({'error': error.description})
+    return response, 500
 
 # Utility functions
 def humanify(obj):
@@ -139,11 +152,16 @@ def mask_dict(from_dict, allowed_keys):
             rv[key] = from_dict[key]
     return rv
 
+def dictify(m_engine_object):
+    return json.loads(m_engine_object.to_json())
+
 # User management
 def user_handler(user_id, method, data):
     if data:
         try:
             data = json.loads(data)
+            if type(data) != dict:
+                abort(400, 'Only dict like objects are supported for user management')
         except ValueError:
             e_message = 'Could not decode JSON from data'
             logger.debug(e_message)
@@ -169,7 +187,7 @@ def _get_user_or_error(user_id):
         raise abort(404, 'User not found')
 
 def _clean_user(user_obj):
-    user_dict = json.loads(user_obj.to_json())
+    user_dict = dictify(user_obj)
     allowed_fields = ['_id', 'email']
     masked_user_dict = mask_dict(user_dict, allowed_fields)
     return masked_user_dict
@@ -219,6 +237,26 @@ def update_user(user_id, user_dict):
 
     user_obj.save()
     return _clean_user(user_obj)
+
+def get_mjs(user_oid):
+    mjs = Mjs.objects(id=user_oid).first()
+    if mjs:
+        mjs_dict = dictify(mjs)
+        return humanify(mjs_dict)
+    else:
+        logger.debug('Mjs not found for user {}'.format(str(user_oid)))
+        return humanify({'mjs':[]})
+
+def update_mjs(user_oid, data):
+    new_mjs = Mjs(id=user_oid, mjs = data)
+    try:
+        new_mjs.save()
+        print dir(new_mjs)
+        return humanify(dictify(new_mjs))
+    except ValidationError as e:
+        logger.debug('Error occured while saving mjs data for user {}'.format(str(user_oid)))
+        logger.debug(e.message) 
+        abort(500, e.message)
 
 
 # Views
@@ -270,15 +308,29 @@ def manage_user(user_id=None):
         user_id = str(current_user.id)
         return user_handler(user_id, request.method, request.data)
 
-@app.route('/mjs/<user_id>', methods=['GET', 'PUT'])
+@app.route('/mjs', methods=['GET', 'PUT'])
 @jwt_required()
-def manage_jewish_story(user_id):
+def manage_jewish_story():
     '''Logged in user may GET or PUT their mjs metadata (a list).
     Each metadata member is a tuple of (id, collection_name).
     A PUT request must include ALL the metadata, not just a new object!
-    The data is saved as a field in the user collection.
+    The data is saved as an object in the mjs collection while its _id
+    equals to this of the updating user.
     '''
-    pass
+    user_oid = current_user.id
+    if request.method == 'GET':
+        mjs = get_mjs(user_oid)
+        return mjs
+
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.data)
+        except ValueError:
+            e_message = 'Could not decode JSON from data'
+            logger.debug(e_message)
+            abort(400, e_message)
+        return update_mjs(user_oid, data)
+
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()
