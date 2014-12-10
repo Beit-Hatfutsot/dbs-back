@@ -31,21 +31,26 @@ def get_conf(config_file='/etc/bhs/config.yml'):
         config_keys = set(conf.keys())
         missing_keys = list(must_have_keys.difference(config_keys))
         if missing_keys != []:
-            if len(missing_keys) == 1:
-               s = ''
-               verb = 'is'
-               missing = missing_keys[0]
-            else:
-               s = 's'
-               verb = 'are'
-               missing = ', '.join(missing_keys)
-            error_message = 'Invalid configuration file: Option{} {} {} missing.'.format(s, missing, verb)
+            keys_message = gen_missing_keys_error(missing_keys)
+            error_message = 'Invalid configuration file: ' + keys_message
             raise ValueError(error_message)
 
         return Struct(**conf) # Enables dot access
 
     except yaml.scanner.ScannerError, e:
         raise yaml.scanner.ScannerError(e.problem+str(e.problem_mark))
+
+def gen_missing_keys_error(missing_keys):
+    if len(missing_keys) == 1:
+        s = ''
+        verb = 'is'
+        missing = missing_keys[0]
+    else:
+        s = 's'
+        verb = 'are'
+        missing = ', '.join(missing_keys)
+    error_message = 'Key{} {} {} missing.'.format(s, missing, verb)
+    return error_message
 
 def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger = logging.getLogger(app_name)
@@ -62,3 +67,9 @@ def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger.addHandler(ch)
     return logger
 
+def upload_file(file_obj, bucket, creds, object_md):
+    '''
+    Upload the file object to a bucket using credentials and object metadata.
+    Object name is a part of its metadata.
+    '''
+    pass
