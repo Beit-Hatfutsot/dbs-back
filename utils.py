@@ -72,4 +72,4 @@ def upload_file(file_obj, bucket, creds, object_md):
     Upload the file object to a bucket using credentials and object metadata.
     Object name is a part of its metadata.
     '''
-    pass
+    return True
