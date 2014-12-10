@@ -8,12 +8,13 @@ from flask.ext.mongoengine import MongoEngine, ValidationError
 from flask.ext.security import Security, MongoEngineUserDatastore, \
     UserMixin, RoleMixin, login_required
 from flask.ext.security.utils import encrypt_password, verify_password
-
 from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
 from  flask.ext.jwt import current_user
 
-from utils import get_conf, get_logger
+from werkzeug import secure_filename
+
+from utils import get_conf, get_logger, gen_missing_keys_error, upload_file
 
 
 
@@ -297,14 +298,15 @@ def manage_user(user_id=None):
             abort(403)
 
     if user_id:
-        # access_mode = 'admin'
+        # admin access_mode
         if is_admin(current_user):
             return user_handler(user_id, request.method, request.data)
         else:
-            logger.debug('Non-admin user %s tried to access user id %s' % (current_user.email, user_id))
+            logger.debug('Non-admin user %s tried to access user id %s' % (
+                                                current_user.email, user_id))
             abort(403)
     else:
-        # access_mode = 'user'
+        # user access_mode
         user_id = str(current_user.id)
         return user_handler(user_id, request.method, request.data)
 
@@ -340,7 +342,37 @@ def save_user_content():
     The server stores the metadata in a ugc collection and uploads the file
     to a bucket.
     '''
-    pass
+    if not request.files:
+        abort(400, 'No files present!')
+
+    must_have_keys = set(['title',
+                        'description',
+                        'location',
+                        'date',
+                        'creator_name',
+                        'people_present'])
+
+    form = request.form
+    keys = form.keys()
+    missing_keys = list(must_have_keys.difference(set(keys)))
+    if missing_keys != []:
+        e_message = gen_missing_keys_error(missing_keys)
+        abort(400, e_message)
+
+    user_oid = current_user.id
+    file_obj = request.files['file']
+    filename = secure_filename(file_obj.filename)
+    metadata = dict(form)
+    metadata['user_id'] = str(user_oid)
+    metadata['filename'] = filename
+
+    bucket = 'test_bucket'
+    creds = ('foo', 'bar')
+    saved = upload_file(file_obj, bucket, creds, metadata)
+    if saved:
+        return humanify({'md': metadata})
+    else:
+        abort(500, 'Failed to save %s' % filename)
 
 if __name__ == '__main__':
     logger.debug('Starting api')
