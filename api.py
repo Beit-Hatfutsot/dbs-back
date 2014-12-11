@@ -18,7 +18,7 @@ import pymongo
 
 from utils import get_conf, get_logger, gen_missing_keys_error, upload_file, \
     get_oid
-
+import phonetic
 
 
 # Create app
@@ -234,7 +234,6 @@ def create_user(user_dict):
 
     return _clean_user(created)
 
-
 def update_user(user_id, user_dict):
     user_obj = _get_user_or_error(user_id)
     if 'email' in user_dict.keys():
@@ -245,6 +244,8 @@ def update_user(user_id, user_dict):
 
     user_obj.save()
     return _clean_user(user_obj)
+
+######################################################################################
 
 def get_mjs(user_oid):
     mjs = Mjs.objects(id=user_oid).first()
@@ -282,13 +283,39 @@ def _fetch_item(item_id):
     collection, _id = item_id.split('.')[:2]
     oid = get_oid(_id)
     if not oid:
-        return None
+        return {}
 
     item = data_db[collection].find_one(oid)
-    # Make the object id Json serialazible
-    item['_id'] = str(item['_id'])
-    item['UpdateDate'] = str(item['UpdateDate'])
-    return item
+    return _make_serializable(item)
+
+def _make_serializable(obj):
+    # Make problematic fields Json serializable
+    if obj.has_key('_id'):
+        obj['_id'] = str(obj['_id'])
+    if obj.has_key('UpdateDate'):
+        obj['UpdateDate'] = str(obj['UpdateDate'])
+    return obj
+
+def search_by_header(string, collection):
+    if phonetic.is_hebrew(string):
+        lang = 'He'
+    else:
+        lang = 'En'
+    item = data_db[collection].find_one({'Header.%s' % lang: string.upper()})
+    if item:
+        return _make_serializable(item)
+    else:
+        return {}
+
+def get_completion(collection,string):
+    pass
+
+def get_contains(collection,string):
+    pass
+
+def get_phonetic(collection,string):
+    pass
+
 
 # Views
 @app.route('/')
@@ -404,17 +431,37 @@ def save_user_content():
         abort(500, 'Failed to save %s' % filename)
 
 @app.route('/search')
-def regular_search():
+def general_search():
     pass
 
-@app.route('/suggest/<string>')
-def get_suggestions(string):
+@app.route('/wsearch')
+def wizard_search():
+    args = request.args
+    must_have_keys = set(['place', 'name'])
+    keys = args.keys()
+    missing_keys = list(must_have_keys.difference(set(keys)))
+    if missing_keys != []:
+        e_message = gen_missing_keys_error(missing_keys)
+        abort(400, e_message)
+
+    place_doc = search_by_header(args['place'], 'places')
+    name_doc = search_by_header(args['name'], 'familyNames')
+    return humanify({'place': place_doc, 'name': name_doc})
+
+
+
+@app.route('/suggest/<collection>/<string>')
+def get_suggestions(collection,string):
     '''
     This view returns a Json with 3 fields:
     "complete", "contains", "phonetic".
     Each field holds a list of up to 5 strings.
     '''
-    pass
+    rv = {}
+    rv['complete'] = get_completion(collection,string)
+    rv['contains'] = get_contains(collection,string)
+    rv['complete'] = get_phonetic(collection,string)
+    return rv
 
 
 @app.route('/item/<item_id>')
