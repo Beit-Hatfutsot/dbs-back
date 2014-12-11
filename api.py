@@ -14,7 +14,10 @@ from  flask.ext.jwt import current_user
 
 from werkzeug import secure_filename
 
-from utils import get_conf, get_logger, gen_missing_keys_error, upload_file
+import pymongo
+
+from utils import get_conf, get_logger, gen_missing_keys_error, upload_file, \
+    get_oid
 
 
 
@@ -66,6 +69,7 @@ def load_user(payload):
 
 # Create database connection object
 db = MongoEngine(app)
+data_db = pymongo.Connection()['bhp6']
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
@@ -135,9 +139,12 @@ def custom_500(error):
 # Utility functions
 def humanify(obj):
     'Adds newline to Json responses to make CLI debugging easier'
-    resp = jsonify(obj)
-    resp.set_data(resp.data+'\n')
-    return resp
+    if type(obj) == list:
+        return json.dumps(obj, indent=2) + '\n'
+    else:
+        resp = jsonify(obj)
+        resp.set_data(resp.data+'\n')
+        return resp
 
 def is_admin(flask_user_obj):
     if flask_user_obj.has_role('admin'):
@@ -259,6 +266,29 @@ def update_mjs(user_oid, data):
         logger.debug(e.message) 
         abort(500, e.message)
 
+def fetch_items(item_list):
+    if len(item_list) == 1:
+        return _fetch_item(item_list[0])
+    else:
+        rv = []
+        for item in item_list:
+            if item: # Drop empty items
+                rv.append( _fetch_item(item))
+        return rv
+
+def _fetch_item(item_id):
+    if not '.' in item_id: # Need colection.id to unpack
+        return None
+    collection, _id = item_id.split('.')[:2]
+    oid = get_oid(_id)
+    if not oid:
+        return None
+
+    item = data_db[collection].find_one(oid)
+    # Make the object id Json serialazible
+    item['_id'] = str(item['_id'])
+    item['UpdateDate'] = str(item['UpdateDate'])
+    return item
 
 # Views
 @app.route('/')
@@ -314,7 +344,7 @@ def manage_user(user_id=None):
 @jwt_required()
 def manage_jewish_story():
     '''Logged in user may GET or PUT their mjs metadata (a list).
-    Each metadata member is a tuple of (id, collection_name).
+    Each metadata member is a string in form of "collection_name.id".
     A PUT request must include ALL the metadata, not just a new object!
     The data is saved as an object in the mjs collection while its _id
     equals to this of the updating user.
@@ -332,7 +362,6 @@ def manage_jewish_story():
             logger.debug(e_message)
             abort(400, e_message)
         return update_mjs(user_oid, data)
-
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()
@@ -373,6 +402,36 @@ def save_user_content():
         return humanify({'md': metadata})
     else:
         abort(500, 'Failed to save %s' % filename)
+
+@app.route('/search')
+def regular_search():
+    pass
+
+@app.route('/suggest/<string>')
+def get_suggestions(string):
+    '''
+    This view returns a Json with 3 fields:
+    "complete", "contains", "phonetic".
+    Each field holds a list of up to 5 strings.
+    '''
+    pass
+
+
+@app.route('/item/<item_id>')
+def get_items(item_id):
+    '''
+    This view returns either Json representing an item or a list of such Jsons.
+    The expected item_id string is in form of "collection_name.item_id"
+    and could be  split by commas - if there is only one id, the view will return
+    a single Json. 
+    Only the first 10 ids will be returned for the list view to prevent abuse.
+    '''
+    items_list = item_id.split(',')
+    items = fetch_items(items_list[:10])
+    if items:
+        return humanify(items)
+    else:
+        abort(404, 'Nothing found ;(')
 
 if __name__ == '__main__':
     logger.debug('Starting api')

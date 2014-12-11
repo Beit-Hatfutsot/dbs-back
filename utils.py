@@ -9,7 +9,10 @@ class Struct:
         self.__dict__.update(entries)
 
 def get_oid(id_str):
-    return bson.objectid.ObjectId(id_str)
+    try:
+        return bson.objectid.ObjectId(id_str)
+    except bson.errors.InvalidId:
+        return None
 
 def get_conf(config_file='/etc/bhs/config.yml'):
     '''Read the configuration file and return config dict.
