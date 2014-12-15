@@ -13,6 +13,8 @@ import unicodedata
 
 def is_hebrew(string):
     'A hacky way to check if our string is in Hebrew - check the 1rst char'
+    if not string: # Support empty strings
+        return False
     # Make sure the string is UTF-8
     if type(string) != unicode:
         string = string.decode('utf-8')

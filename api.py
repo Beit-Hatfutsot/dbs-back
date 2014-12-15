@@ -297,6 +297,8 @@ def _make_serializable(obj):
     return obj
 
 def search_by_header(string, collection):
+    if not string: # Support empty strings
+        return {}
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
@@ -482,4 +484,4 @@ def get_items(item_id):
 
 if __name__ == '__main__':
     logger.debug('Starting api')
-    app.run()
+    app.run('0.0.0.0')
