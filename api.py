@@ -19,13 +19,13 @@ import pymongo
 from utils import get_conf, get_logger, gen_missing_keys_error, upload_file, \
     get_oid
 import phonetic
-
+import pdb
 
 # Create app
 app = Flask(__name__)
 
 # Get configuration from file
-conf = get_conf()
+conf = get_conf('conf/bhs_config.yaml')
 
 # Set app config
 app.config['DEBUG'] = True
@@ -286,7 +286,28 @@ def _fetch_item(item_id):
         return {}
 
     item = data_db[collection].find_one(oid)
+    
+    # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
+    item['related'] = _get_related(item)
+
     return _make_serializable(item)
+
+def _get_related(doc):
+    """
+    THIS IS A HACK TO MOCK REAL RELATED DATA
+    """
+    related = []
+    count = 0
+    for collection_name in data_db.collection_names():
+        cursor = data_db[collection_name].find({'$or': [{'UnitText1.En': {'$regex': doc['Header']['En']}}, {'UnitText1.He': {'$regex': doc['Header']['He']}}]})
+        for related_item in cursor:
+            related_item = _make_serializable(related_item)
+            if not _make_serializable(doc)['_id'] == related_item['_id'] and not count > 5:
+                related_string = collection_name + '.' + related_item['_id']
+                related.append(related_string)
+                count += 1
+    
+    return related
 
 def _make_serializable(obj):
     # Make problematic fields Json serializable
