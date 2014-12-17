@@ -257,7 +257,7 @@ def get_mjs(user_oid):
         return dictify(mjs)
     else:
         logger.debug('Mjs not found for user {}'.format(str(user_oid)))
-        return {'mjs':{}}
+        return {'mjs':{'assigned': [], 'unassigned': []}}
 
 def update_mjs(user_oid, data):
     new_mjs = Mjs(id=user_oid, mjs = data)
