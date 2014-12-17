@@ -83,7 +83,7 @@ class User(db.Document, UserMixin):
     roles = db.ListField(db.ReferenceField(Role))
 
 class Mjs(db.Document):
-    mjs = db.ListField()
+    mjs = db.DictField()
 
 # Ensure we have a user to test with
 @app.before_first_request
@@ -179,9 +179,13 @@ def user_handler(user_id, method, data):
         return humanify(get_user(user_id))
 
     elif method == 'POST':
+        if not data:
+            abort(400, 'No data provided')
         return humanify(create_user(data))
 
     elif method == 'PUT':
+        if not data:
+            abort(400, 'No data provided')
         return humanify(update_user(user_id, data))
 
     elif method == 'DELETE':
@@ -196,7 +200,7 @@ def _get_user_or_error(user_id):
 
 def _clean_user(user_obj):
     user_dict = dictify(user_obj)
-    allowed_fields = ['_id', 'email']
+    allowed_fields = ['email']
     masked_user_dict = mask_dict(user_dict, allowed_fields)
     return masked_user_dict
 
@@ -250,18 +254,16 @@ def update_user(user_id, user_dict):
 def get_mjs(user_oid):
     mjs = Mjs.objects(id=user_oid).first()
     if mjs:
-        mjs_dict = dictify(mjs)
-        return humanify(mjs_dict)
+        return dictify(mjs)
     else:
         logger.debug('Mjs not found for user {}'.format(str(user_oid)))
-        return humanify({'mjs':[]})
+        return {'mjs':{}}
 
 def update_mjs(user_oid, data):
     new_mjs = Mjs(id=user_oid, mjs = data)
     try:
         new_mjs.save()
-        print dir(new_mjs)
-        return humanify(dictify(new_mjs))
+        return dictify(new_mjs)
     except ValidationError as e:
         logger.debug('Error occured while saving mjs data for user {}'.format(str(user_oid)))
         logger.debug(e.message) 
@@ -370,7 +372,7 @@ def manage_user(user_id=None):
         verify_jwt()
     except JWTError as e:
         # You can create a new user while not being logged in
-        # Will have to defend this endpoint with rate limiting or similar
+        # Will have to defend this endpoint with rate limiting or similar means
         if request.method == 'POST':
             return user_handler(None, request.method, request.data)
         else:
@@ -388,30 +390,52 @@ def manage_user(user_id=None):
     else:
         # user access_mode
         user_id = str(current_user.id)
+        # Deny POSTing to logged in non-admin users to avoid confusion with PUT
+        if request.method == 'POST':
+            abort(400, 'POST method is not supported for logged in users.')
         return user_handler(user_id, request.method, request.data)
 
 @app.route('/mjs', methods=['GET', 'PUT'])
 @jwt_required()
 def manage_jewish_story():
-    '''Logged in user may GET or PUT their mjs metadata (a list).
+    '''Logged in user may GET or PUT their mjs metadata - a dict
+    with the following structure:
+    {
+      'assigned': [
+        {'name': 'branch_name_1', 'items': []},
+        {'name': 'branch_name_2', 'items': []}, etc...
+      ],
+      'unassigned': []
+    }
     Each metadata member is a string in form of "collection_name.id".
-    A PUT request must include ALL the metadata, not just a new object!
+    A PUT request must include ALL the metadata, not just the new object!
     The data is saved as an object in the mjs collection while its _id
     equals to this of the updating user.
     '''
     user_oid = current_user.id
     if request.method == 'GET':
         mjs = get_mjs(user_oid)
-        return mjs
+        return humanify(mjs['mjs'])
 
     elif request.method == 'PUT':
         try:
             data = json.loads(request.data)
+            # Enforce mjs structure:
+            if not type(data) == dict:
+                abort(400, 'Expecting an object')
+            must_have_keys = set(['assigned', 'unassigned'])
+            keys = data.keys()
+            missing_keys = list(must_have_keys.difference(set(keys)))
+            if missing_keys != []:
+                e_message = gen_missing_keys_error(missing_keys)
+                abort(400, e_message)
+
         except ValueError:
             e_message = 'Could not decode JSON from data'
             logger.debug(e_message)
             abort(400, e_message)
-        return update_mjs(user_oid, data)
+
+        return humanify(update_mjs(user_oid, data)['mjs'])
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()
