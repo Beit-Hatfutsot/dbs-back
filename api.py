@@ -281,14 +281,17 @@ def fetch_items(item_list):
 
 def _fetch_item(item_id):
     if not '.' in item_id: # Need colection.id to unpack
-        return None
+        return {}
     collection, _id = item_id.split('.')[:2]
     oid = get_oid(_id)
     if not oid:
         return {}
 
     item = data_db[collection].find_one(oid)
-    return _make_serializable(item)
+    if item:
+        return _make_serializable(item)
+    else:
+        return {}
 
 def _make_serializable(obj):
     # Make problematic fields Json serializable
