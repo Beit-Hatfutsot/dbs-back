@@ -315,13 +315,15 @@ def search_by_header(string, collection):
         return {}
 
 def get_completion(collection,string):
-    pass
+    return []
 
 def get_contains(collection,string):
-    pass
+    return []
 
-def get_phonetic(collection,string):
-    pass
+def get_phonetic(collection, string, limit=5):
+    collection = data_db[collection]
+    retval = phonetic.get_similar_strings(string, collection)
+    return retval[:limit]
 
 
 # Views
@@ -487,10 +489,10 @@ def get_suggestions(collection,string):
     Each field holds a list of up to 5 strings.
     '''
     rv = {}
-    rv['complete'] = get_completion(collection,string)
-    rv['contains'] = get_contains(collection,string)
-    rv['complete'] = get_phonetic(collection,string)
-    return rv
+    rv['complete'] = get_completion(collection, string)
+    rv['contains'] = get_contains(collection, string)
+    rv['phonetic'] = get_phonetic(collection, string)
+    return humanify(rv)
 
 
 @app.route('/item/<item_id>')
