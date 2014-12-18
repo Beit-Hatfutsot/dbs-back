@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 import json
+import re
 
 from flask import Flask, jsonify, request, abort
 from flask.ext.mongoengine import MongoEngine, ValidationError
@@ -314,11 +315,32 @@ def search_by_header(string, collection):
     else:
         return {}
 
-def get_completion(collection,string):
-    return []
+def get_completion(collection, string, search_prefix=True, max_res=5):
+    '''Search in the headers of bhp6 compatible db documents.
+    If `search_prefix` flag is set, search only in the beginning of headers,
+    otherwise search everywhere in the header.
+    Return only `max_res` results.
+    '''
+    collection = data_db[collection]
+    if phonetic.is_hebrew(string):
+        lang = 'He'
+    else:
+        lang = 'En'
 
-def get_contains(collection,string):
-    return []
+    if search_prefix:
+        regex = re.compile('^%s' % string, re.IGNORECASE)
+    else:
+        regex = re.compile(string, re.IGNORECASE)
+
+    found = []
+    header = 'Header.{}'.format(lang)
+    cursor = collection.find({header: regex}, {'_id': 0, header: 1}).limit(max_res)
+    for doc in cursor:
+        header_content = doc['Header'][lang]
+        if header_content:
+            found.append(header_content.lower())
+
+    return found
 
 def get_phonetic(collection, string, limit=5):
     collection = data_db[collection]
@@ -485,12 +507,12 @@ def wizard_search():
 def get_suggestions(collection,string):
     '''
     This view returns a Json with 3 fields:
-    "complete", "contains", "phonetic".
+    "complete", "starts_with", "phonetic".
     Each field holds a list of up to 5 strings.
     '''
     rv = {}
-    rv['complete'] = get_completion(collection, string)
-    rv['contains'] = get_contains(collection, string)
+    rv['starts_with'] = get_completion(collection, string)
+    rv['contains'] = get_completion(collection, string, False)
     rv['phonetic'] = get_phonetic(collection, string)
     return humanify(rv)
 
@@ -512,5 +534,4 @@ def get_items(item_id):
         abort(404, 'Nothing found ;(')
 
 if __name__ == '__main__':
-    logger.debug('Starting api')
     app.run('0.0.0.0')
