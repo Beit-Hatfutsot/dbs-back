@@ -84,15 +84,33 @@ def update_dm(collection_obj):
         collection_obj.find_and_modify(query={'_id': oid}, update=name_doc)
         #print name_doc
 
+def get_exact_phonetic_matches(string, collection_obj):
+    'Matches the UnitHeaderDMSoundex field of bhp6 comaptible db'
+    bhp_dms = get_bhp_soundex(string)
+    found = []
+    cursor = collection_obj.find({"UnitHeaderDMSoundex": bhp_dms})
+    for doc in cursor:
+        found.append(doc)
+
+    return found
+
 def get_similar_strings(string, collection_obj):
     'Searches in the UnitHeaderDMSoundex field of bhp6 comaptible db'
+    if is_hebrew(string):
+        lang = 'He'
+        # Get rid of whitespaces inside Hebrew strings
+        string = string.replace(' ', '')
+    else:
+        lang = 'En'
     dms = get_dms(string)
     found = []
     for dms_value in dms.split(' '):
         regex = re.compile(dms_value)
-        cursor = collection_obj.find({"UnitHeaderDMSoundex": regex})
+        cursor = collection_obj.find({"UnitHeaderDMSoundex": regex}, {'_id': 0, 'Header.%s' % lang: 1})
         for doc in cursor:
-            found.append(doc)
+            header = doc['Header'][lang]
+            if header:
+                found.append(header.lower())
 
     return found
 
@@ -252,6 +270,7 @@ def parse_args():
     parser.add_argument('search')
     parser.add_argument('-c', '--collection', default='familyNames')
     parser.add_argument('-b', '--database', default='bhp6')
+    parser.add_argument('-e', '--exact', action='store_true')
 
     return parser.parse_args()
 
@@ -260,11 +279,15 @@ if __name__ == '__main__':
     args = parse_args()
     db = pymongo.Connection()[args.database]
     collection = db[args.collection]
-    retval = get_similar_strings(args.search, collection)
+    if args.exact:
+        retval = get_exact_phonetic_matches(args.search, collection)
+    else:
+        retval = get_similar_strings(args.search, collection)
     if not retval:
         print 'Nothing found for {}'.format(args.search)
     else:
         for doc in retval:
-            print doc['Header']
+            #print doc['Header']
+            print doc
 
     
