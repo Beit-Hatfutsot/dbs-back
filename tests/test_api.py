@@ -14,7 +14,7 @@ def get_auth_header(client):
     '''Asks the api for a JWT token and returns auth header.
     Uses the client fixture'''
 
-    res = client.post('/auth', data = '{"username": "dannybmail@gmail.com", "password": "password"}')
+    res = client.post('/auth', data = '{"username": "tester@example.com", "password": "password"}')
     token = res.json['token']
     auth_header_tuple = ('Authorization', 'Bearer ' + token)
     print 'Got jwt token ' + token
@@ -33,7 +33,7 @@ def test_api_private_view(client, get_auth_header):
     assert res.json == {'access': 'private'}
 
 def test_api_jwt_auth(client):
-    res = client.post('/auth', data = '{"username": "dannybmail@gmail.com", "password": "password"}')
+    res = client.post('/auth', data = '{"username": "tester@example.com", "password": "password"}')
     assert res.json.has_key('token')
 
 #==================================================================================================================================#

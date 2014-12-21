@@ -26,7 +26,7 @@ def is_hebrew(string):
 
 def get_hebrew_dms(string):
     'Run Javascript code extracted from http://www.stevemorse.org/hebrew/dmheb.html'
-    script = 'gen_hebrew_dm_soundex.js'
+    script = './gen_hebrew_dm_soundex.js'
     try:
         output = subprocess.check_output([script, string])
     except(subprocess.CalledProcessError) as e:
