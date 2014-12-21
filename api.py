@@ -363,6 +363,8 @@ def search_by_header(string, collection):
         lang = 'En'
     item = data_db[collection].find_one({'Header.%s' % lang: string.upper()})
 
+    # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
+    item['related'] = _get_related(item)
     # HACK TO GET THUMBNAIL
     item['thumbnail'] = _get_thumbnail(item)
     
