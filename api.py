@@ -3,6 +3,7 @@
 from datetime import timedelta
 import json
 import re
+import urllib
 
 from flask import Flask, jsonify, request, abort
 from flask.ext.mongoengine import MongoEngine, ValidationError
@@ -291,8 +292,12 @@ def _fetch_item(item_id):
     item = data_db[collection].find_one(oid)
 
     if item:
+        
         # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
         item['related'] = _get_related(item)
+        # HACK TO GET THUMBNAIL
+        item['thumbnail'] = _get_thumbnail(item)
+        
         return _make_serializable(item)
     else:
         return {}
@@ -314,6 +319,33 @@ def _get_related(doc):
     
     return related
 
+def _get_picture(picture_id):
+    found = data_db['photos'].find_one({'PictureId': picture_id})
+    return found
+
+def _get_thumbnail(doc):
+    thumbnail = ''
+    path = ''
+    if 'Pictures' in doc.keys():
+        for pic in doc['Pictures']:
+            if pic['IsPreview'] == '1':
+                picture = _get_picture(pic['PictureId'])
+                thumbnail = picture['bin']
+                if 'PictureFileName' in picture.keys():
+                    path = picture['PicturePath']
+    elif 'RelatedPictures' in doc.keys():
+        for pic in doc['RelatedPictures']:
+            if ['IsPreview', 'PictureId'] in pic.keys() and pic['IsPreview'] == '1':
+                picture = _get_picture(pic['PictureId'])
+                thumbnail = picture['bin']
+                if 'PictureFileName' in picture.keys():
+                    path = picture['PicturePath']
+    
+    return {
+        'data': urllib.quote(thumbnail.encode('base-64')), 
+        'path': urllib.quote(path.replace('\\', '/'))
+    }
+
 def _make_serializable(obj):
     # Make problematic fields Json serializable
     if obj.has_key('_id'):
@@ -330,6 +362,10 @@ def search_by_header(string, collection):
     else:
         lang = 'En'
     item = data_db[collection].find_one({'Header.%s' % lang: string.upper()})
+
+    # HACK TO GET THUMBNAIL
+    item['thumbnail'] = _get_thumbnail(item)
+    
     if item:
         return _make_serializable(item)
     else:
