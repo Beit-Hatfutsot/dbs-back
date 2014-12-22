@@ -347,6 +347,9 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
+def fsearch():
+    return {}
+
 
 # Views
 @app.route('/')
@@ -532,6 +535,22 @@ def get_items(item_id):
         return humanify(items)
     else:
         abort(404, 'Nothing found ;(')
+
+@app.route('/fsearch')
+def ftree_search():
+    '''
+    This view searches in gedcom formatted family tree files using
+    genTreeIndividuals collection for the files index.
+    The search supports numerous fields and unexact values for search terms.
+    '''
+    args = request.args
+    if not 'last_name' in args.keys():
+        abort(400, 'You must provide at least a last name')
+    for key, value in args.items():
+        print key + ': ' + value
+    results = fsearch()
+    return humanify(results)
+
 
 if __name__ == '__main__':
     app.run('0.0.0.0')
