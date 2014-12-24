@@ -347,9 +347,85 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-def fsearch():
-    return {}
+def fsearch(**kwargs):
+    '''
+    Search in the genTreeIindividuals table or try to fetch a gedcom file.
+    Names and places could be matched exactly, by the prefix match
+    or phonetically:
+    first_name=yeh,prefix will match "yehuda" and "yehoshua", while
+    first_name=yeh,phonetic will match "yayeh" and "ben jau".
+    Years could be specified with a fudge factor - 1907~2 will match
+    1905, 1906, 1907, 1908 and 1909.
+    If `tree_number` kwarg is present, try to fetch the corresponding file
+    directly (return the link to it or error 404).
+    '''
+    args_to_index = {'first_name': 'IndividualFirstName',
+                     'last_name': 'IndividualLastName',
+                     'maiden_name': 'IndividualBirthLastName',
+                     'sex': 'Gender',
+                     'birth_place': 'BirthPlace',
+                     'marriage_place': 'MarrigePlace',
+                     'death_place': 'DeathPlace',
+                     'death_date': 'DeathDate'}
 
+    extra_args =    ['tree_number',
+                     'birth_year',
+                     'marriage_year',
+                     'death_year']
+
+    allowed_args = set(args_to_index.keys() + extra_args)
+    search_dict = {}
+    for key, value in kwargs.items():
+        search_dict[key] = value[0]
+
+    keys = search_dict.keys()
+    bad_args = set(keys).difference(allowed_args)
+    if bad_args:
+        abort(400, 'Unsupported args in request: {}'.format(', '.join(list(bad_args))))
+    if 'tree_number' in keys:
+        return _fetch_tree(search_dict['tree_number'])
+
+    collection = data_db['genTreeIndividuals'] 
+    # Build gentree search query
+    names = {}
+    places = {}
+    years = {}
+    for k in keys:
+        if '_name' in k:
+            names[k] = search_dict[k]
+        elif '_place' in k:
+            places[k] = search_dict[k]
+        elif '_year' in k:
+            years[k] = search_dict[k]
+
+    for name_query in names:
+        split_name = names[name_query].split(',')
+        q_str = split_name[0]
+        if len(split_name) > 1:
+            if split_name[1] == 'prefix':
+                q = re.compile('^{}'.format(q_str), re.IGNORECASE)
+            elif split_name[1] == 'phonetic':
+                #q = phonetic.
+                pass
+            # Drop wrong instructions - don't treat the part after comma
+            else:
+                q = re.compile(q_str, re.IGNORECASE)
+        else:
+            q = re.compile(q_str, re.IGNORECASE)
+
+    print names, places, years
+
+    search_query = {}
+    projection = {'_id': 0, 'IndividualId': 1, 'GenTreeId': 1}
+
+    return collection.find_one(search_query, projection)
+
+def _fetch_tree(tree_number):
+    print tree_number, type(tree_number)
+    if int(tree_number)%2 == 0:
+        return {'tree_file': 'http://my.trees.com/{}'.format(tree_number)}
+    else:
+        abort(404, 'Tree {} not found'.format(tree_number))
 
 # Views
 @app.route('/')
@@ -539,16 +615,14 @@ def get_items(item_id):
 @app.route('/fsearch')
 def ftree_search():
     '''
-    This view searches in gedcom formatted family tree files using
+    This view searches for gedcom formatted family tree files using
     genTreeIndividuals collection for the files index.
     The search supports numerous fields and unexact values for search terms.
     '''
     args = request.args
     if not 'last_name' in args.keys():
-        abort(400, 'You must provide at least a last name')
-    for key, value in args.items():
-        print key + ': ' + value
-    results = fsearch()
+        abort(400, "Required 'last_name' field is missing")
+    results = fsearch(**args)
     return humanify(results)
 
 
