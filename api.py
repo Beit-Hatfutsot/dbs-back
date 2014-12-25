@@ -358,6 +358,8 @@ def fsearch(**kwargs):
     1905, 1906, 1907, 1908 and 1909.
     If `tree_number` kwarg is present, try to fetch the corresponding file
     directly (return the link to it or error 404).
+    ATTENTION!
+    We don't use year data for the lack of datetime index on date fields...
     '''
     args_to_index = {'first_name': 'IndividualFirstName',
                      'last_name': 'IndividualLastName',
@@ -373,6 +375,8 @@ def fsearch(**kwargs):
                      'marriage_year',
                      'death_year']
 
+    phonetic_field_suffix = 'DMSoundex'
+
     allowed_args = set(args_to_index.keys() + extra_args)
     search_dict = {}
     for key, value in kwargs.items():
@@ -386,39 +390,87 @@ def fsearch(**kwargs):
         return _fetch_tree(search_dict['tree_number'])
 
     collection = data_db['genTreeIndividuals'] 
+
     # Build gentree search query
-    names = {}
-    places = {}
+
+    # Split all the arguments to those with name or place and those with year
+    names_places = {}
     years = {}
     for k in keys:
-        if '_name' in k:
-            names[k] = search_dict[k]
-        elif '_place' in k:
-            places[k] = search_dict[k]
+        if '_name' in k or '_place' in k:
+            names_places[k] = search_dict[k]
         elif '_year' in k:
             years[k] = search_dict[k]
 
-    for name_query in names:
-        split_name = names[name_query].split(',')
-        q_str = split_name[0]
-        if len(split_name) > 1:
-            if split_name[1] == 'prefix':
-                q = re.compile('^{}'.format(q_str), re.IGNORECASE)
-            elif split_name[1] == 'phonetic':
-                #q = phonetic.
-                pass
+    # Build a dict of all the names_places queries
+    for search_arg in names_places:
+        split_arg = names_places[search_arg].split(',')
+        search_str = split_arg[0]
+        if len(split_arg) > 1:
+            if search_arg == 'first_name':
+                # No modifications are supported for first names  
+                q = re.compile(search_str, re.IGNORECASE)
+                qf = {args_to_index[search_arg]: q}
+            elif split_arg[1] == 'prefix':
+                # Search for the exact string without regard to case
+                q = re.compile('^{}'.format(search_str), re.IGNORECASE)
+                qf = {args_to_index[search_arg]: q}
+            elif split_arg[1] == 'phonetic':
+                q = phonetic.get_bhp_soundex(search_str)
+                field_name = args_to_index[search_arg] + phonetic_field_suffix
+                qf = {field_name: q}
             # Drop wrong instructions - don't treat the part after comma
             else:
-                q = re.compile(q_str, re.IGNORECASE)
+                q = re.compile(search_str, re.IGNORECASE)
+                qf = {args_to_index[search_arg]: q}
         else:
-            q = re.compile(q_str, re.IGNORECASE)
+            # There is a simple string search        
+            q = re.compile(search_str, re.IGNORECASE)
+            qf = {args_to_index[search_arg]: q}
 
-    print names, places, years
+        names_places[search_arg] = qf
 
+    # Build a dict of all the year queries
+    for search_arg in years:
+        if '~' in years[search_arg]:
+            split_arg = years[search_arg].split('~')
+            try:
+                year = int(split_arg[0])
+                fudge_factor = int(split_arg[1])
+            except ValueError:
+                abort(400, 'Year and fudge factor must be integers')
+            q = {'$gt': year - fudge_factor, '$lt': year + fudge_factor}       
+            years[search_arg] = q
+        else:
+            try:
+                year = int(years[search_arg])
+                years[search_arg] = year
+            except ValueError:
+                abort(400, 'Year must be an integer')
+            years[search_arg] = year
+            
+
+    print names_places, years
+    # ATTENTION!
+    # We don't use year data for the lack of datetime index on date fields...
     search_query = {}
-    projection = {'_id': 0, 'IndividualId': 1, 'GenTreeId': 1}
+    #print names_places.values()
+    for item in names_places.values():
+        for k in item:
+            search_query[k] = item[k]
+    print search_query
 
-    return collection.find_one(search_query, projection)
+    projection = {'_id': 0,
+                  'IndividualId': 1,
+                  'GenTreeId': 1,
+                  'IndividualLastName': 1,
+                  'IndividualFirstName': 1}
+
+    results = collection.find(search_query, projection)
+    if results.count() > 0:
+        return results[0]
+    else:
+        return {}
 
 def _fetch_tree(tree_number):
     print tree_number, type(tree_number)
