@@ -310,12 +310,13 @@ def _get_related(doc):
     count = 0
     for collection_name in data_db.collection_names():
         cursor = data_db[collection_name].find({'$or': [{'UnitText1.En': {'$regex': doc['Header']['En']}}, {'UnitText1.He': {'$regex': doc['Header']['He']}}]})
-        for related_item in cursor:
-            related_item = _make_serializable(related_item)
-            if not _make_serializable(doc)['_id'] == related_item['_id'] and not count > 5:
-                related_string = collection_name + '.' + related_item['_id']
-                related.append(related_string)
-                count += 1
+        if cursor:
+            for related_item in cursor:
+                related_item = _make_serializable(related_item)
+                if not _make_serializable(doc)['_id'] == related_item['_id'] and not count > 5:
+                    related_string = collection_name + '.' + related_item['_id']
+                    related.append(related_string)
+                    count += 1
     
     return related
 
@@ -362,13 +363,14 @@ def search_by_header(string, collection):
     else:
         lang = 'En'
     item = data_db[collection].find_one({'Header.%s' % lang: string.upper()})
-
-    # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
-    item['related'] = _get_related(item)
-    # HACK TO GET THUMBNAIL
-    item['thumbnail'] = _get_thumbnail(item)
     
     if item:
+
+        # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
+        item['related'] = _get_related(item)
+        # HACK TO GET THUMBNAIL
+        item['thumbnail'] = _get_thumbnail(item)
+        
         return _make_serializable(item)
     else:
         return {}
