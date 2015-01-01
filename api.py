@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 import json
+from bson import json_util
 import re
 
 from flask import Flask, jsonify, request, abort
@@ -142,6 +143,11 @@ def humanify(obj):
     'Adds newline to Json responses to make CLI debugging easier'
     if type(obj) == list:
         return json.dumps(obj, indent=2) + '\n'
+    if type(obj) == pymongo.cursor.Cursor:
+        rv = []
+        for doc in obj:
+            rv.append(json.dumps(doc, default=json_util.default, indent=2))
+        return '[' + ',\n'.join(rv) + ']'
     else:
         resp = jsonify(obj)
         resp.set_data(resp.data+'\n')
@@ -255,7 +261,7 @@ def update_user(user_id, user_dict):
 def get_mjs(user_oid):
     mjs = Mjs.objects(id=user_oid).first()
     if mjs:
-        return dictify(mjs)
+        return mjs
     else:
         logger.debug('Mjs not found for user {}'.format(str(user_oid)))
         return {'mjs':{}}
@@ -264,7 +270,7 @@ def update_mjs(user_oid, data):
     new_mjs = Mjs(id=user_oid, mjs = data)
     try:
         new_mjs.save()
-        return dictify(new_mjs)
+        return new_mjs
     except ValidationError as e:
         logger.debug('Error occured while saving mjs data for user {}'.format(str(user_oid)))
         logger.debug(e.message) 
@@ -295,6 +301,7 @@ def _fetch_item(item_id):
         return {}
 
 def _make_serializable(obj):
+    # ToDo: Replace with json.dumps with default setting and check
     # Make problematic fields Json serializable
     if obj.has_key('_id'):
         obj['_id'] = str(obj['_id'])
@@ -359,22 +366,19 @@ def fsearch(**kwargs):
     If `tree_number` kwarg is present, try to fetch the corresponding file
     directly (return the link to it or error 404).
     ATTENTION!
-    We don't use year data for the lack of datetime index on date fields...
     '''
-    args_to_index = {'first_name': 'FN',
-                     'last_name': 'LN',
-                     'maiden_name': 'IBLN',
+    args_to_index = {'first_name': 'FN_lc',
+                     'last_name': 'LN_lc',
+                     'maiden_name': 'IBLN_lc',
                      'sex': 'G',
-                     'birth_place': 'BP',
-                     'marriage_place': 'MP',
-                     'death_place': 'DP'}
+                     'birth_place': 'BP_lc',
+                     'marriage_place': 'MP_lc',
+                     'death_place': 'DP_lc'}
 
     extra_args =    ['tree_number',
                      'birth_year',
                      'marriage_year',
                      'death_year']
-
-    phonetic_field_suffix = 'S'
 
     allowed_args = set(args_to_index.keys() + extra_args)
     search_dict = {}
@@ -395,37 +399,45 @@ def fsearch(**kwargs):
     # Split all the arguments to those with name or place and those with year
     names_and_places = {}
     years = {}
+    sex_query = None
     for k in keys:
         if '_name' in k or '_place' in k:
-            names_and_places[k] = search_dict[k]
+            # The search is case insensitive
+            names_and_places[k] = search_dict[k].lower()
         elif '_year' in k:
             years[k] = search_dict[k]
+        elif k == 'sex':
+            if search_dict[k].lower() in ['m', 'f']:
+                sex_query = search_dict[k].upper()
+            else:
+                abort(400, "Sex must be on of 'm', 'f'")
+                
 
     # Build a dict of all the names_and_places queries
     for search_arg in names_and_places:
+        field_name = args_to_index[search_arg]
         split_arg = names_and_places[search_arg].split(',')
         search_str = split_arg[0]
+        if search_arg == 'first_name':
+            # No modifications are supported for first names  
+            qf = {field_name: search_str}
+            names_and_places[search_arg] = qf
+            continue
         if len(split_arg) > 1:
-            if search_arg == 'first_name':
-                # No modifications are supported for first names  
-                q = re.compile(search_str, re.IGNORECASE)
-                qf = {args_to_index[search_arg]: q}
-            elif split_arg[1] == 'prefix':
-                q = re.compile('^{}'.format(search_str), re.IGNORECASE)
-                qf = {args_to_index[search_arg]: q}
+            if split_arg[1] == 'prefix':
+                q = re.compile('^{}'.format(search_str))
+                qf = {field_name: q}
             elif split_arg[1] == 'phonetic':
                 q = phonetic.get_bhp_soundex(search_str)
-                field_name = args_to_index[search_arg] + phonetic_field_suffix
+                case_sensitive_fn = field_name.split('_lc')[0]
+                field_name = case_sensitive_fn + 'S'
                 qf = {field_name: q}
             # Drop wrong instructions - don't treat the part after comma
             else:
-                q = re.compile(search_str, re.IGNORECASE)
-                qf = {args_to_index[search_arg]: q}
+                qf = {field_name: search_str}
         else:
             # There is a simple string search        
-            # Search for the exact string without regard to case
-            q = re.compile(search_str, re.IGNORECASE)
-            qf = {args_to_index[search_arg]: q}
+            qf = {field_name: search_str}
 
         names_and_places[search_arg] = qf
 
@@ -442,8 +454,7 @@ def fsearch(**kwargs):
                 fudge_factor = int(split_arg[1])
             except ValueError:
                 abort(400, 'Year and fudge factor must be integers')
-            q = {'$gt': year - fudge_factor, '$lt': year + fudge_factor}
-            q = {'$gt': year - fudge_factor, '$lt': year + fudge_factor}       
+            q = _generate_year_range(year, fudge_factor)
             years[search_arg] = q
         else:
             try:
@@ -454,17 +465,30 @@ def fsearch(**kwargs):
             q = _generate_year_range(year)
             years[search_arg] = q
             
+    year_ranges = {'birth_year': ['BSD', 'BED'],
+                   'death_year': ['DSD', 'DED'],
+                   'marriage_year': ['MSD', 'MED']}
 
-    #print names_and_places, years
-    print years
-    # ATTENTION!
-    # We don't use year data for the lack of datetime index on date fields...
     search_query = {}
-    #print names_and_places.values()
+
+    # ToDo: investigate why adding sex qwarg drops matches to 0 and uncomment
+    '''
+    if sex_query:
+        search_query['Gender'] = sex_query
+    '''
     for item in names_and_places.values():
         for k in item:
             search_query[k] = item[k]
+
+    for item in years:
+        start, end = year_ranges[item] 
+        search_query[start] = years[item]['min']
+        search_query[end] = years[item]['max']
+
     print search_query
+    # ToDo: investigate why adding year fudge factor drops matches to 0
+    # ToDo: Add support for marriage array
+
 
     projection = {'_id': 0,
                   'II': 1,   # Individual ID
@@ -480,11 +504,13 @@ def fsearch(**kwargs):
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1}   # Marriage places as comma separated string
 
+    projection = None
+
     results = collection.find(search_query, projection)
-    #print results.explain()
+    #print json.dumps(results.explain(), default=json_util.default, indent=2)
     if results.count() > 0:
         print results.count()
-        return results[0]
+        return results
     else:
         return {}
 
@@ -496,9 +522,9 @@ def _fetch_tree(tree_number):
         abort(404, 'Tree {} not found'.format(tree_number))
 
 def _generate_year_range(year, fudge_factor=0):
-    lt = int(str(year + fudge_factor) + '9999')
-    gt = int(str(year - fudge_factor) + '0000')
-    return {'$gt': gt, '$lt': lt}
+    maximum = int(str(year + fudge_factor) + '9999')
+    minimum = int(str(year - fudge_factor) + '0000')
+    return {'min': minimum, 'max': maximum}
 
 
 # Views
