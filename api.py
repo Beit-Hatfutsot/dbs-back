@@ -359,13 +359,12 @@ def fsearch(**kwargs):
     Search in the genTreeIindividuals table or try to fetch a gedcom file.
     Names and places could be matched exactly, by the prefix match
     or phonetically:
-    The query "first_name=yeh,prefix" will match "yehuda" and "yehoshua", while
-    the query "first_name=yeh,phonetic" will match "yayeh" and "ben jau".
+    The query "first_name=yeh;prefix" will match "yehuda" and "yehoshua", while
+    the query "first_name=yeh;phonetic" will match "yayeh" and "ben jau".
     Years could be specified with a fudge factor - 1907~2 will match
     1905, 1906, 1907, 1908 and 1909.
     If `tree_number` kwarg is present, try to fetch the corresponding file
     directly (return the link to it or error 404).
-    ATTENTION!
     '''
     args_to_index = {'first_name': 'FN_lc',
                      'last_name': 'LN_lc',
@@ -416,7 +415,7 @@ def fsearch(**kwargs):
     # Build a dict of all the names_and_places queries
     for search_arg in names_and_places:
         field_name = args_to_index[search_arg]
-        split_arg = names_and_places[search_arg].split(',')
+        split_arg = names_and_places[search_arg].split(';')
         search_str = split_arg[0]
         if search_arg == 'first_name':
             # No modifications are supported for first names  
@@ -482,7 +481,7 @@ def fsearch(**kwargs):
         search_query[start] = {'$gt': years[item]['min']}
         search_query[end] = {'$lt': years[item]['max']}
 
-    print search_query
+    logger.debug('Search query:\n{}'.format(search_query))
     # ToDo: Add support for marriage array
 
     projection = {'_id': 0,
@@ -500,13 +499,13 @@ def fsearch(**kwargs):
                   'MP': 1}   # Marriage places as comma separated string
 
     #ToDo: Enable projection after finishing WIP
-    projection = None
+    #projection = None
 
     results = collection.find(search_query, projection)
     # Pretty print cursor.explain for index debugging
     #print json.dumps(results.explain(), default=json_util.default, indent=2)
     if results.count() > 0:
-        print results.count()
+        logger.debug('Found {} results'.format(results.count()))
         return results
     else:
         return {}
@@ -717,8 +716,10 @@ def ftree_search():
     The search supports numerous fields and unexact values for search terms.
     '''
     args = request.args
-    if not 'last_name' in args.keys():
-        abort(400, "Required 'last_name' field is missing")
+    keys = args.keys()
+    if not ('last_name' in keys or 'birth_place' in keys):
+        em = "At least one of 'last_name' or 'birth_place' fields is required"
+        abort(400, em)
     results = fsearch(**args)
     return humanify(results)
 
