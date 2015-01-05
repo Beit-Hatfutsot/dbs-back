@@ -471,7 +471,6 @@ def fsearch(**kwargs):
 
     search_query = {}
 
-    # ToDo: investigate why adding sex qwarg drops matches to 0 and uncomment
     if sex_query:
         search_query['G'] = sex_query
     for item in names_and_places.values():
@@ -480,13 +479,11 @@ def fsearch(**kwargs):
 
     for item in years:
         start, end = year_ranges[item] 
-        search_query[start] = years[item]['min']
-        search_query[end] = years[item]['max']
+        search_query[start] = {'$gt': years[item]['min']}
+        search_query[end] = {'$lt': years[item]['max']}
 
     print search_query
-    # ToDo: investigate why adding year fudge factor drops matches to 0
     # ToDo: Add support for marriage array
-
 
     projection = {'_id': 0,
                   'II': 1,   # Individual ID
@@ -502,9 +499,11 @@ def fsearch(**kwargs):
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1}   # Marriage places as comma separated string
 
+    #ToDo: Enable projection after finishing WIP
     projection = None
 
     results = collection.find(search_query, projection)
+    # Pretty print cursor.explain for index debugging
     #print json.dumps(results.explain(), default=json_util.default, indent=2)
     if results.count() > 0:
         print results.count()
