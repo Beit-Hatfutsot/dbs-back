@@ -365,7 +365,9 @@ def fsearch(**kwargs):
     1905, 1906, 1907, 1908 and 1909.
     If `tree_number` kwarg is present, try to fetch the corresponding file
     directly (return the link to it or error 404).
+    Return up to `max_results`
     '''
+    max_results = 5000
     args_to_index = {'first_name': 'FN_lc',
                      'last_name': 'LN_lc',
                      'maiden_name': 'IBLN_lc',
@@ -501,7 +503,7 @@ def fsearch(**kwargs):
     #ToDo: Enable projection after finishing WIP
     #projection = None
 
-    results = collection.find(search_query, projection)
+    results = collection.find(search_query, projection).limit(max_results)
     # Pretty print cursor.explain for index debugging
     #print json.dumps(results.explain(), default=json_util.default, indent=2)
     if results.count() > 0:
