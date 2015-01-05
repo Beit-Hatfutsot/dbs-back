@@ -472,10 +472,8 @@ def fsearch(**kwargs):
     search_query = {}
 
     # ToDo: investigate why adding sex qwarg drops matches to 0 and uncomment
-    '''
     if sex_query:
-        search_query['Gender'] = sex_query
-    '''
+        search_query['G'] = sex_query
     for item in names_and_places.values():
         for k in item:
             search_query[k] = item[k]
