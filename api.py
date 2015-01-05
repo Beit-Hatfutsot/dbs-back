@@ -391,7 +391,11 @@ def fsearch(**kwargs):
     if bad_args:
         abort(400, 'Unsupported args in request: {}'.format(', '.join(list(bad_args))))
     if 'tree_number' in keys:
-        return _fetch_tree(search_dict['tree_number'])
+        try:
+            tree_number = int(search_dict['tree_number'])
+            return fetch_tree(tree_number)
+        except ValueError:
+            abort(400, 'Tree number must be an integer')
 
     collection = data_db['genTreeIndividuals'] 
 
@@ -501,7 +505,7 @@ def fsearch(**kwargs):
                   'MP': 1}   # Marriage places as comma separated string
 
     #ToDo: Enable projection after finishing WIP
-    #projection = None
+    projection = None
 
     results = collection.find(search_query, projection).limit(max_results)
     # Pretty print cursor.explain for index debugging
@@ -512,10 +516,14 @@ def fsearch(**kwargs):
     else:
         return {}
 
-def _fetch_tree(tree_number):
-    print tree_number, type(tree_number)
-    if int(tree_number)%2 == 0:
-        return {'tree_file': 'http://my.trees.com/{}'.format(tree_number)}
+def fetch_tree(tree_number):
+    gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees/'
+    collection = data_db['genTreeIndividuals']
+    tree = collection.find_one({'ID': tree_number})
+    if tree:
+        tree_path = tree['GenTreePath']
+        tree_fn = tree_path.split('/')[-1]
+        return {'tree_file': '{}/{}'.format(gtrees_bucket_url, tree_fn)}
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
 
