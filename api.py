@@ -366,6 +366,7 @@ def fsearch(**kwargs):
     If `tree_number` kwarg is present, try to fetch the corresponding file
     directly (return the link to it or error 404).
     Return up to `max_results`
+    ToDo: ensure there is index on LN_lc and BP_ls
     '''
     max_results = 5000
     args_to_index = {'first_name': 'FN_lc',
@@ -517,6 +518,7 @@ def fsearch(**kwargs):
         return {}
 
 def fetch_tree(tree_number):
+    # ToDo: ensure there is index on ID
     gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees/'
     collection = data_db['genTreeIndividuals']
     tree = collection.find_one({'ID': tree_number})
