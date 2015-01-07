@@ -143,11 +143,11 @@ def humanify(obj):
     'Adds newline to Json responses to make CLI debugging easier'
     if type(obj) == list:
         return json.dumps(obj, indent=2) + '\n'
-    if type(obj) == pymongo.cursor.Cursor:
+    elif type(obj) == pymongo.cursor.Cursor:
         rv = []
         for doc in obj:
             rv.append(json.dumps(doc, default=json_util.default, indent=2))
-        return '[' + ',\n'.join(rv) + ']'
+        return '[' + ',\n'.join(rv) + ']' + '\n'
     else:
         resp = jsonify(obj)
         resp.set_data(resp.data+'\n')
@@ -378,7 +378,8 @@ def fsearch(max_results=5000,**kwargs):
     extra_args =    ['tree_number',
                      'birth_year',
                      'marriage_year',
-                     'death_year']
+                     'death_year',
+                     'debug']
 
     allowed_args = set(args_to_index.keys() + extra_args)
     search_dict = {}
@@ -508,8 +509,8 @@ def fsearch(max_results=5000,**kwargs):
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1}   # Marriage places as comma separated string
 
-    #ToDo: Enable projection after finishing WIP
-    projection = None
+    if 'debug' in search_dict.keys():
+        projection = None
 
     results = collection.find(search_query, projection).limit(max_results)
     # Pretty print cursor.explain for index debugging
