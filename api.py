@@ -488,8 +488,8 @@ def fsearch(max_results=5000,**kwargs):
 
     for item in years:
         start, end = year_ranges[item] 
-        search_query[start] = {'$gt': years[item]['min']}
-        search_query[end] = {'$lt': years[item]['max']}
+        search_query[start] = {'$gte': years[item]['min']}
+        search_query[end] = {'$lte': years[item]['max']}
 
     logger.debug('Search query:\n{}'.format(search_query))
     # ToDo: Add support for marriage array
