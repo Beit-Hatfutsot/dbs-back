@@ -498,8 +498,7 @@ def fsearch(max_results=5000,**kwargs):
 
     logger.debug('Search query:\n{}'.format(search_query))
 
-    projection = {'_id': 0,
-                  'II': 1,   # Individual ID
+    projection = {'II': 1,   # Individual ID
                   'GT': 1,   # GenTree ID
                   'LN': 1,   # Last name
                   'FN': 1,   # First Name
