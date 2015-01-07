@@ -442,7 +442,7 @@ def fsearch(max_results=5000,**kwargs):
                 case_sensitive_fn = field_name.split('_lc')[0]
                 field_name = case_sensitive_fn + 'S'
                 qf = {field_name: q}
-            # Drop wrong instructions - don't treat the part after comma
+            # Drop wrong instructions - don't treat the part after semicolon
             else:
                 qf = {field_name: search_str}
         else:
@@ -452,10 +452,6 @@ def fsearch(max_results=5000,**kwargs):
         names_and_places[search_arg] = qf
 
     # Build a dict of all the year queries
-    date_ranges = {'birth_year': ['BSD', 'BED'],
-                   'death_year': ['DSD', 'DED'],
-                   'marriage_year': ['MSD', 'MED']}
-
     for search_arg in years:
         if '~' in years[search_arg]:
             split_arg = years[search_arg].split('~')
@@ -464,36 +460,37 @@ def fsearch(max_results=5000,**kwargs):
                 fudge_factor = int(split_arg[1])
             except ValueError:
                 abort(400, 'Year and fudge factor must be integers')
-            q = _generate_year_range(year, fudge_factor)
-            years[search_arg] = q
+            years[search_arg] = _generate_year_range(year, fudge_factor)
         else:
             try:
                 year = int(years[search_arg])
                 years[search_arg] = year
             except ValueError:
                 abort(400, 'Year must be an integer')
-            q = _generate_year_range(year)
-            years[search_arg] = q
+            years[search_arg] = _generate_year_range(year)
             
     year_ranges = {'birth_year': ['BSD', 'BED'],
-                   'death_year': ['DSD', 'DED'],
-                   'marriage_year': ['MSD', 'MED']}
+                   'death_year': ['DSD', 'DED']}
 
     search_query = {}
 
-    if sex_query:
-        search_query['G'] = sex_query
-    for item in names_and_places.values():
-        for k in item:
-            search_query[k] = item[k]
-
     for item in years:
+        if item == 'marriage_year':
+            # Look in the MSD array
+            search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}} 
+            continue
         start, end = year_ranges[item] 
         search_query[start] = {'$gte': years[item]['min']}
         search_query[end] = {'$lte': years[item]['max']}
 
+    if sex_query:
+        search_query['G'] = sex_query
+
+    for item in names_and_places.values():
+        for k in item:
+            search_query[k] = item[k]
+
     logger.debug('Search query:\n{}'.format(search_query))
-    # ToDo: Add support for marriage array
 
     projection = {'_id': 0,
                   'II': 1,   # Individual ID
