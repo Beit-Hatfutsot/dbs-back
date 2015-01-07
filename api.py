@@ -363,8 +363,7 @@ def fsearch(max_results=5000,**kwargs):
     the query "first_name=yeh;phonetic" will match "yayeh" and "ben jau".
     Years could be specified with a fudge factor - 1907~2 will match
     1905, 1906, 1907, 1908 and 1909.
-    If `tree_number` kwarg is present, try to fetch the corresponding file
-    directly (return the link to it or error 404).
+    If `tree_number` kwarg is present, return only the results from this tree. 
     Return up to `max_results`
     '''
     args_to_index = {'first_name': 'FN_lc',
@@ -393,11 +392,14 @@ def fsearch(max_results=5000,**kwargs):
     if 'tree_number' in keys:
         try:
             tree_number = int(search_dict['tree_number'])
-            return fetch_tree(tree_number)
         except ValueError:
             abort(400, 'Tree number must be an integer')
+    else:
+        tree_number = None
 
     collection = data_db['genTreeIndividuals'] 
+
+    # Ensure there are indices for all the needed fields
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
     needed_indices = ['LN_lc', 'BP_lc', 'ID']
     for index_key in needed_indices:
@@ -405,11 +407,11 @@ def fsearch(max_results=5000,**kwargs):
              logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
              collection.ensure_index(index_key)
     
-    # Build gentree search query
-    # Split all the arguments to those with name or place and those with year
+    # Sort all the arguments to those with name or place and those with year
     names_and_places = {}
     years = {}
     sex_query = None
+
     for k in keys:
         if '_name' in k or '_place' in k:
             # The search is case insensitive
@@ -472,6 +474,7 @@ def fsearch(max_results=5000,**kwargs):
     year_ranges = {'birth_year': ['BSD', 'BED'],
                    'death_year': ['DSD', 'DED']}
 
+    # Build gentree search query from all the subqueries
     search_query = {}
 
     for item in years:
@@ -482,6 +485,9 @@ def fsearch(max_results=5000,**kwargs):
         start, end = year_ranges[item] 
         search_query[start] = {'$gte': years[item]['min']}
         search_query[end] = {'$lte': years[item]['max']}
+
+    if tree_number:
+        search_query['ID'] = tree_number
 
     if sex_query:
         search_query['G'] = sex_query
@@ -517,17 +523,6 @@ def fsearch(max_results=5000,**kwargs):
         return results
     else:
         return {}
-
-def fetch_tree(tree_number):
-    gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees'
-    collection = data_db['genTreeIndividuals']
-    tree = collection.find_one({'ID': tree_number})
-    if tree:
-        tree_path = tree['GenTreePath']
-        tree_fn = tree_path.split('/')[-1]
-        return {'tree_file': '{}/{}'.format(gtrees_bucket_url, tree_fn)}
-    else:
-        abort(404, 'Tree {} not found'.format(tree_number))
 
 def _generate_year_range(year, fudge_factor=0):
     maximum = int(str(year + fudge_factor) + '9999')
@@ -734,6 +729,23 @@ def ftree_search():
         abort(400, em)
     results = fsearch(**args)
     return humanify(results)
+
+@app.route('/get_ftree_url/<tree_number>')
+def fetch_tree(tree_number):
+    try:
+        tree_number = int(tree_number)
+    except ValueError:
+        abort(400, 'Tree number must be an integer')
+    gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees'
+    collection = data_db['genTreeIndividuals']
+    tree = collection.find_one({'ID': tree_number})
+    if tree:
+        tree_path = tree['GenTreePath']
+        tree_fn = tree_path.split('/')[-1]
+        rv = {'tree_file': '{}/{}'.format(gtrees_bucket_url, tree_fn)}
+        return humanify(rv)
+    else:
+        abort(404, 'Tree {} not found'.format(tree_number))
 
 
 if __name__ == '__main__':
