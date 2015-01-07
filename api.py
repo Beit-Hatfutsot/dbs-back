@@ -308,21 +308,23 @@ def _fetch_item(item_id):
     else:
         return {}
 
-def _get_related(doc):
+def _get_related(doc, max_items=5):
     """
     THIS IS A HACK TO MOCK REAL RELATED DATA
     """
     related = []
-    count = 0
-    for collection_name in data_db.collection_names():
-        cursor = data_db[collection_name].find({'$or': [{'UnitText1.En': {'$regex': doc['Header']['En']}}, {'UnitText1.He': {'$regex': doc['Header']['He']}}]})
+    collections = ['familyNames',
+                   'places',
+                   'photoUnits']
+
+    for collection_name in collections:
+        cursor = data_db[collection_name].find({'$or': [{'UnitText1.En': {'$regex': doc['Header']['En']}}, {'UnitText1.He': {'$regex': doc['Header']['He']}}]}).limit(max_items)
         if cursor:
             for related_item in cursor:
                 related_item = _make_serializable(related_item)
-                if not _make_serializable(doc)['_id'] == related_item['_id'] and not count > 5:
+                if not _make_serializable(doc)['_id'] == related_item['_id']:
                     related_string = collection_name + '.' + related_item['_id']
                     related.append(related_string)
-                    count += 1
     
     return related
 
@@ -337,6 +339,8 @@ def _get_thumbnail(doc):
         for pic in doc['Pictures']:
             if pic['IsPreview'] == '1':
                 picture = _get_picture(pic['PictureId'])
+                if not picture.has_key('bin'):
+                    return {}
                 thumbnail = picture['bin']
                 if 'PictureFileName' in picture.keys():
                     path = picture['PicturePath']
@@ -344,6 +348,8 @@ def _get_thumbnail(doc):
         for pic in doc['RelatedPictures']:
             if ['IsPreview', 'PictureId'] in pic.keys() and pic['IsPreview'] == '1':
                 picture = _get_picture(pic['PictureId'])
+                if not picture.has_key('bin'):
+                    return {}
                 thumbnail = picture['bin']
                 if 'PictureFileName' in picture.keys():
                     path = picture['PicturePath']
