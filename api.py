@@ -354,7 +354,7 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-def fsearch(**kwargs):
+def fsearch(max_results=5000,**kwargs):
     '''
     Search in the genTreeIindividuals table or try to fetch a gedcom file.
     Names and places could be matched exactly, by the prefix match
@@ -366,9 +366,7 @@ def fsearch(**kwargs):
     If `tree_number` kwarg is present, try to fetch the corresponding file
     directly (return the link to it or error 404).
     Return up to `max_results`
-    ToDo: ensure there is index on LN_lc and BP_ls
     '''
-    max_results = 5000
     args_to_index = {'first_name': 'FN_lc',
                      'last_name': 'LN_lc',
                      'maiden_name': 'IBLN_lc',
@@ -399,9 +397,14 @@ def fsearch(**kwargs):
             abort(400, 'Tree number must be an integer')
 
     collection = data_db['genTreeIndividuals'] 
-
+    index_keys = [v['key'][0][0] for v in collection.index_information().values()]
+    needed_indices = ['LN_lc', 'BP_lc', 'ID']
+    for index_key in needed_indices:
+        if index_key not in index_keys:
+             logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
+             collection.ensure_index(index_key)
+    
     # Build gentree search query
-
     # Split all the arguments to those with name or place and those with year
     names_and_places = {}
     years = {}
@@ -518,8 +521,7 @@ def fsearch(**kwargs):
         return {}
 
 def fetch_tree(tree_number):
-    # ToDo: ensure there is index on ID
-    gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees/'
+    gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees'
     collection = data_db['genTreeIndividuals']
     tree = collection.find_one({'ID': tree_number})
     if tree:
