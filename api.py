@@ -27,6 +27,9 @@ import pdb
 # Create app
 app = Flask(__name__)
 
+# Specify the bucket name for user generated content
+ugc_bucket = 'bhs-ugc'
+
 # Get configuration from file
 conf = get_conf()
 
@@ -699,6 +702,7 @@ def save_user_content():
     The server stores the metadata in a ugc collection and uploads the file
     to a bucket.
     '''
+    ugc_collection = data_db['ugc']
     if not request.files:
         abort(400, 'No files present!')
 
@@ -721,11 +725,12 @@ def save_user_content():
     filename = secure_filename(file_obj.filename)
     metadata = dict(form)
     metadata['user_id'] = str(user_oid)
-    metadata['filename'] = filename
+    metadata['original_filename'] = filename
+    file_oid = ugc_collection.insert(metadata)
+    metadata['obj_name'] = str(file_oid)
 
-    bucket = 'test_bucket'
-    creds = ('foo', 'bar')
-    saved = upload_file(file_obj, bucket, creds, metadata)
+    bucket = ugc_bucket
+    saved = upload_file(file_obj, bucket, metadata)
     if saved:
         return humanify({'md': metadata})
     else:

@@ -22,3 +22,4 @@ wsgiref==0.1.2
 pyaml==14.05.2
 pytest==2.6.4
 pytest-flask==0.4.0
+gcs-oauth2-boto-plugin==1.8

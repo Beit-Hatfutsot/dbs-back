@@ -3,9 +3,14 @@ import json
 import datetime
 
 import yaml
+import boto
+import gcs_oauth2_boto_plugin
 import bson
 from bson.objectid import ObjectId
 from werkzeug import Response
+
+# Set default GCE project id
+project_id = 'bh-org-01'
 
 class MongoJsonEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -90,9 +95,13 @@ def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger.addHandler(ch)
     return logger
 
-def upload_file(file_obj, bucket, creds, object_md):
+def upload_file(file_obj, bucket, object_md):
     '''
     Upload the file object to a bucket using credentials and object metadata.
     Object name is a part of its metadata.
     '''
-    return True
+    fn = object_md['obj_name']
+    dest_uri = boto.storage_uri(bucket + '/' + fn, 'gs')
+    dest_uri.new_key().set_contents_from_file(file_obj)
+
+    return dest_uri
