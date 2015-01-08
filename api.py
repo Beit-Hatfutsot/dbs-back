@@ -72,7 +72,7 @@ def load_user(payload):
 
 # Create database connection object
 db = MongoEngine(app)
-data_db = pymongo.Connection(db.connection.HOST)['bhp6']
+data_db = pymongo.Connection(db.connection.host)['bhp6']
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
