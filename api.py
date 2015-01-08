@@ -752,9 +752,7 @@ def wizard_search():
     # fsearch() expects a dictionary of lists and returns Mongo cursor
     ftree_args = {'last_name': [name], 'birth_place': [place]}
     # We turn the cursor to list in order to serialize it
-    family_trees = fsearch(**ftree_args)
-    if family_trees:
-        family_trees = list(family_trees)
+    family_trees = list(fsearch(**ftree_args))
     rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
     return humanify(rv)
 
