@@ -6,7 +6,7 @@ from bson import json_util
 import re
 import urllib
 
-from flask import Flask, jsonify, request, abort
+from flask import Flask, request, abort
 from flask.ext.mongoengine import MongoEngine, ValidationError
 from flask.ext.security import Security, MongoEngineUserDatastore, \
     UserMixin, RoleMixin, login_required
@@ -20,7 +20,7 @@ from werkzeug import secure_filename
 import pymongo
 
 from utils import get_conf, get_logger, gen_missing_keys_error, upload_file, \
-    get_oid
+    get_oid, jsonify
 import phonetic
 import pdb
 
@@ -142,11 +142,14 @@ def custom_500(error):
 # Utility functions
 def humanify(obj):
     'Adds newline to Json responses to make CLI debugging easier'
+    # jsonify function doesn't work with lists
     if type(obj) == list:
-        return json.dumps(obj, indent=2) + '\n'
+        return json.dumps(obj, default=json_util.default, indent=2) + '\n'
     elif type(obj) == pymongo.cursor.Cursor:
         rv = []
         for doc in obj:
+            doc['_id'] = str(doc['_id'])
+            print doc['_id']
             rv.append(json.dumps(doc, default=json_util.default, indent=2))
         return '[' + ',\n'.join(rv) + ']' + '\n'
     else:
@@ -581,8 +584,6 @@ def fsearch(max_results=5000,**kwargs):
         projection = None
 
     results = collection.find(search_query, projection).limit(max_results)
-    # Pretty print cursor.explain for index debugging
-    #print json.dumps(results.explain(), default=json_util.default, indent=2)
     if results.count() > 0:
         logger.debug('Found {} results'.format(results.count()))
         return results
@@ -743,12 +744,17 @@ def wizard_search():
     if missing_keys != []:
         e_message = gen_missing_keys_error(missing_keys)
         abort(400, e_message)
-
-    place_doc = search_by_header(args['place'], 'places')
-    name_doc = search_by_header(args['name'], 'familyNames')
-    return humanify({'place': place_doc, 'name': name_doc})
-
-
+    
+    place = args['place']
+    name = args['name']
+    place_doc = search_by_header(place, 'places')
+    name_doc = search_by_header(name, 'familyNames')
+    # fsearch() expects a dictionary of lists and returns Mongo cursor
+    ftree_args = {'last_name': [name], 'birth_place': [place]}
+    # We turn the cursor to list in order to serialize it
+    family_trees = list(fsearch(**ftree_args))
+    rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
+    return humanify(rv)
 
 @app.route('/suggest/<collection>/<string>')
 def get_suggestions(collection,string):
