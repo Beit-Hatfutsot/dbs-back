@@ -5,6 +5,7 @@ import json
 from bson import json_util
 import re
 import urllib
+import mimetypes
 
 from flask import Flask, request, abort
 from flask.ext.mongoengine import MongoEngine, ValidationError
@@ -728,6 +729,7 @@ def save_user_content():
     metadata['original_filename'] = filename
     file_oid = ugc_collection.insert(metadata)
     metadata['obj_name'] = str(file_oid)
+    metadata['Content-Type'] = mimetypes.guess_type(filename)[0]
 
     bucket = ugc_bucket
     saved = upload_file(file_obj, bucket, metadata)
