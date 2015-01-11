@@ -103,5 +103,7 @@ def upload_file(file_obj, bucket, object_md):
     fn = object_md['obj_name']
     dest_uri = boto.storage_uri(bucket + '/' + fn, 'gs')
     dest_uri.new_key().set_contents_from_file(file_obj)
+    new_key = dest_uri.get_key()
+    new_key.update_metadata(object_md)
 
     return dest_uri
