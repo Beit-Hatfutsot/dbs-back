@@ -702,6 +702,7 @@ def save_user_content():
     file and metadata.
     The server stores the metadata in a ugc collection and uploads the file
     to a bucket.
+    Only the first file and set of metadata is recorded.
     '''
     ugc_collection = data_db['ugc']
     if not request.files:
@@ -722,19 +723,27 @@ def save_user_content():
         abort(400, e_message)
 
     user_oid = current_user.id
+
     file_obj = request.files['file']
     filename = secure_filename(file_obj.filename)
     metadata = dict(form)
     metadata['user_id'] = str(user_oid)
     metadata['original_filename'] = filename
-    file_oid = ugc_collection.insert(metadata)
-    metadata['obj_name'] = str(file_oid)
     metadata['Content-Type'] = mimetypes.guess_type(filename)[0]
+    
+    # Pick the first item for all the list fields in the metadata
+    clean_md = {}
+    for key in metadata:
+        if type(metadata[key]) == list:
+            clean_md[key] = metadata[key][0]
+        else:
+            clean_md[key] = metadata[key]
+    file_oid = ugc_collection.insert(clean_md)
 
     bucket = ugc_bucket
-    saved = upload_file(file_obj, bucket, metadata)
+    saved = upload_file(file_obj, bucket, clean_md)
     if saved:
-        return humanify({'md': metadata})
+        return humanify({'md': clean_md})
     else:
         abort(500, 'Failed to save %s' % filename)
 

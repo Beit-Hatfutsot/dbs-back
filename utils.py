@@ -100,10 +100,10 @@ def upload_file(file_obj, bucket, object_md):
     Upload the file object to a bucket using credentials and object metadata.
     Object name is a part of its metadata.
     '''
-    fn = object_md['obj_name']
+    fn = str(object_md['_id'])
     dest_uri = boto.storage_uri(bucket + '/' + fn, 'gs')
-    dest_uri.new_key().set_contents_from_file(file_obj)
-    new_key = dest_uri.get_key()
+    new_key = dest_uri.new_key()
     new_key.update_metadata(object_md)
+    new_key.set_contents_from_file(file_obj)
 
     return dest_uri
