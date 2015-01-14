@@ -32,7 +32,7 @@ app = Flask(__name__)
 ugc_bucket = 'bhs-ugc'
 
 # Get configuration from file
-conf = get_conf()
+conf = get_conf('conf/bhs_config.yaml')
 
 # Set app config
 app.config['DEBUG'] = True
@@ -344,7 +344,7 @@ def _get_thumbnail(doc):
     path = ''
     if 'Pictures' in doc.keys():
         for pic in doc['Pictures']:
-            if pic['IsPreview'] == '1':
+            if 'IsPreview' in pic.keys() and 'PictureId' in pic.keys() and pic['IsPreview'] == '1':
                 picture = _get_picture(pic['PictureId'])
                 if not picture.has_key('bin'):
                     return {}
@@ -353,7 +353,7 @@ def _get_thumbnail(doc):
                     path = picture['PicturePath']
     elif 'RelatedPictures' in doc.keys():
         for pic in doc['RelatedPictures']:
-            if ['IsPreview', 'PictureId'] in pic.keys() and pic['IsPreview'] == '1':
+            if 'IsPreview' in pic.keys() and 'PictureId' in pic.keys() and pic['IsPreview'] == '1':
                 picture = _get_picture(pic['PictureId'])
                 if not picture.has_key('bin'):
                     return {}
