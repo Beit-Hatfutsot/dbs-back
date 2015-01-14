@@ -32,7 +32,7 @@ app = Flask(__name__)
 ugc_bucket = 'bhs-ugc'
 
 # Get configuration from file
-conf = get_conf('conf/bhs_config.yaml')
+conf = get_conf()
 
 # Set app config
 app.config['DEBUG'] = True
