@@ -153,7 +153,6 @@ def humanify(obj):
         rv = []
         for doc in obj:
             doc['_id'] = str(doc['_id'])
-            print doc['_id']
             rv.append(json.dumps(doc, default=json_util.default, indent=2))
         return '[' + ',\n'.join(rv) + ']' + '\n'
     else:
@@ -269,7 +268,7 @@ def update_user(user_id, user_dict):
 def get_mjs(user_oid):
     mjs = Mjs.objects(id=user_oid).first()
     if mjs:
-        return mjs
+        return dictify(mjs)
     else:
         logger.debug('Mjs not found for user {}'.format(str(user_oid)))
         return {'mjs':{}}
@@ -283,6 +282,10 @@ def update_mjs(user_oid, data):
         logger.debug('Error occured while saving mjs data for user {}'.format(str(user_oid)))
         logger.debug(e.message) 
         abort(500, e.message)
+
+def _init_mjs():
+    return {'assigned': [],
+            'unassigned': []}
 
 def fetch_items(item_list):
     if len(item_list) == 1:
@@ -743,6 +746,11 @@ def save_user_content():
     bucket = ugc_bucket
     saved = upload_file(file_obj, bucket, clean_md)
     if saved:
+        mjs = get_mjs(user_oid)['mjs']
+        if mjs == {}:
+            mjs = _init_mjs()
+        mjs['unassigned'].append('ugc.{}'.format(str(file_oid)))
+        update_mjs(user_oid, mjs)
         return humanify({'md': clean_md})
     else:
         abort(500, 'Failed to save %s' % filename)
