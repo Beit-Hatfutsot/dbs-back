@@ -474,7 +474,7 @@ def fsearch(max_results=5000,**kwargs):
 
     # Ensure there are indices for all the needed fields
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
-    needed_indices = ['LN_lc', 'BP_lc', 'ID']
+    needed_indices = ['LN_lc', 'BP_lc', 'GT']
     for index_key in needed_indices:
         if index_key not in index_keys:
              logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
@@ -560,7 +560,7 @@ def fsearch(max_results=5000,**kwargs):
         search_query[end] = {'$lte': years[item]['max']}
 
     if tree_number:
-        search_query['ID'] = tree_number
+        search_query['GT'] = tree_number
 
     if sex_query:
         search_query['G'] = sex_query
@@ -825,7 +825,7 @@ def fetch_tree(tree_number):
         abort(400, 'Tree number must be an integer')
     gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees'
     collection = data_db['genTreeIndividuals']
-    tree = collection.find_one({'ID': tree_number})
+    tree = collection.find_one({'GT': tree_number})
     if tree:
         tree_path = tree['GenTreePath']
         tree_fn = tree_path.split('/')[-1]
