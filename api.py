@@ -153,7 +153,6 @@ def humanify(obj):
         rv = []
         for doc in obj:
             doc['_id'] = str(doc['_id'])
-            print doc['_id']
             rv.append(json.dumps(doc, default=json_util.default, indent=2))
         return '[' + ',\n'.join(rv) + ']' + '\n'
     else:
@@ -457,6 +456,8 @@ def fsearch(max_results=5000,**kwargs):
     search_dict = {}
     for key, value in kwargs.items():
         search_dict[key] = value[0]
+        if not value[0]:
+            abort(400, "{} argument couldn't be empty".format(key))
 
     keys = search_dict.keys()
     bad_args = set(keys).difference(allowed_args)
@@ -760,6 +761,10 @@ def wizard_search():
     if missing_keys != []:
         e_message = gen_missing_keys_error(missing_keys)
         abort(400, e_message)
+
+    for key in must_have_keys:
+        if not args[key]:
+            abort(400, "{} argument couldn't be empty".format(key))
     
     place = args['place']
     name = args['name']
