@@ -131,4 +131,4 @@ def upload_to_soundcloud(sc_client, fn):
          'sharing': 'private',
          'asset_data': open(fn, 'rb')
          })
-    return track['id']
+    return track.obj
