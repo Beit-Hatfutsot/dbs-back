@@ -109,6 +109,17 @@ def upload_file(file_obj, bucket, object_md):
 
     return dest_uri
 
+def get_yaml_conf(fn):
+    fh = open(fn)
+    conf = yaml.load(fh)
+    fh.close()
+    return conf
+
+def get_sc_client(fn):
+    conf = get_yaml_conf(fn)
+    client = soundcloud.Client(**scc)
+    return client
+
 def upload_to_soundcloud(sc_client, fn):
     '''
     Upload the file from fn path to soundcloud using a client object.
