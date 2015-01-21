@@ -6,6 +6,7 @@ import yaml
 import boto
 import gcs_oauth2_boto_plugin
 import bson
+import soundcloud
 from bson.objectid import ObjectId
 from werkzeug import Response
 
@@ -107,3 +108,16 @@ def upload_file(file_obj, bucket, object_md):
     new_key.set_contents_from_file(file_obj)
 
     return dest_uri
+
+def upload_to_soundcloud(sc_client, fn):
+    '''
+    Upload the file from fn path to soundcloud using a client object.
+    Save it as a track with the same name.
+    Return the id generated for uploaded track.
+    '''
+    track = sc_client.post('/tracks', track={
+         'title': fn,
+         'sharing': 'private',
+         'asset_data': open(fn, 'rb')
+         })
+    return track['id']
