@@ -117,7 +117,7 @@ def get_yaml_conf(fn):
 
 def get_sc_client(fn):
     conf = get_yaml_conf(fn)
-    client = soundcloud.Client(**scc)
+    client = soundcloud.Client(**conf)
     return client
 
 def upload_to_soundcloud(sc_client, fn):
