@@ -754,24 +754,37 @@ def general_search():
 
 @app.route('/wsearch')
 def wizard_search():
+    '''
+    We must have either `place` or `name` (or both) of the keywords.
+    If present, the keys must not be empty.
+    '''
     args = request.args
-    must_have_keys = set(['place', 'name'])
+    must_have_keys = ['place', 'name']
     keys = args.keys()
-    missing_keys = list(must_have_keys.difference(set(keys)))
-    if missing_keys != []:
-        e_message = gen_missing_keys_error(missing_keys)
-        abort(400, e_message)
+    if not ('place' in keys) and not ('name' in keys):
+        em = "Either 'place' or 'name' key must be present and not empty"
+        abort(400, em)
 
-    for key in must_have_keys:
-        if not args[key]:
-            abort(400, "{} argument couldn't be empty".format(key))
-    
-    place = args['place']
-    name = args['name']
+    validated_args = {'place': None, 'name': None}
+    for k in must_have_keys:
+        if k in keys:
+            if args[k]:
+                validated_args[k] = args[k]
+            else:
+                abort(400, "{} argument couldn't be empty".format(k))
+   
+    place = validated_args['place']
+    name = validated_args['name']
+
     place_doc = search_by_header(place, 'places')
     name_doc = search_by_header(name, 'familyNames')
     # fsearch() expects a dictionary of lists and returns Mongo cursor
-    ftree_args = {'last_name': [name], 'birth_place': [place]}
+    ftree_args = {}
+    if name:
+        ftree_args['last_name'] = [name]
+    if place:
+        ftree_args['birth_place'] = [place]
+        
     # We turn the cursor to list in order to serialize it
     family_trees = list(fsearch(**ftree_args))
     rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
