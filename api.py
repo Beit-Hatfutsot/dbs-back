@@ -713,12 +713,15 @@ def save_user_content():
     if not request.files:
         abort(400, 'No files present!')
 
-    must_have_keys = set(['title',
+    must_have_key_list = ['title',
                         'description',
                         'location',
                         'date',
                         'creator_name',
-                        'people_present'])
+                        'people_present']
+
+    must_have_key_list_en = [k+'_en' for k in must_have_key_list]
+    must_have_keys = set(must_have_key_list_en)
 
     form = request.form
     keys = form.keys()
