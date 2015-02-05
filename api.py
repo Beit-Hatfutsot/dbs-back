@@ -460,6 +460,8 @@ def fsearch(max_results=5000,**kwargs):
     search_dict = {}
     for key, value in kwargs.items():
         search_dict[key] = value[0]
+        if not value[0]:
+            abort(400, "{} argument couldn't be empty".format(key))
 
     keys = search_dict.keys()
     bad_args = set(keys).difference(allowed_args)
@@ -477,7 +479,7 @@ def fsearch(max_results=5000,**kwargs):
 
     # Ensure there are indices for all the needed fields
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
-    needed_indices = ['LN_lc', 'BP_lc', 'ID']
+    needed_indices = ['LN_lc', 'BP_lc', 'GTN']
     for index_key in needed_indices:
         if index_key not in index_keys:
              logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
@@ -563,7 +565,7 @@ def fsearch(max_results=5000,**kwargs):
         search_query[end] = {'$lte': years[item]['max']}
 
     if tree_number:
-        search_query['ID'] = tree_number
+        search_query['GTN'] = tree_number
 
     if sex_query:
         search_query['G'] = sex_query
@@ -575,7 +577,7 @@ def fsearch(max_results=5000,**kwargs):
     logger.debug('Search query:\n{}'.format(search_query))
 
     projection = {'II': 1,   # Individual ID
-                  'GT': 1,   # GenTree ID
+                  'GTN': 1,   # GenTree Number
                   'LN': 1,   # Last name
                   'FN': 1,   # First Name
                   'IBLN': 1, # Maiden name
@@ -761,20 +763,37 @@ def general_search():
 
 @app.route('/wsearch')
 def wizard_search():
+    '''
+    We must have either `place` or `name` (or both) of the keywords.
+    If present, the keys must not be empty.
+    '''
     args = request.args
-    must_have_keys = set(['place', 'name'])
+    must_have_keys = ['place', 'name']
     keys = args.keys()
-    missing_keys = list(must_have_keys.difference(set(keys)))
-    if missing_keys != []:
-        e_message = gen_missing_keys_error(missing_keys)
-        abort(400, e_message)
-    
-    place = args['place']
-    name = args['name']
+    if not ('place' in keys) and not ('name' in keys):
+        em = "Either 'place' or 'name' key must be present and not empty"
+        abort(400, em)
+
+    validated_args = {'place': None, 'name': None}
+    for k in must_have_keys:
+        if k in keys:
+            if args[k]:
+                validated_args[k] = args[k]
+            else:
+                abort(400, "{} argument couldn't be empty".format(k))
+   
+    place = validated_args['place']
+    name = validated_args['name']
+
     place_doc = search_by_header(place, 'places')
     name_doc = search_by_header(name, 'familyNames')
     # fsearch() expects a dictionary of lists and returns Mongo cursor
-    ftree_args = {'last_name': [name], 'birth_place': [place]}
+    ftree_args = {}
+    if name:
+        ftree_args['last_name'] = [name]
+    if place:
+        ftree_args['birth_place'] = [place]
+        
     # We turn the cursor to list in order to serialize it
     family_trees = list(fsearch(**ftree_args))
     rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
@@ -833,7 +852,7 @@ def fetch_tree(tree_number):
         abort(400, 'Tree number must be an integer')
     gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees'
     collection = data_db['genTreeIndividuals']
-    tree = collection.find_one({'ID': tree_number})
+    tree = collection.find_one({'GTN': tree_number})
     if tree:
         tree_path = tree['GenTreePath']
         tree_fn = tree_path.split('/')[-1]
