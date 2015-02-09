@@ -378,6 +378,16 @@ def _make_serializable(obj):
         obj['UpdateDate'] = str(obj['UpdateDate'])
     return obj
 
+def _generate_credits(fn='credits.html'):
+    try:
+        fh = open(fn)
+        credits = fh.read()
+        fh.close()
+        return credits
+    except:
+        logger.debug("Couldn't open credits file {}".format(fn))
+        return '<h1>No credits found</h1>'
+
 def search_by_header(string, collection):
     if not string: # Support empty strings
         return {}
@@ -784,9 +794,12 @@ def wizard_search():
                 validated_args[k] = args[k]
             else:
                 abort(400, "{} argument couldn't be empty".format(k))
-   
+
     place = validated_args['place']
     name = validated_args['name']
+
+    if place == 'havat_taninim' and name == 'tick-tock':
+        return _generate_credits()
 
     place_doc = search_by_header(place, 'places')
     name_doc = search_by_header(name, 'familyNames')
