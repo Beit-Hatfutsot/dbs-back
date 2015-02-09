@@ -756,6 +756,12 @@ def save_user_content():
             clean_md[key] = metadata[key][0]
         else:
             clean_md[key] = metadata[key]
+
+    # Make sure there are no empty keys
+    for key in clean_md:
+        if not clean_md[key]:
+            abort(400, "'{}' field couldn't be empty".format(key))
+
     file_oid = ugc_collection.insert(clean_md)
 
     bucket = ugc_bucket
