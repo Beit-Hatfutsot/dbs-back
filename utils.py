@@ -96,12 +96,12 @@ def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger.addHandler(ch)
     return logger
 
-def upload_file(file_obj, bucket, object_md):
+def upload_file(file_obj, bucket, file_oid, object_md):
     '''
     Upload the file object to a bucket using credentials and object metadata.
     Object name is a part of its metadata.
     '''
-    fn = str(object_md['_id'])
+    fn = str(file_oid)
     dest_uri = boto.storage_uri(bucket + '/' + fn, 'gs')
     new_key = dest_uri.new_key()
     new_key.update_metadata(object_md)

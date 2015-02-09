@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from datetime import timedelta
 import json
@@ -388,6 +389,61 @@ def _generate_credits(fn='credits.html'):
         logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
 
+def _convert_meta_to_bhp6(upload_md):
+    '''Convert language specific metadata fields to bhp6 format:
+    {
+      "Header": { # title
+        "En": "nice photo", 
+        "HE": "תמונה נחמדה"
+      }, 
+      "UnitType": 1, # photo unit type 
+      "UnitText1": { # description
+        "En": "this is a very nice photo", 
+        "He": "זוהי תמונה מאוד נחמדה"
+      }, 
+      "UnitText2": { # people_present
+        "En": "danny and pavel", 
+        "He": "דני ופבל"
+      } 
+    }
+    '''
+    # Sort all the metadata fields to Hebrew, English and no_lang
+    he = {'code': 'He', 'values': {}}
+    en = {'code': 'En', 'values': {}}
+    no_lang = {}
+    for key in upload_md:
+        if key.endswith('_en'):
+            # Add the functional part of key name to language dict
+            en['values'][key[:-3]] = upload_md[key]
+        elif key.endswith('_he'):
+            he['values'][key[:-3]] = upload_md[key]
+        else:
+            no_lang[key] = upload_md[key]
+
+    bhp6_to_ugc = {
+        'Header': 'title',
+        'UnitText1': 'description', 
+        'UnitText2': 'people_present'
+    }
+
+    rv = {
+        'Header': {'He': '', 'En': ''},
+        'UnitText1': {'He': '', 'En': ''},
+        'UnitText2': {'He': '', 'En': ''}
+    }
+
+    for key in rv:
+        for lang in [he, en]:
+            if lang['values'].has_key(bhp6_to_ugc[key]):
+                rv[key][lang['code']] = lang['values'][bhp6_to_ugc[key]]
+            else:
+                rv[key][lang['code']] = ''
+
+    # Add Unit type to rv
+    rv['UnitType'] = 1 # 1 = pictures, leaving it hardcoded for now
+    print rv
+    return rv
+
 def search_by_header(string, collection):
     if not string: # Support empty strings
         return {}
@@ -730,15 +786,27 @@ def save_user_content():
                         'creator_name',
                         'people_present']
 
-    must_have_key_list_en = [k+'_en' for k in must_have_key_list]
-    must_have_keys = set(must_have_key_list_en)
-
     form = request.form
     keys = form.keys()
-    missing_keys = list(must_have_keys.difference(set(keys)))
-    if missing_keys != []:
-        e_message = gen_missing_keys_error(missing_keys)
-        abort(400, e_message)
+
+    # Check that we have a full language specific set of fields
+
+    must_have_keys = {
+        '_en': {'missing': None, 'error': None}, 
+        '_he': {'missing': None, 'error': None}
+    }
+    for lang in must_have_keys:
+        must_have_list = [k+lang for k in must_have_key_list]
+        must_have_set = set(must_have_list)
+        must_have_keys[lang]['missing'] = list(must_have_set.difference(set(keys)))
+        if must_have_keys[lang]['missing']:
+            missing_keys = must_have_keys[lang]['missing']
+            must_have_keys[lang]['error'] = gen_missing_keys_error(missing_keys)
+
+    if must_have_keys['_en']['missing'] and must_have_keys['_he']['missing']:
+        em_base = 'You must provide a full list of keys in English or Hebrew. '
+        em = em_base + must_have_keys['_en']['error'] + ' ' +  must_have_keys['_he']['error']
+        abort(400, em)
 
     user_oid = current_user.id
 
@@ -762,10 +830,13 @@ def save_user_content():
         if not clean_md[key]:
             abort(400, "'{}' field couldn't be empty".format(key))
 
-    file_oid = ugc_collection.insert(clean_md)
+    # Convert user specified metadata to BHP6 format
+    bhp6_md = _convert_meta_to_bhp6(clean_md)
+    # Insert the metadata to the ugc collection
+    file_oid = ugc_collection.insert(bhp6_md)
 
     bucket = ugc_bucket
-    saved = upload_file(file_obj, bucket, clean_md)
+    saved = upload_file(file_obj, bucket, file_oid, clean_md) 
     if saved:
         mjs = get_mjs(user_oid)['mjs']
         if mjs == {}:
