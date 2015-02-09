@@ -20,10 +20,9 @@ from werkzeug import secure_filename
 
 import pymongo
 
-from utils import get_conf, get_logger, gen_missing_keys_error, upload_file, \
-    get_oid, jsonify
+from bhs_common.utils import get_conf, gen_missing_keys_error
+from utils import get_logger, upload_file, get_oid, jsonify
 import phonetic
-import pdb
 
 # Create app
 app = Flask(__name__)
@@ -32,7 +31,14 @@ app = Flask(__name__)
 ugc_bucket = 'bhs-ugc'
 
 # Get configuration from file
-conf = get_conf()
+must_have_keys = set(['secret_key',
+                    'security_password_hash',
+                    'security_password_salt',
+                    'db_host',
+                    'db_port',
+                    'db_name'])
+
+conf = get_conf('/etc/bhs/config.yml', must_have_keys)
 
 # Set app config
 app.config['DEBUG'] = True

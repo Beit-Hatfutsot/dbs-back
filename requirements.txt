@@ -44,3 +44,5 @@ six==1.8.0
 soundcloud==0.4.1
 uritemplate==0.6
 wsgiref==0.1.2
+-e git+ssh://git@bitbucket.org/bhonline/bhs-common.git#egg=bhs_common
+
