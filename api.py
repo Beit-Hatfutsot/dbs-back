@@ -848,13 +848,19 @@ def save_user_content():
             if (empty_keys['_en'] and empty_keys['_he']):
                 abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
 
+    # Create a version of clean_md with the full fields only
+    full_md = {}
+    for key in clean_md:
+        if clean_md[key]:
+            full_md[key] = clean_md[key]
+
     # Convert user specified metadata to BHP6 format
     bhp6_md = _convert_meta_to_bhp6(clean_md)
     # Insert the metadata to the ugc collection
     file_oid = ugc_collection.insert(bhp6_md)
 
     bucket = ugc_bucket
-    saved = upload_file(file_obj, bucket, file_oid, clean_md) 
+    saved = upload_file(file_obj, bucket, file_oid, full_md) 
     if saved:
         mjs = get_mjs(user_oid)['mjs']
         if mjs == {}:
