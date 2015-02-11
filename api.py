@@ -21,7 +21,7 @@ from werkzeug import secure_filename
 
 import pymongo
 
-from bhs_common.utils import get_conf, gen_missing_keys_error
+from bhs_common.utils import get_conf, gen_missing_keys_error, binarize_image
 from utils import get_logger, upload_file, get_oid, jsonify
 import phonetic
 
@@ -862,6 +862,10 @@ def save_user_content():
 
     # Convert user specified metadata to BHP6 format
     bhp6_md = _convert_meta_to_bhp6(clean_md)
+    # Create a thumbnail and add it to bhp metadata
+    binary_thumbnail = binarize_image(file_obj)
+    bhp6_md['thumbnail'] = {}
+    bhp6_md['thumbnail']['data'] = binary_thumbnail.encode('base64')
     # Insert the metadata to the ugc collection
     file_oid = ugc_collection.insert(bhp6_md)
 
