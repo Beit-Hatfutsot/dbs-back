@@ -441,7 +441,8 @@ def _convert_meta_to_bhp6(upload_md):
 
     # Add Unit type to rv
     rv['UnitType'] = 1 # 1 = pictures, leaving it hardcoded for now
-    print rv
+    # Add the raw upload data to rv
+    rv['raw'] = no_lang
     return rv
 
 def search_by_header(string, collection):
@@ -807,6 +808,12 @@ def save_user_content():
         em_base = 'You must provide a full list of keys in English or Hebrew. '
         em = em_base + must_have_keys['_en']['error'] + ' ' +  must_have_keys['_he']['error']
         abort(400, em)
+    
+    # Set metadata language(s) to the one(s) without missing fields
+    md_languages = []
+    for lang in must_have_keys:
+        if not must_have_keys[lang]['missing']:
+            md_languages.append(lang)
 
     user_oid = current_user.id
 
@@ -825,10 +832,21 @@ def save_user_content():
         else:
             clean_md[key] = metadata[key]
 
-    # Make sure there are no empty keys
-    for key in clean_md:
-        if not clean_md[key]:
-            abort(400, "'{}' field couldn't be empty".format(key))
+    # Make sure there are no empty keys for at least one of the md_languages
+    empty_keys = {'_en': [], '_he': []}
+    for lang in md_languages:
+        for key in clean_md:
+            if key.endswith(lang):
+                if not clean_md[key]:
+                    empty_keys[lang].append(key)
+
+    # Check for empty keys of the single language with the full list of fields
+    if len(md_languages) == 1 and empty_keys[md_languages[0]]:
+        abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
+    # Check for existence of empty keys in ALL the languages
+    elif len(md_languages) > 1:
+            if (empty_keys['_en'] and empty_keys['_he']):
+                abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
 
     # Convert user specified metadata to BHP6 format
     bhp6_md = _convert_meta_to_bhp6(clean_md)
