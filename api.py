@@ -778,7 +778,7 @@ def manage_jewish_story():
 def save_user_content():
     '''Logged in user POSTs a multipart request that includes a binary
     file and metadata.
-    The server stores the metadata in a ugc collection and uploads the file
+    The server stores the metadata in the ugc collection and uploads the file
     to a bucket.
     Only the first file and set of metadata is recorded.
     '''
@@ -950,8 +950,23 @@ def get_items(item_id):
     Only the first 10 ids will be returned for the list view to prevent abuse.
     '''
     items_list = item_id.split(',')
+    # Check if there are items from ugc collection and test their access control
+    ugc_items = []
+    for item in items_list:
+        if item.startswith('ugc'):
+            ugc_items.append(item)
+    if ugc_items:
+        # Check if the user is logged in
+        try:
+            verify_jwt()
+        except JWTError as e:
+            logger.debug(e.description)
+            abort(403, 'You have to be logged in to access this item(s)')
+        
+
     items = fetch_items(items_list[:10])
     if items:
+        # Check that each of the ugc_items is accessible by the logged in user
         return humanify(items)
     else:
         abort(404, 'Nothing found ;(')
