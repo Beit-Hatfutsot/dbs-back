@@ -862,6 +862,7 @@ def save_user_content():
 
     # Convert user specified metadata to BHP6 format
     bhp6_md = _convert_meta_to_bhp6(clean_md)
+    bhp6_md['owner'] = str(user_oid)
     # Create a thumbnail and add it to bhp metadata
     binary_thumbnail = binarize_image(file_obj)
     bhp6_md['thumbnail'] = {}
@@ -959,6 +960,7 @@ def get_items(item_id):
         # Check if the user is logged in
         try:
             verify_jwt()
+            user_oid = current_user.id
         except JWTError as e:
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
@@ -966,7 +968,15 @@ def get_items(item_id):
 
     items = fetch_items(items_list[:10])
     if items:
+        # Cast items to list
+        if type(items) != list:
+            items = [items]
         # Check that each of the ugc_items is accessible by the logged in user
+        for ugc_item_id in [item_id[4:] for item_id in ugc_items]:
+            for item in items:
+                print item
+                if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != user_oid:
+                    abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
     else:
         abort(404, 'Nothing found ;(')
