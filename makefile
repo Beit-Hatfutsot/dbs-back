@@ -2,7 +2,7 @@ virtual_env = /home/bhs/venv
 api = /home/bhs/api
 
 
-all: reload venv /usr/include/x86_64-linux-gnu/ffi.h
+all: reload venv external_dependencies
 
 pull:
 	cd $(api) && git pull origin master
@@ -14,8 +14,8 @@ $(virtual_env)/bin/activate: requirements.txt
 	. $(virtual_env)/bin/activate; pip install --upgrade -r requirements.txt
 	touch $(virtual_env)/bin/activate
 
-/usr/include/x86_64-linux-gnu/ffi.h:
-	sudo apt-get install -y libffi-dev
+external_dependencies:
+	sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev > /dev/null
 
 reload: pull
 	sudo service uwsgi reload
