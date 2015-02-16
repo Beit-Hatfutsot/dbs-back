@@ -1,6 +1,7 @@
 import logging
 import json
 import datetime
+import os
 
 import yaml
 import boto
@@ -103,9 +104,22 @@ def upload_file(file_obj, bucket, file_oid, object_md):
     '''
     fn = str(file_oid)
     dest_uri = boto.storage_uri(bucket + '/' + fn, 'gs')
-    new_key = dest_uri.new_key()
+    try:
+        new_key = dest_uri.new_key()
+    except boto.exception.NoAuthHandlerFound as e:
+        print e.message
+        return None
+
     new_key.update_metadata(object_md)
-    new_key.set_contents_from_file(file_obj)
+    try:
+        new_key.set_contents_from_file(file_obj)
+    except boto.exception.GSResponseError as e:
+        # Do we have the credentials file set up?
+        boto_cred_file = os.path.expanduser('~') + '/.boto'
+        if not os.path.exists(boto_cred_file):
+            print('Credentials file {} was not found.'.format(boto_cred_file))
+
+        return None
 
     return dest_uri
 
