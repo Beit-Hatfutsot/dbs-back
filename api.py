@@ -25,6 +25,8 @@ from bhs_common.utils import get_conf, gen_missing_keys_error, binarize_image
 from utils import get_logger, upload_file, get_oid, jsonify
 import phonetic
 
+import pdb
+
 # Create app
 app = Flask(__name__)
 
@@ -319,7 +321,8 @@ def _fetch_item(item_id):
         # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
         item['related'] = _get_related(item)
         # HACK TO GET THUMBNAIL
-        item['thumbnail'] = _get_thumbnail(item)
+        if not 'thumbnail' in item.keys():
+            item['thumbnail'] = _get_thumbnail(item)
         
         return _make_serializable(item)
     else:
@@ -866,7 +869,7 @@ def save_user_content():
     # Create a thumbnail and add it to bhp metadata
     binary_thumbnail = binarize_image(file_obj)
     bhp6_md['thumbnail'] = {}
-    bhp6_md['thumbnail']['data'] = binary_thumbnail.encode('base64')
+    bhp6_md['thumbnail']['data'] = urllib.quote(binary_thumbnail.encode('base64'))
     # Add ugc flag to the metadata
     bhp6_md['ugc'] = True
     # Insert the metadata to the ugc collection
@@ -977,7 +980,7 @@ def get_items(item_id):
         for ugc_item_id in [item_id[4:] for item_id in ugc_items]:
             for item in items:
                 print item
-                if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != user_oid:
+                if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != unicode(user_oid):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
     else:
