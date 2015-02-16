@@ -867,6 +867,8 @@ def save_user_content():
     binary_thumbnail = binarize_image(file_obj)
     bhp6_md['thumbnail'] = {}
     bhp6_md['thumbnail']['data'] = binary_thumbnail.encode('base64')
+    # Add ugc flag to the metadata
+    bhp6_md['ugc'] = True
     # Insert the metadata to the ugc collection
     file_oid = ugc_collection.insert(bhp6_md)
 
