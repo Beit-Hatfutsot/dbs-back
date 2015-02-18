@@ -979,7 +979,6 @@ def get_items(item_id):
         # Check that each of the ugc_items is accessible by the logged in user
         for ugc_item_id in [item_id[4:] for item_id in ugc_items]:
             for item in items:
-                print item
                 if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != unicode(user_oid):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
