@@ -22,7 +22,7 @@ from werkzeug import secure_filename
 import pymongo
 
 from bhs_common.utils import get_conf, gen_missing_keys_error, binarize_image
-from utils import get_logger, upload_file, get_oid, jsonify
+from utils import get_logger, upload_file, get_oid, jsonify, send_gmail
 import phonetic
 
 import pdb
@@ -32,6 +32,10 @@ app = Flask(__name__)
 
 # Specify the bucket name for user generated content
 ugc_bucket = 'bhs-ugc'
+
+# Specify the email address of the editor for UGC moderation
+#editor_address = 'pavel.suchman@gmail.com'
+editor_address = 'pavel.suchman@bh.org.il'
 
 # Get configuration from file
 must_have_keys = set(['secret_key',
@@ -317,13 +321,16 @@ def _fetch_item(item_id):
     item = data_db[collection].find_one(oid)
 
     if item:
-        
-        # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
-        item['related'] = _get_related(item)
-        # HACK TO GET THUMBNAIL
-        if not 'thumbnail' in item.keys():
-            item['thumbnail'] = _get_thumbnail(item)
-        
+        if item.has_key('Header'):
+            # Only check related if our item is regular and has header
+            # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
+            item['related'] = _get_related(item)
+            # HACK TO GET THUMBNAIL
+            if not 'thumbnail' in item.keys():
+                item['thumbnail'] = _get_thumbnail(item)
+        elif item.has_key('LN_lc'):
+            # GenTreeIndividual - don't look for related
+            pass
         return _make_serializable(item)
     else:
         return {}
@@ -696,7 +703,7 @@ def home():
 @app.route('/private')
 @jwt_required()
 def private_space():
-    return humanify({'access': 'private'})
+    return humanify({'access': 'private', 'email': current_user.email})
 
 @app.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @app.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
@@ -784,8 +791,10 @@ def save_user_content():
     The server stores the metadata in the ugc collection and uploads the file
     to a bucket.
     Only the first file and set of metadata is recorded.
+    After successful upload the server sends an email to editor.
     '''
     ugc_collection = data_db['ugc']
+
     if not request.files:
         abort(400, 'No files present!')
 
@@ -876,13 +885,25 @@ def save_user_content():
     file_oid = ugc_collection.insert(bhp6_md)
 
     bucket = ugc_bucket
-    saved = upload_file(file_obj, bucket, file_oid, full_md) 
-    if saved:
+    saved_uri = upload_file(file_obj, bucket, file_oid, full_md) 
+    user_email = current_user.email
+    if saved_uri:
+        http_uri = 'https://storage.googleapis.com/'+saved_uri.split('gs://')[1]
         mjs = get_mjs(user_oid)['mjs']
         if mjs == {}:
+            logger.debug('Creating mjs for user {}'.format(user_email))
             mjs = _init_mjs()
         mjs['unassigned'].append('ugc.{}'.format(str(file_oid)))
         update_mjs(user_oid, mjs)
+        # Send an email to editor
+        subject = 'New UGC submission'
+        body = '''Hello, there is a new file at {}.
+It was uploaded by {}.
+Thanks,
+Beit HaTfutsot Online team'''.format(http_uri, user_email)
+        sent = send_gmail(subject, body, editor_address)
+        if not sent:
+            logger.error('There was an error sending an email to {}'.format(editor_address))
         return humanify({'md': clean_md})
     else:
         abort(500, 'Failed to save %s' % filename)
