@@ -3,8 +3,13 @@ secret_key: glpjht9dPBXQe8mBS9XxDMGLIoHukbpvSNU0FpnZ
 security_password_hash: pbkdf2_sha512
 security_password_salt: pjht9dPBXQe8mB
 
-# DB Config
+# DB config
 db_host: localhost
 db_port: 27017
 db_name: bh
+
+# Email config
+email_username: bhatfutsot@gmail.com
+email_password: Bassword. You now, for buzzwords ;)
+email_from: info@bh.org.il
 
