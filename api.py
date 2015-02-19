@@ -322,15 +322,13 @@ def _fetch_item(item_id):
 
     if item:
         if item.has_key('Header'):
-            # Only check related if our item is regular and has header
+            # Only add related and thumbnail if our item has header
             # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
             item['related'] = _get_related(item)
             # HACK TO GET THUMBNAIL
             if not 'thumbnail' in item.keys():
                 item['thumbnail'] = _get_thumbnail(item)
-        elif item.has_key('LN_lc'):
-            # GenTreeIndividual - don't look for related
-            pass
+
         return _make_serializable(item)
     else:
         return {}
