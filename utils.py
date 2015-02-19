@@ -8,6 +8,7 @@ import boto
 import gcs_oauth2_boto_plugin
 import bson
 import soundcloud
+import gmail
 from bson.objectid import ObjectId
 from werkzeug import Response
 
@@ -41,17 +42,10 @@ def get_oid(id_str):
     except bson.errors.InvalidId:
         return None
 
-def get_conf(config_file='/etc/bhs/config.yml'):
+def get_conf(config_file='/etc/bhs/config.yml', must_have_keys=set()):
     '''Read the configuration file and return config dict.
     Check that all the necessary options are present.
     Raise meaningful exceptions on errors'''
-
-    must_have_keys = set(['secret_key',
-                        'security_password_hash',
-                        'security_password_salt',
-                        'db_host',
-                        'db_port',
-                        'db_name'])
     fh = open(config_file)
     try:
         conf = yaml.load(fh)
@@ -121,7 +115,7 @@ def upload_file(file_obj, bucket, file_oid, object_md):
 
         return None
 
-    return dest_uri
+    return str(dest_uri)
 
 def get_yaml_conf(fn):
     fh = open(fn)
@@ -146,3 +140,20 @@ def upload_to_soundcloud(sc_client, fn):
          'asset_data': open(fn, 'rb')
          })
     return track.obj
+
+def send_gmail(subject, body, address):
+    must_have_keys = set(['email_username',
+                    'email_password',
+                    'email_from'])
+
+    conf = get_conf('/etc/bhs/config.yml', must_have_keys)
+
+    my_gmail = gmail.GMail(conf.email_username, conf.email_password)
+    msg = gmail.Message(subject, text=body, to=address, sender=conf.email_from)
+    try:
+        my_gmail.send(msg) 
+    except  gmail.gmail.SMTPAuthenticationError as e:
+        print e.smtp_error
+        return False
+
+    return True
