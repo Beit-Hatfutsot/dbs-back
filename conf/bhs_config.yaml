@@ -13,3 +13,5 @@ email_username: bhatfutsot@gmail.com
 email_password: Bassword. You now, for buzzwords ;)
 email_from: info@bh.org.il
 
+# Local gedcoms
+gedcom_dir: /home/bhs/gedcoms
