@@ -15,7 +15,7 @@ $(virtual_env)/bin/activate: requirements.txt
 	touch $(virtual_env)/bin/activate
 
 external_dependencies:
-	sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev > /dev/null
+	sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev > /dev/null
 
 reload: pull
 	sudo service uwsgi reload
