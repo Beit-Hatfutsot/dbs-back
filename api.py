@@ -535,6 +535,7 @@ def fsearch(max_results=5000,**kwargs):
                      'birth_year',
                      'marriage_year',
                      'death_year',
+                     'individual_id',
                      'debug']
 
     allowed_args = set(args_to_index.keys() + extra_args)
@@ -560,7 +561,7 @@ def fsearch(max_results=5000,**kwargs):
 
     # Ensure there are indices for all the needed fields
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
-    needed_indices = ['LN_lc', 'BP_lc', 'GTN']
+    needed_indices = ['LN_lc', 'BP_lc', 'GTN', 'LNS', 'II']
     for index_key in needed_indices:
         if index_key not in index_keys:
              logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
@@ -569,7 +570,9 @@ def fsearch(max_results=5000,**kwargs):
     # Sort all the arguments to those with name or place and those with year
     names_and_places = {}
     years = {}
+    # Set up optional queries
     sex_query = None
+    individual_id = None
 
     for k in keys:
         if '_name' in k or '_place' in k:
@@ -582,7 +585,8 @@ def fsearch(max_results=5000,**kwargs):
                 sex_query = search_dict[k].upper()
             else:
                 abort(400, "Sex must be on of 'm', 'f'")
-                
+        elif k == 'individual_id':
+            individual_id = search_dict['individual_id']
 
     # Build a dict of all the names_and_places queries
     for search_arg in names_and_places:
@@ -645,15 +649,18 @@ def fsearch(max_results=5000,**kwargs):
         search_query[start] = {'$gte': years[item]['min']}
         search_query[end] = {'$lte': years[item]['max']}
 
-    if tree_number:
-        search_query['GTN'] = tree_number
-
     if sex_query:
         search_query['G'] = sex_query
 
     for item in names_and_places.values():
         for k in item:
             search_query[k] = item[k]
+
+    if tree_number:
+        search_query['GTN'] = tree_number
+        # WARNING: Discarding all the other search qeuries if looking for GTN and II
+        if individual_id:
+            search_query = {'GTN': tree_number, 'II': individual_id}
 
     logger.debug('Search query:\n{}'.format(search_query))
 
@@ -1013,8 +1020,8 @@ def ftree_search():
     '''
     args = request.args
     keys = args.keys()
-    if not ('last_name' in keys or 'birth_place' in keys):
-        em = "At least one of 'last_name' or 'birth_place' fields is required"
+    if not ('last_name' in keys or 'birth_place' in keys or 'individual_id' in keys):
+        em = "At least one of 'last_name', 'birth_place' or 'individual_id' fields is required"
         abort(400, em)
     results = fsearch(**args)
     return humanify(results)
