@@ -30,7 +30,7 @@ def test_api_private_view(client, get_auth_header):
     headers = []
     headers.append(get_auth_header)
     res = client.get('/private', headers=headers)
-    assert res.json == {'access': 'private'}
+    assert res.json.has_key('access') and res.json['access'] == 'private'
 
 def test_api_jwt_auth(client):
     res = client.post('/auth', data = '{"username": "tester@example.com", "password": "password"}')
