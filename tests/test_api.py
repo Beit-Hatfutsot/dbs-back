@@ -13,7 +13,9 @@ from pytest_flask.plugin import client, config
 def get_auth_header(client):
     '''Asks the api for a JWT token and returns auth header.
     Uses the client fixture'''
-
+    # We must use confusing email=username alias until the flask-jwt
+    # author merges request #31
+    # https://github.com/mattupstate/flask-jwt/pull/31
     res = client.post('/auth', data = '{"username": "tester@example.com", "password": "password"}')
     token = res.json['token']
     auth_header_tuple = ('Authorization', 'Bearer ' + token)
@@ -40,32 +42,34 @@ def test_api_jwt_auth(client):
 # User API
 
 def test_user(client, request):
-    username = 'krakoziabr@example.com'
+    email = 'krakoziabr@example.com'
+    name = 'The evil one'
     password = 'kr0koftW!'
     route = '/user'
     new_email = 'shmakoziabr@example.com'
     new_password = 'kr0koftL!'
 
-    print 'Creating test user %s' % username
-    res = client.post('/user', data = json.dumps({'email': username,
+    print 'Creating test user %s' % name
+    res = client.post('/user', data = json.dumps({'email': email,
+                                                  'name': name,
                                                   'password': password}))
     parsed_res = res.json
-    assert parsed_res['email'] == username
+    assert parsed_res['email'] == email
 
-    def get_generic_auth_header(username, password):
-        data =  json.dumps({'username': username, 'password': password})
+    def get_generic_auth_header(email, password):
+        data =  json.dumps({'username': email, 'password': password})
         res = client.post('/auth', data=data)
         token = res.json['token']
         auth_header_tuple = ('Authorization', 'Bearer ' + token)
         return auth_header_tuple
     
-    auth_header = get_generic_auth_header(username, password)    
+    auth_header = get_generic_auth_header(email, password)    
     headers = []
     headers.append(auth_header)
 
-    def user_get_self(username, password):
+    def user_get_self(email, password):
         headers = []
-        auth_header = get_generic_auth_header(username, password)
+        auth_header = get_generic_auth_header(email, password)
         headers.append(auth_header)
         res = client.get(route, headers=headers)
         return res.json

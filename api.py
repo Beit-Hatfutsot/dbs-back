@@ -69,9 +69,12 @@ cors = CORS(app, origins=['*'], headers=['content-type', 'accept', 'Authorizatio
 jwt = JWT(app)
 @jwt.authentication_handler
 def authenticate(username, password):
+    # We must use confusing email=username alias until the flask-jwt
+    # author merges request #31
+    # https://github.com/mattupstate/flask-jwt/pull/31
     user_obj = user_datastore.find_user(email=username)
     if not user_obj:
-        logger.debug('User %s not found' % username)
+        logger.debug('User {} not found'.format(username))
         return None
 
     if verify_password(password, user_obj.password):
@@ -79,7 +82,7 @@ def authenticate(username, password):
         user_obj.id = str(user_obj.id)
         return user_obj
     else:
-        logger.debug('Wrong password for %s' %  username)
+        logger.debug('Wrong password for {}'.format(username))
         return None
 
 @jwt.user_handler
@@ -98,6 +101,7 @@ class Role(db.Document, RoleMixin):
 class User(db.Document, UserMixin):
     email = db.StringField(max_length=255)
     password = db.StringField(max_length=255)
+    name = db.StringField(max_length=255)
     active = db.BooleanField(default=True)
     confirmed_at = db.DateTimeField()
     roles = db.ListField(db.ReferenceField(Role))
@@ -117,6 +121,7 @@ def setup_users():
     if not user_datastore.get_user('tester@example.com'):
         logger.debug('Creating test user.')
         user_datastore.create_user(email='tester@example.com',
+                                   name='Test User',
                                    password=encrypt_password('password'),
                                    roles=[user_role])
 
@@ -227,7 +232,7 @@ def _get_user_or_error(user_id):
 
 def _clean_user(user_obj):
     user_dict = dictify(user_obj)
-    allowed_fields = ['email']
+    allowed_fields = ['email', 'name']
     masked_user_dict = mask_dict(user_dict, allowed_fields)
     return masked_user_dict
 
@@ -246,6 +251,7 @@ def delete_user(user_id):
 def create_user(user_dict):
     try:
         email = user_dict['email']
+        name = user_dict['name']
         enc_password = encrypt_password(user_dict['password'])
     except KeyError as e:
         e_message = '%s key is missing from data' % e
@@ -259,6 +265,7 @@ def create_user(user_dict):
         abort(409, e_message)
 
     created = user_datastore.create_user(email=email,
+                                        name=name,
                                         password=enc_password)
     # Add default role to a newly created user
     user_datastore.add_role_to_user(created, 'user')
@@ -269,6 +276,8 @@ def update_user(user_id, user_dict):
     user_obj = _get_user_or_error(user_id)
     if 'email' in user_dict.keys():
         user_obj.email = user_dict['email']
+    if 'name' in user_dict.keys():
+        user_obj.email = user_dict['name']
     if 'password' in user_dict.keys():
         enc_password = encrypt_password(user_dict['password'])
         user_obj.password = enc_password
@@ -715,7 +724,7 @@ def private_space():
 def manage_user(user_id=None):
     '''
     Manage user accounts. If routed as /user, gives access only to logged in
-    user, if routed as /user/<user_id>, allows administrative level access
+    user, else if routed as /user/<user_id>, allows administrative level access
     if the looged in user is in the admin group.
     POST gets special treatment, as there must be a way to register new user.
     '''
@@ -892,6 +901,7 @@ def save_user_content():
     bucket = ugc_bucket
     saved_uri = upload_file(file_obj, bucket, file_oid, full_md) 
     user_email = current_user.email
+    user_name = current_user.name
     if saved_uri:
         http_uri = 'https://storage.googleapis.com/'+saved_uri.split('gs://')[1]
         mjs = get_mjs(user_oid)['mjs']
@@ -903,9 +913,9 @@ def save_user_content():
         # Send an email to editor
         subject = 'New UGC submission'
         body = '''Hello, there is a new file at {}.
-It was uploaded by {}.
+It was uploaded by {} - their email is {}.
 Thanks,
-Beit HaTfutsot Online team'''.format(http_uri, user_email)
+Beit HaTfutsot Online team'''.format(http_uri, user_name, user_email)
         sent = send_gmail(subject, body, editor_address)
         if not sent:
             logger.error('There was an error sending an email to {}'.format(editor_address))
