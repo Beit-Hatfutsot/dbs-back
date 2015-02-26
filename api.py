@@ -7,6 +7,7 @@ from bson import json_util
 import re
 import urllib
 import mimetypes
+import magic
 
 from flask import Flask, request, abort
 from flask.ext.mongoengine import MongoEngine, ValidationError
@@ -412,8 +413,10 @@ def _generate_credits(fn='credits.html'):
         logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
 
-def _convert_meta_to_bhp6(upload_md):
-    '''Convert language specific metadata fields to bhp6 format:
+def _convert_meta_to_bhp6(upload_md, file_info):
+    '''Convert language specific metadata fields to bhp6 format.
+    Use file_info to set the unit type.
+    The bhp6 format is as follows:
     {
       "Header": { # title
         "En": "nice photo", 
@@ -430,6 +433,11 @@ def _convert_meta_to_bhp6(upload_md):
       } 
     }
     '''
+    # unit_types dictionary
+    unit_types = {
+        'image data': 1,
+        'GEDCOM genealogy': 4
+        }
     # Sort all the metadata fields to Hebrew, English and no_lang
     he = {'code': 'He', 'values': {}}
     en = {'code': 'En', 'values': {}}
@@ -463,7 +471,14 @@ def _convert_meta_to_bhp6(upload_md):
                 rv[key][lang['code']] = ''
 
     # Add Unit type to rv
-    rv['UnitType'] = 1 # 1 = pictures, leaving it hardcoded for now
+    ut_matched = False
+    for ut in unit_types:
+        if ut in file_info:
+           rv['UnitType'] = unit_types[ut]
+           ut_matched = True
+    if not ut_matched:
+        rv['UnitType'] = 0
+        logger.debug('Failed to match UnitType for "{}"'.format(file_info))
     # Add the raw upload data to rv
     rv['raw'] = no_lang
     return rv
@@ -886,13 +901,22 @@ def save_user_content():
         if clean_md[key]:
             full_md[key] = clean_md[key]
 
+    # Get the magic file info
+    file_info_str = magic.from_buffer(file_obj.stream.read())
+    # Rewind the file object 
+    file_obj.stream.seek(0)
     # Convert user specified metadata to BHP6 format
-    bhp6_md = _convert_meta_to_bhp6(clean_md)
+    bhp6_md = _convert_meta_to_bhp6(clean_md, file_info_str)
     bhp6_md['owner'] = str(user_oid)
     # Create a thumbnail and add it to bhp metadata
-    binary_thumbnail = binarize_image(file_obj)
-    bhp6_md['thumbnail'] = {}
-    bhp6_md['thumbnail']['data'] = urllib.quote(binary_thumbnail.encode('base64'))
+    try:
+        binary_thumbnail = binarize_image(file_obj)
+        bhp6_md['thumbnail'] = {}
+        bhp6_md['thumbnail']['data'] = urllib.quote(binary_thumbnail.encode('base64'))
+    except IOError as e:
+        logger.debug('Thumbnail creation failed for {} with error: {}'.format(
+            file_obj.filename, e.message))
+        
     # Add ugc flag to the metadata
     bhp6_md['ugc'] = True
     # Insert the metadata to the ugc collection
@@ -919,6 +943,7 @@ Beit HaTfutsot Online team'''.format(http_uri, user_name, user_email)
         sent = send_gmail(subject, body, editor_address)
         if not sent:
             logger.error('There was an error sending an email to {}'.format(editor_address))
+        clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
         return humanify({'md': clean_md})
     else:
         abort(500, 'Failed to save %s' % filename)

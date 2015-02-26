@@ -46,3 +46,4 @@ uritemplate==0.6
 wsgiref==0.1.2
 -e git+ssh://git@bitbucket.org/bhonline/bhs-common.git#egg=bhs_common
 gmail>=0.5
+python-magic==0.4.6
