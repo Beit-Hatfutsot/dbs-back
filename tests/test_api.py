@@ -29,7 +29,7 @@ def test_api_public_view(client):
 
 def test_api_private_view(client, get_auth_header):
     'Uses the JWT token obtained from get_auth_header fixture'
-    headers = []
+    headers = [('Content-Type', 'application/json')]
     headers.append(get_auth_header)
     res = client.get('/private', headers=headers)
     assert res.json.has_key('access') and res.json['access'] == 'private'
@@ -50,9 +50,11 @@ def test_user(client, request):
     new_password = 'kr0koftL!'
 
     print 'Creating test user %s' % name
-    res = client.post('/user', data = json.dumps({'email': email,
-                                                  'name': name,
-                                                  'password': password}))
+    res = client.post('/user',
+                      headers = {'Content-Type': 'application/json'},
+                      data = json.dumps({'email': email,
+                                         'name': name,
+                                         'password': password}))
     parsed_res = res.json
     assert parsed_res['email'] == email
 
@@ -64,11 +66,11 @@ def test_user(client, request):
         return auth_header_tuple
     
     auth_header = get_generic_auth_header(email, password)    
-    headers = []
+    headers = [('Content-Type', 'application/json')]
     headers.append(auth_header)
 
     def user_get_self(email, password):
-        headers = []
+        headers = [('Content-Type', 'application/json')]
         auth_header = get_generic_auth_header(email, password)
         headers.append(auth_header)
         res = client.get(route, headers=headers)

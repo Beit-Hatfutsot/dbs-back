@@ -743,11 +743,13 @@ def manage_user(user_id=None):
     if the looged in user is in the admin group.
     POST gets special treatment, as there must be a way to register new user.
     '''
+    if request.headers['Content-Type'] != 'application/json':
+        abort(400, "Please set 'Content-Type' header to 'application/json'")
     try:
         verify_jwt()
     except JWTError as e:
         # You can create a new user while not being logged in
-        # Will have to defend this endpoint with rate limiting or similar means
+        # ToDo: defend this endpoint with rate limiting or similar means
         if request.method == 'POST':
             return user_handler(None, request.method, request.data)
         else:
