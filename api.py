@@ -134,31 +134,43 @@ security = Security(app, user_datastore)
 # Stubs for custom error handlers
 @app.errorhandler(400)
 def custom_400(error):
+    # Bad Request
     response = humanify({'error': error.description})
     return response, 400
 
 @app.errorhandler(403)
 def custom_403(error):
+    # Forbidden
     response = humanify({'error': error.description})
     return response, 403
 
 @app.errorhandler(404)
 def custom_404(error):
+    # Not Found
     response = humanify({'error': error.description})
     return response, 404
 
 @app.errorhandler(405)
 def custom_405(error):
+    # Method not allowed
     response = humanify({'error': error.description})
     return response, 405
 
 @app.errorhandler(409)
 def custom_409(error):
+    # Conflict
     response = humanify({'error': error.description})
     return response, 409
 
+@app.errorhandler(415)
+def custom_415(error):
+    # Unsupported Media Type
+    response = humanify({'error': error.description})
+    return response, 415
+
 @app.errorhandler(500)
 def custom_500(error):
+    # Internal Server Error
     response = humanify({'error': error.description})
     return response, 500
 
