@@ -517,7 +517,9 @@ def search_by_header(string, collection):
 
 def _validate_filetype(file_info_str):
     allowed_filetypes = [
-                          'image data',                        
+                          'PNG image data',
+                          'JPEG image data',
+                          'Adobe Photoshop Image',
                           'GEDCOM genealogy'
     ]
 
