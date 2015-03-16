@@ -709,7 +709,7 @@ def fsearch(max_results=5000,**kwargs):
         logger.debug('Found {} results'.format(results.count()))
         return results
     else:
-        return {}
+        return []
 
 def _generate_year_range(year, fudge_factor=0):
     maximum = int(str(year + fudge_factor) + '9999')
