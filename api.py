@@ -515,6 +515,18 @@ def search_by_header(string, collection):
     else:
         return {}
 
+def _validate_filetype(file_info_str):
+    allowed_filetypes = [
+                          'image data',                        
+                          'GEDCOM genealogy'
+    ]
+
+    for filetype in allowed_filetypes:
+        if filetype in file_info_str:
+            return True
+
+    return False
+
 def get_completion(collection, string, search_prefix=True, max_res=5):
     '''Search in the headers of bhp6 compatible db documents.
     If `search_prefix` flag is set, search only in the beginning of headers,
@@ -917,6 +929,9 @@ def save_user_content():
 
     # Get the magic file info
     file_info_str = magic.from_buffer(file_obj.stream.read())
+    if not _validate_filetype(file_info_str):
+        abort(415, "File type '{}' is not supported".format(file_info_str))
+
     # Rewind the file object 
     file_obj.stream.seek(0)
     # Convert user specified metadata to BHP6 format
