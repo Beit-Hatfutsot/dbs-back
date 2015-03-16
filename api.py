@@ -743,7 +743,7 @@ def manage_user(user_id=None):
     if the looged in user is in the admin group.
     POST gets special treatment, as there must be a way to register new user.
     '''
-    if request.headers['Content-Type'] != 'application/json':
+    if not 'application/json' in request.headers['Content-Type']:
         abort(400, "Please set 'Content-Type' header to 'application/json'")
     try:
         verify_jwt()
