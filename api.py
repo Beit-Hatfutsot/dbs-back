@@ -36,7 +36,7 @@ ugc_bucket = 'bhs-ugc'
 
 # Specify the email address of the editor for UGC moderation
 #editor_address = 'pavel.suchman@gmail.com'
-editor_address = 'pavel.suchman@bh.org.il'
+editor_address = 'pavel.suchman@bh.org.il,dannyb@bh.org.il'
 
 # Get configuration from file
 must_have_keys = set(['secret_key',
