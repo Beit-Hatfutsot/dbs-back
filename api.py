@@ -548,7 +548,10 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
 
     found = []
     header = 'Header.{}'.format(lang)
-    cursor = collection.find({header: regex}, {'_id': 0, header: 1}).limit(max_res)
+    unit_text = 'UnitText1.{}'.format(lang)
+    projection = {'_id': 0, header: 1}
+    cursor = collection.find({header: regex,
+                             unit_text: {"$ne": None}}, projection).limit(max_res)
     for doc in cursor:
         header_content = doc['Header'][lang]
         if header_content:

@@ -106,7 +106,11 @@ def get_similar_strings(string, collection_obj):
     found = []
     for dms_value in dms.split(' '):
         regex = re.compile(dms_value)
-        cursor = collection_obj.find({"UnitHeaderDMSoundex": regex}, {'_id': 0, 'Header.%s' % lang: 1})
+        unit_text = 'UnitText1.{}'.format(lang)
+        header = 'Header.{}'.format(lang)
+        projection = {'_id': 0, header: 1}
+        cursor = collection_obj.find({"UnitHeaderDMSoundex": regex,
+                                      unit_text: {"$ne": None}}, projection)
         for doc in cursor:
             header = doc['Header'][lang]
             if header:
