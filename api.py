@@ -21,6 +21,7 @@ from  flask.ext.jwt import current_user
 from werkzeug import secure_filename
 
 import pymongo
+import jinja2
 
 from bhs_common.utils import get_conf, gen_missing_keys_error, binarize_image
 from utils import get_logger, upload_file, get_oid, jsonify, send_gmail
@@ -961,7 +962,8 @@ def save_user_content():
     user_email = current_user.email
     user_name = current_user.name
     if saved_uri:
-        http_uri = 'https://storage.googleapis.com/'+saved_uri.split('gs://')[1]
+        console_uri = 'https://console.developers.google.com/m/cloudstorage/b/{}/o/{}'
+        http_uri = console_uri.format(bucket, file_oid)
         mjs = get_mjs(user_oid)['mjs']
         if mjs == {}:
             logger.debug('Creating mjs for user {}'.format(user_email))
@@ -970,10 +972,12 @@ def save_user_content():
         update_mjs(user_oid, mjs)
         # Send an email to editor
         subject = 'New UGC submission'
-        body = '''Hello, there is a new file at {}.
-It was uploaded by {} - their email is {}.
-Thanks,
-Beit HaTfutsot Online team'''.format(http_uri, user_name, user_email)
+        with open('editors_email_template') as fh:
+            template = jinja2.Template(fh.read())
+        body = template.render({'uri': http_uri,
+                                'metadata': clean_md,
+                                'user_email': user_email,
+                                'user_name': user_name})
         sent = send_gmail(subject, body, editor_address)
         if not sent:
             logger.error('There was an error sending an email to {}'.format(editor_address))
