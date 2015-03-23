@@ -863,10 +863,7 @@ def save_user_content():
 
     must_have_key_list = ['title',
                         'description',
-                        'location',
-                        'date',
-                        'creator_name',
-                        'people_present']
+                        'creator_name']
 
     form = request.form
     keys = form.keys()
