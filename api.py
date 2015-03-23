@@ -503,7 +503,9 @@ def search_by_header(string, collection):
         lang = 'He'
     else:
         lang = 'En'
-    item = data_db[collection].find_one({'Header.%s' % lang: string.upper()})
+    header_regex = re.compile(string, re.IGNORECASE)
+    lang_header = 'Header.{}'.format(lang)
+    item = data_db[collection].find_one({lang_header: header_regex})
     
     if item:
 
@@ -511,7 +513,7 @@ def search_by_header(string, collection):
         item['related'] = _get_related(item)
         # HACK TO GET THUMBNAIL
         item['thumbnail'] = _get_thumbnail(item)
-        
+
         return _make_serializable(item)
     else:
         return {}
