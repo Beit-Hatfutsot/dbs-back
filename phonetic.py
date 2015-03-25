@@ -110,7 +110,7 @@ def get_similar_strings(string, collection_obj):
         header = 'Header.{}'.format(lang)
         show_filter = {'StatusDesc': 'Completed',
                        'RightsDesc': 'Full',
-                       unit_text: {"$ne": None}}
+                       unit_text: {"$nin": ['', None]}}
         dms_search_ex = {'UnitHeaderDMSoundex': dms_regex}
         dms_search_ex.update(show_filter)
         projection = {'_id': 0, header: 1}

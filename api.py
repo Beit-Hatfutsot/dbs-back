@@ -505,8 +505,11 @@ def search_by_header(string, collection):
         lang = 'En'
     header_regex = re.compile(string, re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
+    unit_text = 'UnitText1.{}'.format(lang)
     # Search only for docs with right status
-    show_filter = {'StatusDesc': 'Completed','RightsDesc': 'Full'}
+    show_filter = {'StatusDesc': 'Completed',
+                   'RightsDesc': 'Full',
+                   unit_text: {"$nin": [None, '']}}
     header_search_ex = {lang_header: header_regex}
     header_search_ex.update(show_filter)
     item = data_db[collection].find_one(header_search_ex)
@@ -557,7 +560,7 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     unit_text = 'UnitText1.{}'.format(lang)
     show_filter = {'StatusDesc': 'Completed',
                    'RightsDesc': 'Full',
-                   unit_text: {"$ne": None}}
+                   unit_text: {"$nin": ['', None]}}
     header_search_ex = {header: regex}
     header_search_ex.update(show_filter)
     projection = {'_id': 0, header: 1}
