@@ -95,7 +95,7 @@ def get_exact_phonetic_matches(string, collection_obj):
     return found
 
 def get_similar_strings(string, collection_obj):
-    'Searches in the UnitHeaderDMSoundex field of bhp6 comaptible db'
+    'Searches in the UnitHeaderDMSoundex field of bhp6 compatible db'
     if is_hebrew(string):
         lang = 'He'
         # Get rid of whitespaces inside Hebrew strings
@@ -105,12 +105,16 @@ def get_similar_strings(string, collection_obj):
     dms = get_dms(string)
     found = []
     for dms_value in dms.split(' '):
-        regex = re.compile(dms_value)
+        dms_regex = re.compile(dms_value)
         unit_text = 'UnitText1.{}'.format(lang)
         header = 'Header.{}'.format(lang)
+        show_filter = {'StatusDesc': 'Completed',
+                       'RightsDesc': 'Full',
+                       unit_text: {"$ne": None}}
+        dms_search_ex = {'UnitHeaderDMSoundex': dms_regex}
+        dms_search_ex.update(show_filter)
         projection = {'_id': 0, header: 1}
-        cursor = collection_obj.find({"UnitHeaderDMSoundex": regex,
-                                      unit_text: {"$ne": None}}, projection)
+        cursor = collection_obj.find(dms_search_ex, projection)
         for doc in cursor:
             header = doc['Header'][lang]
             if header:

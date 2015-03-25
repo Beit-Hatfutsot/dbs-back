@@ -505,10 +505,13 @@ def search_by_header(string, collection):
         lang = 'En'
     header_regex = re.compile(string, re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
-    item = data_db[collection].find_one({lang_header: header_regex})
+    # Search only for docs with right status
+    show_filter = {'StatusDesc': 'Completed','RightsDesc': 'Full'}
+    header_search_ex = {lang_header: header_regex}
+    header_search_ex.update(show_filter)
+    item = data_db[collection].find_one(header_search_ex)
     
     if item:
-
         # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
         item['related'] = _get_related(item)
         # HACK TO GET THUMBNAIL
@@ -552,9 +555,13 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     found = []
     header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
+    show_filter = {'StatusDesc': 'Completed',
+                   'RightsDesc': 'Full',
+                   unit_text: {"$ne": None}}
+    header_search_ex = {header: regex}
+    header_search_ex.update(show_filter)
     projection = {'_id': 0, header: 1}
-    cursor = collection.find({header: regex,
-                             unit_text: {"$ne": None}}, projection).limit(max_res)
+    cursor = collection.find(header_search_ex ,projection).limit(max_res)
     for doc in cursor:
         header_content = doc['Header'][lang]
         if header_content:
