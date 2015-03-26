@@ -659,8 +659,9 @@ def fsearch(max_results=5000,**kwargs):
         field_name = args_to_index[search_arg]
         split_arg = names_and_places[search_arg].split(';')
         search_str = split_arg[0]
+        # No modifications are supported for first names because
+        # firstname DMS (Soundex) values are not stored in the BHP database.
         if search_arg == 'first_name':
-            # No modifications are supported for first names  
             qf = {field_name: search_str}
             names_and_places[search_arg] = qf
             continue
