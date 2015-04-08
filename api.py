@@ -111,6 +111,9 @@ class User(db.Document, UserMixin):
 class Mjs(db.Document):
     mjs = db.DictField()
 
+class Ugc(db.Document):
+    ugc = db.DictField()
+
 # Ensure we have a user to test with
 @app.before_first_request
 def setup_users():
@@ -207,6 +210,7 @@ def mask_dict(from_dict, allowed_keys):
     return rv
 
 def dictify(m_engine_object):
+    # ToDo: take care of $oid conversion to string
     return json.loads(m_engine_object.to_json())
 
 # User management
@@ -340,8 +344,16 @@ def _fetch_item(item_id):
     oid = get_oid(_id)
     if not oid:
         return {}
-
-    item = data_db[collection].find_one(oid)
+    if collection == 'ugc':
+        item = dictify(Ugc.objects(id=oid).first())
+        if item:
+            item_id = item['_id']
+            item = item['ugc']
+            item['_id'] = item_id
+            if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
+                item['_id'] = item['_id']['$oid']
+    else:
+        item = data_db[collection].find_one(oid)
 
     if item:
         if item.has_key('Header'):
@@ -867,8 +879,6 @@ def save_user_content():
     Only the first file and set of metadata is recorded.
     After successful upload the server sends an email to editor.
     '''
-    ugc_collection = data_db['ugc']
-
     if not request.files:
         abort(400, 'No files present!')
 
@@ -965,7 +975,9 @@ def save_user_content():
     # Add ugc flag to the metadata
     bhp6_md['ugc'] = True
     # Insert the metadata to the ugc collection
-    file_oid = ugc_collection.insert(bhp6_md)
+    new_ugc = Ugc(bhp6_md)
+    new_ugc.save()
+    file_oid = new_ugc.id
 
     bucket = ugc_bucket
     saved_uri = upload_file(file_obj, bucket, file_oid, full_md) 
