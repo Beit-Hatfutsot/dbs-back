@@ -43,9 +43,12 @@ editor_address = 'pavel.suchman@bh.org.il,dannyb@bh.org.il'
 must_have_keys = set(['secret_key',
                     'security_password_hash',
                     'security_password_salt',
-                    'db_host',
-                    'db_port',
-                    'db_name'])
+                    'user_db_host',
+                    'user_db_port',
+                    'user_db_name',
+                    'data_db_host',
+                    'data_db_port',
+                    'data_db_name'])
 
 conf = get_conf('/etc/bhs/config.yml', must_have_keys)
 
@@ -57,9 +60,9 @@ app.config['SECURITY_PASSWORD_SALT'] = conf.security_password_salt
 app.config['JWT_EXPIRATION_DELTA'] = timedelta(days=1)
 
 # DB Config
-app.config['MONGODB_DB'] = conf.db_name
-app.config['MONGODB_HOST'] = conf.db_host
-app.config['MONGODB_PORT'] = conf.db_port
+app.config['MONGODB_DB'] = conf.user_db_name
+app.config['MONGODB_HOST'] = conf.user_db_host
+app.config['MONGODB_PORT'] = conf.user_db_port
 
 # Logging config
 logger = get_logger()
@@ -94,7 +97,7 @@ def load_user(payload):
 
 # Create database connection object
 db = MongoEngine(app)
-data_db = pymongo.Connection(db.connection.host)['bhp6']
+data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port)[conf.data_db_name]
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
