@@ -97,7 +97,7 @@ def load_user(payload):
 
 # Create database connection object
 db = MongoEngine(app)
-data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port)[conf.data_db_name]
+data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port, slaveOK=True)[conf.data_db_name]
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
