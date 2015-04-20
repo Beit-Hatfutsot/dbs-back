@@ -384,8 +384,15 @@ def _get_related(doc, max_items=5):
         # Don't look for related items in photo units (UnitType 1)
         return []
 
+    en_header = doc['Header']['En']
+    he_header = doc['Header']['He']
+
     for collection_name in collections:
-        cursor = data_db[collection_name].find({'$or': [{'UnitText1.En': {'$regex': doc['Header']['En']}}, {'UnitText1.He': {'$regex': doc['Header']['He']}}]}).limit(max_items)
+        col = data_db[collection_name]
+        headers = en_header + ' ' + he_header
+        # Create text indices for text search to work:
+        # db.YOUR_COLLECTION.createIndex({"UnitText1.En": "text", "UnitText1.He": "text"})
+        cursor = col.find({'$text': {'$search': headers}}).limit(max_items)
         if cursor:
             for related_item in cursor:
                 related_item = _make_serializable(related_item)
