@@ -380,6 +380,10 @@ def _get_related(doc, max_items=5):
                    'places',
                    'photoUnits']
 
+    if doc['UnitType'] == 1:
+        # Don't look for related items in photo units (UnitType 1)
+        return []
+
     for collection_name in collections:
         cursor = data_db[collection_name].find({'$or': [{'UnitText1.En': {'$regex': doc['Header']['En']}}, {'UnitText1.He': {'$regex': doc['Header']['He']}}]}).limit(max_items)
         if cursor:
