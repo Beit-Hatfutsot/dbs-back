@@ -385,11 +385,18 @@ def _get_related(doc, max_items=5):
         return []
 
     en_header = doc['Header']['En']
+    if en_header == None:
+        en_header = ''
     he_header = doc['Header']['He']
+    if he_header == None:
+        he_header = ''
 
     for collection_name in collections:
         col = data_db[collection_name]
         headers = en_header + ' ' + he_header
+        if headers == ' ':
+            # No headers at all
+            return []
         # Create text indices for text search to work:
         # db.YOUR_COLLECTION.createIndex({"UnitText1.En": "text", "UnitText1.He": "text"})
         cursor = col.find({'$text': {'$search': headers}}).limit(max_items)
