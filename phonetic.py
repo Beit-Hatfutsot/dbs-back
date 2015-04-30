@@ -110,6 +110,7 @@ def get_similar_strings(string, collection_obj):
         header = 'Header.{}'.format(lang)
         show_filter = {'StatusDesc': 'Completed',
                        'RightsDesc': 'Full',
+                       'DisplayStatusDesc':  {'$nin': ['Internal Use']},
                        unit_text: {"$nin": ['', None]}}
         dms_field = 'UnitHeaderDMSoundex.{}'.format(lang)
         dms_search_ex = {dms_field: dms_regex}

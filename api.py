@@ -399,7 +399,12 @@ def _get_related(doc, max_items=5):
             return []
         # Create text indices for text search to work:
         # db.YOUR_COLLECTION.createIndex({"UnitText1.En": "text", "UnitText1.He": "text"})
-        cursor = col.find({'$text': {'$search': headers}}).limit(max_items)
+        header_text_search = {'$text': {'$search': headers}}
+        show_filter = {'StatusDesc': 'Completed',
+                      'RightsDesc': 'Full',
+                      'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
+        header_text_search.update(show_filter)
+        cursor = col.find(header_text_search).limit(max_items)
         if cursor:
             for related_item in cursor:
                 related_item = _make_serializable(related_item)
@@ -542,6 +547,7 @@ def search_by_header(string, collection):
     # Search only for docs with right status
     show_filter = {'StatusDesc': 'Completed',
                    'RightsDesc': 'Full',
+                   'DisplayStatusDesc':  {'$nin': ['Internal Use']},
                    unit_text: {"$nin": [None, '']}}
     header_search_ex = {lang_header: header_regex}
     header_search_ex.update(show_filter)
@@ -593,6 +599,7 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     unit_text = 'UnitText1.{}'.format(lang)
     show_filter = {'StatusDesc': 'Completed',
                    'RightsDesc': 'Full',
+                   'DisplayStatusDesc':  {'$nin': ['Internal Use']},
                    unit_text: {"$nin": ['', None]}}
     header_search_ex = {header: regex}
     header_search_ex.update(show_filter)
