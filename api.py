@@ -362,7 +362,8 @@ def _fetch_item(item_id):
         if item.has_key('Header'):
             # Only add related and thumbnail if our item has header
             # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
-            item['related'] = _get_related(item)
+            #item['related'] = _get_related(item)
+            item['related'] = _get_bhp_related(item)
             # HACK TO GET THUMBNAIL
             if not 'thumbnail' in item.keys():
                 item['thumbnail'] = _get_thumbnail(item)
@@ -413,6 +414,38 @@ def _get_related(doc, max_items=5):
                     related.append(related_string)
     
     return related
+
+def _get_bhp_related(doc, max_items=5):
+    """
+    Bring the documents that were tagged as related by an editor
+    Unfortunately there are not a lot of tags, so we only check more promising vectors.
+    photoUnits -> places, photoUnits -> personalities
+    places -> photoUnits
+    personalities -> places, personalities -> familyNames, personalities -> photoUnits
+    """
+    related = []
+    related_collections = {'places':
+                                {'field': 'UnitPlaces',
+                                'links': ['photoUnits']},
+                          'personalities':
+                                {'field': 'PersonalityIds',
+                                'links': ['photoUnits', 'places', 'familyNames']},
+                          'photoUnits':
+                                {'field': 'PictureUnitsIds',
+                                'links': ['personalities', 'places']}}
+
+
+    return related 
+
+def _get_mongo_doc_id(unit_id, collection):
+    '''
+    Try to return Mongo _id for the given unit_id and collection name.
+    '''
+    show_filter = {'StatusDesc': 'Completed',
+                   'RightsDesc': 'Full',
+                   'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
+    show_filter['UnitId'] = unit_id
+    return db[collection].find_one(show_filter)
 
 def _get_picture(picture_id):
     found = data_db['photos'].find_one({'PictureId': picture_id})
