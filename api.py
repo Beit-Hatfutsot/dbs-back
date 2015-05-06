@@ -99,6 +99,13 @@ def load_user(payload):
 db = MongoEngine(app)
 data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port, slaveOK=True)[conf.data_db_name]
 
+collection_map = {
+                   6: 'familyNames',
+                   8: 'personalities',
+                   5: 'places',
+                   1: 'photoUnits',
+                   10: 'lexicon'}
+
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
     description = db.StringField(max_length=255)
@@ -423,7 +430,7 @@ def _get_bhp_related(doc, max_items=5):
     places -> photoUnits
     personalities -> places, personalities -> familyNames, personalities -> photoUnits
     """
-    related = []
+    related = set()
     related_collections = {'places':
                                 {'field': 'UnitPlaces',
                                 'links': ['photoUnits']},
@@ -434,9 +441,39 @@ def _get_bhp_related(doc, max_items=5):
                                 {'field': 'PictureUnitsIds',
                                 'links': ['personalities', 'places']}}
 
+    for collection in related_collections:
+        print 'collection', collection
+        for r_collection in related_collections[collection]['links']:
+            print '_r_collection', r_collection
+            r_field = related_collections[collection]['field']
+            print '_r_field', r_field
+            if doc.has_key(r_field) and doc[r_field]:
+                r_field_value = doc[r_field]
+                print  '__r_field_value', r_field_value
+                if type(r_field_value) == list:
+                    # Some related ids are encoded in comma separated strings and other in lists
+                    r_field_value_list = [i['PlaceIds'] for i in r_field_value]
+                else:
+                    r_field_value_list = r_field_value.split(',')
 
-    return related 
+                for i in r_field_value_list:
+                    if not i:
+                        continue
+                    try:
+                        r_id = int(i)
+                        mongo_id =  _get_mongo_doc_id(r_id, collection)
+                        if mongo_id:
+                            related.add(collection + '.' + mongo_id)
+                        else:
+                            print 'Not found UnitId {} in {}'.format(r_id, collection)
+                    except ValueError as e:
+                        print e.message
+                        
+    return list(related)
 
+    #self_collection_name = _get_collection_name(doc)
+    #if not self_collection_name:
+    #    return []
 def _get_mongo_doc_id(unit_id, collection):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
@@ -445,7 +482,21 @@ def _get_mongo_doc_id(unit_id, collection):
                    'RightsDesc': 'Full',
                    'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
     show_filter['UnitId'] = unit_id
-    return db[collection].find_one(show_filter)
+    found = data_db[collection].find_one(show_filter, {'_id': 1})
+    if found:
+        return str(found['_id'])
+    else:
+        return None
+
+def _get_self_collection_name(doc):
+    if doc.has_key('UnitType'):
+        unit_type = doc['UnitType']
+    else:
+        return None
+    if unit_type in collection_map.keys():
+        return collection_map[unit_type]
+    else:
+        return None
 
 def _get_picture(picture_id):
     found = data_db['photos'].find_one({'PictureId': picture_id})
