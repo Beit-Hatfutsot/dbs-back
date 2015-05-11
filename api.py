@@ -422,6 +422,23 @@ def _get_related(doc, max_items=5):
     
     return related
 
+def get_related_pictures(doc, max_len=5, field='PictureId'):
+    rv = []
+    field = 'RelatedPictures'
+    collection = 'photoUnits'
+    unit_id_list = [i['PicId'] for i in doc['RelatedPictures']]
+    for i in unit_id_list:
+        if not i:
+            continue
+        try:
+            p_id = int(i)
+            mongo_id =  _get_mongo_doc_id(p_id, collection)
+            if mongo_id:
+                rv.append(collection + '.' + mongo_id)
+        except ValueError as e:
+            logger.debug(e.message)
+    return rv[:max_len]
+            
 def _get_bhp_related(doc, max_items=5):
     """
     Bring the documents that were tagged as related by an editor
@@ -430,65 +447,65 @@ def _get_bhp_related(doc, max_items=5):
     places -> photoUnits
     personalities -> places, personalities -> familyNames, personalities -> photoUnits
     """
-    related = set()
-    related_collections = {'places':
-                                {'field': 'UnitPlaces',
-                                'links': ['photoUnits']},
-                          'personalities':
-                                {'field': 'PersonalityIds',
-                                'links': ['photoUnits', 'places', 'familyNames']},
-                          'photoUnits':
-                                {'field': 'PictureUnitsIds',
-                                'links': ['personalities', 'places']}}
+    collection_names = {'PersonalityIds': 'personalities',
+                        'PictureUnitsIds': 'photoUnits',
+                        'FamilyNameIds': 'familyNames',
+                        'UnitPlaces': 'places'}
+    
+    related_fields = {'places': ['PictureUnitsIds'],
+                     'personalities': ['PictureUnitsIds', 'FamilyNameIds', 'UnitPlaces'],
+                     'photoUnits': ['UnitPlaces', 'PersonalityIds']}
 
-    for collection in related_collections:
-        print 'collection', collection
-        for r_collection in related_collections[collection]['links']:
-            print '_r_collection', r_collection
-            r_field = related_collections[collection]['field']
-            print '_r_field', r_field
-            if doc.has_key(r_field) and doc[r_field]:
-                r_field_value = doc[r_field]
-                print  '__r_field_value', r_field_value
-                if type(r_field_value) == list:
-                    # Some related ids are encoded in comma separated strings and other in lists
-                    r_field_value_list = [i['PlaceIds'] for i in r_field_value]
-                else:
-                    r_field_value_list = r_field_value.split(',')
+    rv = []
+    self_collection_name = _get_collection_name(doc)
 
-                for i in r_field_value_list:
-                    if not i:
-                        continue
-                    try:
-                        r_id = int(i)
-                        mongo_id =  _get_mongo_doc_id(r_id, collection)
-                        if mongo_id:
-                            related.add(collection + '.' + mongo_id)
-                        else:
-                            print 'Not found UnitId {} in {}'.format(r_id, collection)
-                    except ValueError as e:
-                        print e.message
-                        
-    return list(related)
+    if not self_collection_name:
+        logger.debug('Unkown collection')
+        return rv
+    elif self_collection_name not in related_fields:
+        logger.debug('BHP related not supported for collection {}'.format(self_collection_name))
+        return rv
 
-    #self_collection_name = _get_collection_name(doc)
-    #if not self_collection_name:
-    #    return []
-def _get_mongo_doc_id(unit_id, collection):
+    fields = related_fields[self_collection_name]
+    for field in fields:
+        if doc.has_key(field) and doc[field]:
+            related_value = doc[field]
+            if type(related_value) == list:
+                # Some related ids are encoded in comma separated strings and other in lists
+                related_value_list = [i['PlaceIds'] for i in related_value]
+            else:
+                related_value_list = related_value.split(',')
+
+            for i in related_value_list:
+                if not i:
+                    continue
+                try:
+                    r_id = int(i)
+                    collection = collection_names[field]
+                    mongo_id =  _get_mongo_doc_id(r_id, collection)
+                    if mongo_id:
+                        rv.append(collection + '.' + mongo_id)
+                except ValueError as e:
+                    logger.debug(e.message)
+
+    return rv
+
+def _get_mongo_doc_id(unit_id, collection, field='UnitId'):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     '''
     show_filter = {'StatusDesc': 'Completed',
                    'RightsDesc': 'Full',
                    'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
-    show_filter['UnitId'] = unit_id
+    show_filter[field] = unit_id
     found = data_db[collection].find_one(show_filter, {'_id': 1})
     if found:
         return str(found['_id'])
     else:
+        logger.debug('UnitId {} was not found in {}'.format(unit_id, collection))
         return None
 
-def _get_self_collection_name(doc):
+def _get_collection_name(doc):
     if doc.has_key('UnitType'):
         unit_type = doc['UnitType']
     else:
