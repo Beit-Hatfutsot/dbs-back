@@ -106,6 +106,13 @@ collection_map = {
                    1: 'photoUnits',
                    10: 'lexicon'}
 
+# While searching for docs, we always need to filter results by their work
+# status and rights
+show_filter = {
+                'StatusDesc': 'Completed',
+                'RightsDesc': 'Full',
+                'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
+
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
     description = db.StringField(max_length=255)
@@ -363,13 +370,12 @@ def _fetch_item(item_id):
             if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
                 item['_id'] = item['_id']['$oid']
     else:
+        # Return item by id without show filter - good for debugging
         item = data_db[collection].find_one(oid)
 
     if item:
         if item.has_key('Header'):
             # Only add related and thumbnail if our item has header
-            # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
-            #item['related'] = _get_related(item)
             item['related'] = _get_bhp_related(item)
             # HACK TO GET THUMBNAIL
             if not 'thumbnail' in item.keys():
@@ -379,18 +385,19 @@ def _fetch_item(item_id):
     else:
         return {}
 
-def _get_related(doc, max_items=5):
+def _get_text_related(doc, max_items=2):
     """
     THIS IS A HACK TO MOCK REAL RELATED DATA
     """
     related = []
     collections = ['familyNames',
                    'places',
-                   'photoUnits']
+                   'photoUnits',
+                   'personalities']
 
-    if doc['UnitType'] == 1:
-        # Don't look for related items in photo units (UnitType 1)
-        return []
+    #if doc['UnitType'] == 1:
+    #    # Don't look for related items in photo units (UnitType 1)
+    #    return []
 
     en_header = doc['Header']['En']
     if en_header == None:
@@ -403,15 +410,13 @@ def _get_related(doc, max_items=5):
         col = data_db[collection_name]
         headers = en_header + ' ' + he_header
         if headers == ' ':
-            # No headers at all
+            # No headers at all - empty doc - no relateds
             return []
         # Create text indices for text search to work:
         # db.YOUR_COLLECTION.createIndex({"UnitText1.En": "text", "UnitText1.He": "text"})
         header_text_search = {'$text': {'$search': headers}}
-        show_filter = {'StatusDesc': 'Completed',
-                      'RightsDesc': 'Full',
-                      'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
         header_text_search.update(show_filter)
+        print header_text_search
         cursor = col.find(header_text_search).limit(max_items)
         if cursor:
             for related_item in cursor:
@@ -439,23 +444,31 @@ def get_related_pictures(doc, max_len=5, field='PictureId'):
             logger.debug(e.message)
     return rv[:max_len]
             
-def _get_bhp_related(doc, max_items=5):
+def _get_bhp_related(doc, max_items=15):
     """
-    Bring the documents that were tagged as related by an editor
-    Unfortunately there are not a lot of tags, so we only check more promising vectors.
-    photoUnits -> places, photoUnits -> personalities
+    Bring the documents that were manually marked as related to the current doc
+    by an editor.
+    Unfortunately there are not a lot of connections, so we only check the more
+    promising vectors:
     places -> photoUnits
-    personalities -> places, personalities -> familyNames, personalities -> photoUnits
+    personalities -> photoUnits, familyNames, places
+    photoUnits -> places, personalities
     """
-    collection_names = {'PersonalityIds': 'personalities',
-                        'PictureUnitsIds': 'photoUnits',
-                        'FamilyNameIds': 'familyNames',
-                        'UnitPlaces': 'places'}
-    
-    related_fields = {'places': ['PictureUnitsIds'],
-                     'personalities': ['PictureUnitsIds', 'FamilyNameIds', 'UnitPlaces'],
-                     'photoUnits': ['UnitPlaces', 'PersonalityIds']}
+    # A map of fields that we check for each kind of document (by collection)
+    related_fields = {
+            'places': ['PictureUnitsIds'],
+            'personalities': ['PictureUnitsIds', 'FamilyNameIds', 'UnitPlaces'],
+            'photoUnits': ['UnitPlaces', 'PersonalityIds']}
 
+    # A map of document fields to related collections
+    collection_names = {
+            'PersonalityIds': 'personalities',
+            'PictureUnitsIds': 'photoUnits',
+            'FamilyNameIds': 'familyNames',
+            'UnitPlaces': 'places'}
+
+    # Check what is the collection name for the current doc and what are the
+    # related fields that we have to check for it
     rv = []
     self_collection_name = _get_collection_name(doc)
 
@@ -463,15 +476,19 @@ def _get_bhp_related(doc, max_items=5):
         logger.debug('Unkown collection')
         return rv
     elif self_collection_name not in related_fields:
-        logger.debug('BHP related not supported for collection {}'.format(self_collection_name))
+        logger.debug(
+                'BHP related not supported for collection {}'.format(
+                self_collection_name))
         return rv
 
+    # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
     for field in fields:
         if doc.has_key(field) and doc[field]:
             related_value = doc[field]
             if type(related_value) == list:
-                # Some related ids are encoded in comma separated strings and other in lists
+                # Some related ids are encoded in comma separated strings
+                # and others are inside lists
                 related_value_list = [i['PlaceIds'] for i in related_value]
             else:
                 related_value_list = related_value.split(',')
@@ -487,18 +504,19 @@ def _get_bhp_related(doc, max_items=5):
                         rv.append(collection + '.' + mongo_id)
                 except ValueError as e:
                     logger.debug(e.message)
-
-    return rv
+    # If we didn't find enough related items inside the document fields,
+    # get more items using text search
+    if len(rv) < max_items:
+        rv.extend(_get_text_related(doc))
+    return rv[:max_items]
 
 def _get_mongo_doc_id(unit_id, collection, field='UnitId'):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     '''
-    show_filter = {'StatusDesc': 'Completed',
-                   'RightsDesc': 'Full',
-                   'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
-    show_filter[field] = unit_id
-    found = data_db[collection].find_one(show_filter, {'_id': 1})
+    search_query = {field: unit_id}
+    search_query.update(show_filter)
+    found = data_db[collection].find_one(search_query, {'_id': 1})
     if found:
         return str(found['_id'])
     else:
@@ -645,18 +663,15 @@ def search_by_header(string, collection):
     header_regex = re.compile(string, re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
-    # Search only for docs with right status
-    show_filter = {'StatusDesc': 'Completed',
-                   'RightsDesc': 'Full',
-                   'DisplayStatusDesc':  {'$nin': ['Internal Use']},
-                   unit_text: {"$nin": [None, '']}}
+    # Search only for non empty docs with right status
+    show_filter[unit_text] = {"$nin": [None, '']}
     header_search_ex = {lang_header: header_regex}
     header_search_ex.update(show_filter)
     item = data_db[collection].find_one(header_search_ex)
     
     if item:
         # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
-        item['related'] = _get_related(item)
+        item['related'] = _get_bhp_related(item)
         # HACK TO GET THUMBNAIL
         item['thumbnail'] = _get_thumbnail(item)
 
@@ -698,10 +713,8 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     found = []
     header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
-    show_filter = {'StatusDesc': 'Completed',
-                   'RightsDesc': 'Full',
-                   'DisplayStatusDesc':  {'$nin': ['Internal Use']},
-                   unit_text: {"$nin": ['', None]}}
+    # Search only for non empty docs with right status
+    show_filter[unit_text] = {"$nin": [None, '']}
     header_search_ex = {header: regex}
     header_search_ex.update(show_filter)
     projection = {'_id': 0, header: 1}
@@ -873,7 +886,7 @@ def fsearch(max_results=5000,**kwargs):
     logger.debug('Search query:\n{}'.format(search_query))
 
     projection = {'II': 1,   # Individual ID
-                  'GTN': 1,   # GenTree Number
+                  'GTN': 1,  # GenTree Number
                   'LN': 1,   # Last name
                   'FN': 1,   # First Name
                   'IBLN': 1, # Maiden name
