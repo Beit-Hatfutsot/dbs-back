@@ -267,7 +267,7 @@ def _get_user_or_error(user_id):
 
 def _clean_user(user_obj):
     user_dict = dictify(user_obj)
-    allowed_fields = ['email', 'name']
+    allowed_fields = ['email', 'name', 'confirmed_at']
     masked_user_dict = mask_dict(user_dict, allowed_fields)
     return masked_user_dict
 
