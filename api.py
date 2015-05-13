@@ -433,23 +433,6 @@ def _get_text_related(doc, max_items=3):
 
     return related
 
-def get_related_pictures(doc, max_len=5, field='PictureId'):
-    rv = []
-    field = 'RelatedPictures'
-    collection = 'photoUnits'
-    unit_id_list = [i['PicId'] for i in doc['RelatedPictures']]
-    for i in unit_id_list:
-        if not i:
-            continue
-        try:
-            p_id = int(i)
-            mongo_id =  _get_mongo_doc_id(p_id, collection)
-            if mongo_id:
-                rv.append(collection + '.' + mongo_id)
-        except ValueError as e:
-            logger.debug(e.message)
-    return rv[:max_len]
-            
 def _get_bhp_related(doc, max_items=6):
     """
     Bring the documents that were manually marked as related to the current doc
