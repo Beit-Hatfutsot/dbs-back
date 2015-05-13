@@ -385,7 +385,7 @@ def _fetch_item(item_id):
     else:
         return {}
 
-def _get_text_related(doc, max_items=2):
+def _get_text_related(doc, max_items=3):
     """
     THIS IS A HACK TO MOCK REAL RELATED DATA
     """
@@ -394,10 +394,6 @@ def _get_text_related(doc, max_items=2):
                    'places',
                    'photoUnits',
                    'personalities']
-
-    #if doc['UnitType'] == 1:
-    #    # Don't look for related items in photo units (UnitType 1)
-    #    return []
 
     en_header = doc['Header']['En']
     if en_header == None:
@@ -416,15 +412,25 @@ def _get_text_related(doc, max_items=2):
         # db.YOUR_COLLECTION.createIndex({"UnitText1.En": "text", "UnitText1.He": "text"})
         header_text_search = {'$text': {'$search': headers}}
         header_text_search.update(show_filter)
-        print header_text_search
-        cursor = col.find(header_text_search).limit(max_items)
+        projection = {'score': {'$meta': 'textScore'}}
+        sort_expression = [('score', {'$meta': 'textScore'})]
+        # http://api.mongodb.org/python/current/api/pymongo/cursor.html 
+        cursor = col.find(header_text_search, projection).sort(sort_expression).limit(max_items)
         if cursor:
-            for related_item in cursor:
-                related_item = _make_serializable(related_item)
-                if not _make_serializable(doc)['_id'] == related_item['_id']:
-                    related_string = collection_name + '.' + related_item['_id']
-                    related.append(related_string)
-    
+            try:
+                for related_item in cursor:
+                    related_item = _make_serializable(related_item)
+                    if not _make_serializable(doc)['_id'] == related_item['_id']:
+                        related_string = collection_name + '.' + related_item['_id']
+                        related.append(related_string)
+            except pymongo.errors.OperationFailure as e:
+                # Create a text index
+                logger.debug('Creating a text index for collection {}'.format(collection_name))
+                col.ensure_index([('UnitText1.En', pymongo.TEXT), ('UnitText1.He', pymongo.TEXT)])
+                continue
+        else:
+            continue
+
     return related
 
 def get_related_pictures(doc, max_len=5, field='PictureId'):
@@ -444,7 +450,7 @@ def get_related_pictures(doc, max_len=5, field='PictureId'):
             logger.debug(e.message)
     return rv[:max_len]
             
-def _get_bhp_related(doc, max_items=15):
+def _get_bhp_related(doc, max_items=6):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -505,9 +511,12 @@ def _get_bhp_related(doc, max_items=15):
                 except ValueError as e:
                     logger.debug(e.message)
     # If we didn't find enough related items inside the document fields,
-    # get more items using text search
+    # get more items using text search.
+    # Using list -> set -> list conversion to avoid adding the same item
+    # multiple times.
     if len(rv) < max_items:
         rv.extend(_get_text_related(doc))
+        rv = list(set(rv))
     return rv[:max_items]
 
 def _get_mongo_doc_id(unit_id, collection, field='UnitId'):
@@ -804,7 +813,7 @@ def fsearch(max_results=5000,**kwargs):
             if search_dict[k].lower() in ['m', 'f']:
                 sex_query = search_dict[k].upper()
             else:
-                abort(400, "Sex must be on of 'm', 'f'")
+                abort(400, "Sex must be one of 'm', 'f'")
         elif k == 'individual_id':
             individual_id = search_dict['individual_id']
 
