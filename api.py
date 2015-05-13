@@ -442,6 +442,8 @@ def _get_bhp_related(doc, max_items=6):
     places -> photoUnits
     personalities -> photoUnits, familyNames, places
     photoUnits -> places, personalities
+    If no manual marks are found for the document, return the result of text
+    related search.
     """
     # A map of fields that we check for each kind of document (by collection)
     related_fields = {
@@ -463,12 +465,12 @@ def _get_bhp_related(doc, max_items=6):
 
     if not self_collection_name:
         logger.debug('Unkown collection')
-        return rv
+        return _get_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
         logger.debug(
                 'BHP related not supported for collection {}'.format(
                 self_collection_name))
-        return rv
+        return _get_text_related(doc)[:max_items]
 
     # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
