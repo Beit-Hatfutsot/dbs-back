@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
 from bson import json_util
 import re
@@ -9,7 +9,7 @@ import urllib
 import mimetypes
 import magic
 
-from flask import Flask, request, abort
+from flask import Flask, request, abort, url_for
 from flask.ext.mongoengine import MongoEngine, ValidationError
 from flask.ext.security import Security, MongoEngineUserDatastore, \
     UserMixin, RoleMixin, login_required
@@ -17,6 +17,7 @@ from flask.ext.security.utils import encrypt_password, verify_password
 from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
 from  flask.ext.jwt import current_user
+from itsdangerous import URLSafeSerializer, BadSignature
 
 from werkzeug import secure_filename
 
@@ -69,6 +70,16 @@ logger = get_logger()
 
 #allow CORS
 cors = CORS(app, origins=['*'], headers=['content-type', 'accept', 'Authorization'])
+
+def get_serializer(secret_key=None):
+    if secret_key is None:
+        secret_key = app.secret_key
+    return URLSafeSerializer(secret_key)
+
+def get_activation_link(user_id):
+    s = get_serializer()
+    payload = s.dumps(user_id)
+    return url_for('activate_user', payload=payload, _external=True)
 
 # Set up the JWT Token authentication
 jwt = JWT(app)
@@ -304,6 +315,9 @@ def create_user(user_dict):
                                         password=enc_password)
     # Add default role to a newly created user
     user_datastore.add_role_to_user(created, 'user')
+    # Send an email confirmation link
+    user_id = str(created.id)
+    _send_activation_email(user_id)
 
     return _clean_user(created)
 
@@ -576,6 +590,28 @@ def _generate_credits(fn='credits.html'):
     except:
         logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
+
+def _send_activation_email(user_id):
+    user =_get_user_or_error(user_id)
+    email = user.email
+    name = user.name
+    activation_link = get_activation_link(user_id)
+    body = _generate_confirmation_body(name, activation_link)
+    subject = 'My Jewish Story: please confirm your email address'
+    sent = send_gmail(subject, body, email)
+    if not sent:
+        e_message = 'There was an error sending an email to {}'.format(email)
+        logger.error(e_message)
+        abort(500, e_message)
+    return humanify({'sent': email})
+
+def _generate_confirmation_body(name, activation_link):
+    body = '''Hello {}!
+    Please click on <a href="{}">activation link</a> to activate your user at My Jewish Story web site.
+    If you received this email by mistake, simply delete it.
+
+    Thanks, Beit HaTfutsot Online team.'''
+    return body.format(name, activation_link)
 
 def _convert_meta_to_bhp6(upload_md, file_info):
     '''Convert language specific metadata fields to bhp6 format.
@@ -924,6 +960,26 @@ def home():
 @jwt_required()
 def private_space():
     return humanify({'access': 'private', 'email': current_user.email})
+
+@app.route('/users/activate/<payload>')
+def activate_user(payload):
+    s = get_serializer()
+    try:
+        user_id = s.loads(payload)
+    except BadSignature:
+        abort(404)
+
+    user = _get_user_or_error(user_id)
+    user.confirmed_at = datetime.now()
+    user.save()
+    logger.debug('User {} activated'.format(user.email))
+    return humanify(_clean_user(user))
+
+@app.route('/users/send_activation_email',  methods=['POST'])
+@jwt_required()
+def send_activation_email():
+    user_id = str(current_user.id)
+    return _send_activation_email(user_id)
 
 @app.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @app.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
