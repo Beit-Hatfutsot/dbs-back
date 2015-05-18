@@ -10,6 +10,7 @@ import bson
 import soundcloud
 import gmail
 from bson.objectid import ObjectId
+from bson import json_util
 from werkzeug import Response
 
 # Set default GCE project id
@@ -28,6 +29,7 @@ def jsonify(*args, **kwargs):
         See https://gist.github.com/akhenakh/2954605
     """
     return Response(json.dumps(dict(*args, **kwargs),
+                    default=json_util.default,
                     indent=2,
                     cls=MongoJsonEncoder),
                     mimetype='application/json')
