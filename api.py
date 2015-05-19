@@ -1330,6 +1330,24 @@ def fetch_tree(tree_number):
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
 
+@app.route('/get_changes/<from_date>/<to_date>')
+def get_changes(from_date, to_date):
+    '''
+    Return the documents in migration_log collection where the
+    'date' field is inside the from_date to to_date range.
+    The records in migration_log collections are created by migration script.
+    '''
+    # Validate the dates
+    dates = {'start': from_date, 'end': to_date}
+    for date in dates:
+        try:
+            dates[date] = datetime.fromtimestamp(float(dates[date]))
+        except ValueError as e:
+            abort(400, 'Bad timestamp - {}'.format(dates[date]))
+
+    collection = data_db['migration_log']
+    query = {'date': {'$gte': dates['start'], '$lte': dates['end']}}
+    return humanify(collection.find(query))
 
 if __name__ == '__main__':
     app.run('0.0.0.0')
