@@ -24,7 +24,8 @@ from werkzeug import secure_filename
 import pymongo
 import jinja2
 
-from bhs_common.utils import get_conf, gen_missing_keys_error, binarize_image
+from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
+                             get_unit_type)
 from utils import get_logger, upload_file, get_oid, jsonify, send_gmail
 import phonetic
 
@@ -109,13 +110,6 @@ def load_user(payload):
 # Create database connection object
 db = MongoEngine(app)
 data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port, slaveOK=True)[conf.data_db_name]
-
-collection_map = {
-                   6: 'familyNames',
-                   8: 'personalities',
-                   5: 'places',
-                   1: 'photoUnits',
-                   10: 'lexicon'}
 
 # While searching for docs, we always need to filter results by their work
 # status and rights
@@ -536,10 +530,7 @@ def _get_collection_name(doc):
         unit_type = doc['UnitType']
     else:
         return None
-    if unit_type in collection_map.keys():
-        return collection_map[unit_type]
-    else:
-        return None
+    return get_unit_type(unit_type)
 
 def _get_picture(picture_id):
     found = data_db['photos'].find_one({'PictureId': picture_id})
