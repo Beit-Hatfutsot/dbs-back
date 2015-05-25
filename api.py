@@ -3,7 +3,7 @@
 
 from datetime import timedelta, datetime
 import json
-from bson import json_util
+from bson import json_util, ObjectId
 import re
 import urllib
 import mimetypes
@@ -561,7 +561,7 @@ def _get_thumbnail(doc):
         for pic in doc['RelatedPictures']:
             if 'IsPreview' in pic.keys() and 'PictureId' in pic.keys() and pic['IsPreview'] == '1':
                 picture = _get_picture(pic['PictureId'])
-                if not picture.has_key('bin'):
+                if (not picture) or (not picture.has_key('bin')):
                     return {}
                 thumbnail = picture['bin']
                 if 'PictureFileName' in picture.keys():
@@ -1334,9 +1334,10 @@ def fetch_tree(tree_number):
 def get_changes(from_date, to_date):
     '''
     Return the documents in migration_log collection where the
-    'date' field is inside the from_date to to_date range.
+    'date' field is inside the from_date — to_date range.
     The records in migration_log collections are created by migration script.
     '''
+    rv = set()
     # Validate the dates
     dates = {'start': from_date, 'end': to_date}
     for date in dates:
@@ -1345,9 +1346,27 @@ def get_changes(from_date, to_date):
         except ValueError as e:
             abort(400, 'Bad timestamp - {}'.format(dates[date]))
 
-    collection = data_db['migration_log']
+    log_collection = data_db['migration_log']
     query = {'date': {'$gte': dates['start'], '$lte': dates['end']}}
-    return humanify(collection.find(query))
+    projection = {'item_id': 1, '_id': 0}
+    cursor = log_collection.find(query, projection)
+    if not cursor:
+        return humanify([])
+    else:
+        for doc in cursor:
+            col, _id = doc['item_id'].split('.')
+            if col == 'genTreeIndividuals':
+                continue
+            else:
+                query = {'_id': ObjectId(_id)}
+                query.update(show_filter)
+                viewable_doc = data_db[col].find_one(query, {'_id': 1})
+                if not viewable_doc:
+                    logger.debug('Document {} was updated, but it is not viewable'.format(doc['item_id']))
+                    continue
+                else:
+                    rv.add(doc['item_id'])
+    return humanify(list(rv))
 
 if __name__ == '__main__':
     app.run('0.0.0.0')
