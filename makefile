@@ -2,7 +2,7 @@ virtual_env = /home/bhs/venv
 api = /home/bhs/api
 
 
-all: reload venv external_dependencies
+all: reload venv external_dependencies bhs_common
 
 pull:
 	cd $(api) && git pull origin master
@@ -16,6 +16,9 @@ $(virtual_env)/bin/activate: requirements.txt
 
 external_dependencies:
 	sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev > /dev/null
+
+bhs_common: venv
+	pip install -e git+ssh://git@bitbucket.org/bhonline/bhs-common.git#egg=bhs_common
 
 reload: pull
 	sudo service uwsgi reload
