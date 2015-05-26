@@ -17,8 +17,8 @@ $(virtual_env)/bin/activate: requirements.txt
 external_dependencies:
 	sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev > /dev/null
 
-bhs_common: venv
-	pip install -e git+ssh://git@bitbucket.org/bhonline/bhs-common.git#egg=bhs_common
+bhs_common:
+	. $(virtual_env)/bin/activate; pip install -e git+ssh://git@bitbucket.org/bhonline/bhs-common.git#egg=bhs_common
 
 reload: pull
 	sudo service uwsgi reload
