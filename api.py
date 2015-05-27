@@ -539,29 +539,30 @@ def _get_picture(picture_id):
 def _get_thumbnail(doc):
     thumbnail = ''
     path = ''
-    if 'Pictures' in doc.keys():
-        for pic in doc['Pictures']:
-            if 'IsPreview' in pic.keys() and 'PictureId' in pic.keys() and pic['IsPreview'] == '1':
-                picture = _get_picture(pic['PictureId'])
-                if not picture.has_key('bin'):
-                    return {}
-                thumbnail = picture['bin']
-                if 'PictureFileName' in picture.keys():
-                    path = picture['PicturePath']
-    elif 'RelatedPictures' in doc.keys():
-        for pic in doc['RelatedPictures']:
-            if 'IsPreview' in pic.keys() and 'PictureId' in pic.keys() and pic['IsPreview'] == '1':
-                picture = _get_picture(pic['PictureId'])
-                if (not picture) or (not picture.has_key('bin')):
-                    return {}
-                thumbnail = picture['bin']
-                if 'PictureFileName' in picture.keys():
-                    path = picture['PicturePath']
+
+    try:
+        if 'Pictures' in doc.keys():
+            for pic in doc['Pictures']:
+                if pic['IsPreview'] == '1':
+                    picture = _get_picture(pic['PictureId'])
+                    thumbnail = picture['bin']
+                    if 'PictureFileName' in picture.keys():
+                        path = picture['PicturePath']
+        elif 'RelatedPictures' in doc.keys():
+            for pic in doc['RelatedPictures']:
+                if pic['IsPreview'] == '1':
+                    picture = _get_picture(pic['PictureId'])
+                    thumbnail = picture['bin']
+                    if 'PictureFileName' in picture.keys():
+                        path = picture['PicturePath']
+        
+        return {
+            'data': urllib.quote(thumbnail.encode('base-64')), 
+            'path': urllib.quote(path.replace('\\', '/'))
+        }
     
-    return {
-        'data': urllib.quote(thumbnail.encode('base-64')), 
-        'path': urllib.quote(path.replace('\\', '/'))
-    }
+    except (KeyError, TypeError):
+        return {}
 
 def _make_serializable(obj):
     # ToDo: Replace with json.dumps with default setting and check
