@@ -8,6 +8,7 @@ import re
 import urllib
 import mimetypes
 import magic
+from uuid import UUID
 
 from flask import Flask, request, abort, url_for
 from flask.ext.mongoengine import MongoEngine, ValidationError
@@ -1321,6 +1322,44 @@ def fetch_tree(tree_number):
         return humanify(rv)
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
+
+@app.route('/get_image_urls/<image_ids>')
+def fetch_images(image_ids):
+    """Validate the comma separated list of image UUIDs and return a list
+    of links to these images.
+    Will return only 10 first results.
+    """
+    images_bucket_url = 'https://storage.googleapis.com/bhs-flat-pics'
+    collection = data_db['photos']
+    valid_ids = []
+    image_urls = []
+    image_id_list = image_ids.split(',')[:10]
+
+    for i in image_id_list:
+        if not i:
+            continue
+        try:
+            UUID(i)
+            valid_ids.append(i)
+        except ValueError:
+            logger.debug('Wrong UUID - {}'.format(i))
+            continue
+
+    for i in valid_ids:
+        photo = collection.find_one({'PictureId': i})
+        if photo:
+            photo_path = photo['PicturePath']
+            photo_fn = photo['PictureFileName']
+            if not (photo_path and photo_fn):
+                logger.debug('Bad picture path or filename - {}'.format(i))
+                continue
+            photo_extension = photo_path.split('.')[-1].lower()
+            photo_url = '{}/{}.{}'.format(images_bucket_url, i, photo_extension)
+            image_urls.append(photo_url)
+        else:
+            logger.debug('UUID {} was not found'.format(i))
+
+    return humanify(image_urls)
 
 @app.route('/get_changes/<from_date>/<to_date>')
 def get_changes(from_date, to_date):
