@@ -389,6 +389,12 @@ def _fetch_item(item_id):
             # HACK TO GET THUMBNAIL
             if not 'thumbnail' in item.keys():
                 item['thumbnail'] = _get_thumbnail(item)
+            if not 'main_image_url' in item.keys():
+                try:
+                    main_image_id = [image['PictureId'] for image in item['Pictures'] if image['IsPreview'] == '1'][0]
+                    item['main_image_url'] = get_image_url(main_image_id)
+                except (KeyError, IndexError):
+                    item['main_image_url'] = None
 
         return _make_serializable(item)
     else:
@@ -938,6 +944,25 @@ def _generate_year_range(year, fudge_factor=0):
     return {'min': minimum, 'max': maximum}
 
 
+def get_image_url(image_id):
+    image_bucket_url = conf.image_bucket_url
+    collection = data_db['photos']
+
+    photo = collection.find_one({'PictureId': image_id})
+    if photo:
+        photo_path = photo['PicturePath']
+        photo_fn = photo['PictureFileName']
+        if not (photo_path and photo_fn):
+            logger.debug('Bad picture path or filename - {}'.format(image_id))
+            return None
+        extension = photo_path.split('.')[-1].lower()
+        url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
+        return url
+    else:
+        logger.debug('UUID {} was not found'.format(i))
+        return None
+
+
 # Views
 @app.route('/')
 def home():
@@ -1313,13 +1338,13 @@ def fetch_tree(tree_number):
         tree_number = int(tree_number)
     except ValueError:
         abort(400, 'Tree number must be an integer')
-    gtrees_bucket_url = 'https://storage.googleapis.com/bhs-familytrees'
+    ftree_bucket_url = conf.ftree_bucket
     collection = data_db['genTreeIndividuals']
     tree = collection.find_one({'GTN': tree_number})
     if tree:
         tree_path = tree['GenTreePath']
         tree_fn = tree_path.split('/')[-1]
-        rv = {'tree_file': '{}/{}'.format(gtrees_bucket_url, tree_fn)}
+        rv = {'tree_file': '{}/{}'.format(ftree_bucket_url, tree_fn)}
         return humanify(rv)
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
@@ -1330,8 +1355,7 @@ def fetch_images(image_ids):
     of links to these images.
     Will return only 10 first results.
     """
-    images_bucket_url = 'https://storage.googleapis.com/bhs-flat-pics'
-    collection = data_db['photos']
+
     valid_ids = []
     image_urls = []
     image_id_list = image_ids.split(',')[:10]
@@ -1346,21 +1370,9 @@ def fetch_images(image_ids):
             logger.debug('Wrong UUID - {}'.format(i))
             continue
 
-    for i in valid_ids:
-        photo = collection.find_one({'PictureId': i})
-        if photo:
-            photo_path = photo['PicturePath']
-            photo_fn = photo['PictureFileName']
-            if not (photo_path and photo_fn):
-                logger.debug('Bad picture path or filename - {}'.format(i))
-                continue
-            photo_extension = photo_path.split('.')[-1].lower()
-            photo_url = '{}/{}.{}'.format(images_bucket_url, i, photo_extension)
-            image_urls.append(photo_url)
-        else:
-            logger.debug('UUID {} was not found'.format(i))
-
+    image_urls = [get_image_url(i) for i in valid_ids]
     return humanify(image_urls)
+
 
 @app.route('/get_changes/<from_date>/<to_date>')
 def get_changes(from_date, to_date):
