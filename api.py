@@ -919,7 +919,8 @@ def fsearch(max_results=5000,**kwargs):
                   'DP': 1,   # Death place
                   'G': 1,    # Gender
                   'MD': 1,   # Marriage dates as comma separated string
-                  'MP': 1}   # Marriage places as comma separated string
+                  'MP': 1,   # Marriage places as comma separated string
+                  'EditorRemarks': 1}
 
     if 'debug' in search_dict.keys():
         projection = None
