@@ -1338,7 +1338,7 @@ def fetch_tree(tree_number):
         tree_number = int(tree_number)
     except ValueError:
         abort(400, 'Tree number must be an integer')
-    ftree_bucket_url = conf.ftree_bucket
+    ftree_bucket_url = conf.ftree_bucket_url
     collection = data_db['genTreeIndividuals']
     tree = collection.find_one({'GTN': tree_number})
     if tree:
