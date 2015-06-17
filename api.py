@@ -51,7 +51,9 @@ must_have_keys = set(['secret_key',
                     'user_db_name',
                     'data_db_host',
                     'data_db_port',
-                    'data_db_name'])
+                    'data_db_name',
+                    'image_bucket_url',
+                    'video_bucket_url'])
 
 conf = get_conf('/etc/bhs/config.yml', must_have_keys)
 
@@ -395,6 +397,13 @@ def _fetch_item(item_id):
                     item['main_image_url'] = get_image_url(main_image_id)
                 except (KeyError, IndexError):
                     item['main_image_url'] = None
+            video_id_key = 'MovieFileId'
+            if item.has_key(video_id_key):
+                # Try to fetch the video URL
+                video_id = item[video_id_key]
+                video_url = get_video_url(video_id)
+                if video_url:
+                    item['video_url'] = video_url
 
         return _make_serializable(item)
     else:
@@ -959,9 +968,26 @@ def get_image_url(image_id):
         url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
         return url
     else:
-        logger.debug('UUID {} was not found'.format(i))
+        logger.debug('UUID {} was not found'.format(image_id))
         return None
 
+
+def get_video_url(video_id):
+    video_bucket_url = conf.video_bucket_url
+    collection = data_db['movies']
+    # Only filtered by rights and status videos were uploaded
+    video = collection.find_one({'MovieFileId': video_id,
+                                 'RightsDesc': 'Full',
+                                 'StatusDesc': 'Completed',
+                                 'MoviePath': {'$nin': [None, 'None']}})
+    if video:
+        video_path = video['MoviePath']
+        extension = video_path.split('.')[-1].lower()
+        url = '{}/{}.{}'.format(video_bucket_url, video_id, extension)
+        return url
+    else:
+        logger.debug('Video URL was not found for {}'.format(video_id))
+        return None
 
 # Views
 @app.route('/')
