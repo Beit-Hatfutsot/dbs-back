@@ -473,7 +473,7 @@ def _get_bhp_related(doc, max_items=6):
     self_collection_name = _get_collection_name(doc)
 
     if not self_collection_name:
-        logger.debug('Unkown collection')
+        logger.debug('Unknown collection')
         return _get_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
         logger.debug(
