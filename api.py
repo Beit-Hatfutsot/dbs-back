@@ -982,7 +982,9 @@ def get_video_url(video_id):
                                  'MoviePath': {'$nin': [None, 'None']}})
     if video:
         video_path = video['MoviePath']
-        extension = video_path.split('.')[-1].lower()
+        #extension = video_path.split('.')[-1].lower()
+        # We transcode everything to H264 in mp4 container
+        extension = 'mp4'
         url = '{}/{}.{}'.format(video_bucket_url, video_id, extension)
         return url
     else:
