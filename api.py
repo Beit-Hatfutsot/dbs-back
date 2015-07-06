@@ -386,28 +386,33 @@ def _fetch_item(item_id):
 
     if item:
         if item.has_key('Header'):
-            # Only add related and thumbnail if our item has header
-            item['related'] = _get_bhp_related(item)
-            # HACK TO GET THUMBNAIL
-            if not 'thumbnail' in item.keys():
-                item['thumbnail'] = _get_thumbnail(item)
-            if not 'main_image_url' in item.keys():
-                try:
-                    main_image_id = [image['PictureId'] for image in item['Pictures'] if image['IsPreview'] == '1'][0]
-                    item['main_image_url'] = get_image_url(main_image_id)
-                except (KeyError, IndexError):
-                    item['main_image_url'] = None
-            video_id_key = 'MovieFileId'
-            if item.has_key(video_id_key):
-                # Try to fetch the video URL
-                video_id = item[video_id_key]
-                video_url = get_video_url(video_id)
-                if video_url:
-                    item['video_url'] = video_url
-
+            item = enrich_item(item)
+        else:
+            logger.debug('No header for item id {}'.format(str(item['_id'])))
+            return {}
         return _make_serializable(item)
     else:
         return {}
+
+def enrich_item(item):
+    item['related'] = _get_bhp_related(item)
+    if not 'thumbnail' in item.keys():
+        item['thumbnail'] = _get_thumbnail(item)
+    if not 'main_image_url' in item.keys():
+        try:
+            main_image_id = [image['PictureId'] for image in item['Pictures'] if image['IsPreview'] == '1'][0]
+            item['main_image_url'] = get_image_url(main_image_id)
+        except (KeyError, IndexError):
+            item['main_image_url'] = None
+    video_id_key = 'MovieFileId'
+    if item.has_key(video_id_key):
+        # Try to fetch the video URL
+        video_id = item[video_id_key]
+        video_url = get_video_url(video_id)
+        if video_url:
+            item['video_url'] = video_url
+
+    return item
 
 def _get_text_related(doc, max_items=3):
     """
@@ -706,13 +711,9 @@ def search_by_header(string, collection):
     header_search_ex = {lang_header: header_regex}
     header_search_ex.update(show_filter)
     item = data_db[collection].find_one(header_search_ex)
-    
-    if item:
-        # HACK TO GET RELATED WHILE THERE IS NO REAL DATA
-        item['related'] = _get_bhp_related(item)
-        # HACK TO GET THUMBNAIL
-        item['thumbnail'] = _get_thumbnail(item)
 
+    if item:
+        item = enrich_item(item)
         return _make_serializable(item)
     else:
         return {}
