@@ -411,7 +411,8 @@ def enrich_item(item):
         video_url = get_video_url(video_id)
         if video_url:
             item['video_url'] = video_url
-
+        else:
+            abort(404, 'No video URL was found for this movie item.')
     return item
 
 def _get_text_related(doc, max_items=3):
