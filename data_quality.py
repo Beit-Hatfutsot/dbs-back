@@ -19,8 +19,8 @@ if __name__ == '__main__':
     collections = ['places',
                    'photoUnits',
                    'personalities',
-                   'movies']
-                   #'familyNames']
+                   'movies',
+                   'familyNames']
     broken = {}
     for c in collections:
         broken[c] = get_bad_headers(db[c])
@@ -28,4 +28,4 @@ if __name__ == '__main__':
     for c in broken:
         print c
         unit_ids = [str(int(i.keys()[0])) for i in broken[c]]
-        print ','.join(unit_ids)
+        print '\n'.join(unit_ids)
