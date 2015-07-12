@@ -698,14 +698,17 @@ def _convert_meta_to_bhp6(upload_md, file_info):
     rv['raw'] = no_lang
     return rv
 
-def search_by_header(string, collection):
+def search_by_header(string, collection, mode='contains'):
     if not string: # Support empty strings
         return {}
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
         lang = 'En'
-    header_regex = re.compile('^'+string, re.IGNORECASE)
+    if mode == 'starts_with':
+        header_regex = re.compile('^'+string, re.IGNORECASE)
+    else:
+        header_regex = re.compile(string, re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
@@ -1283,7 +1286,7 @@ def wizard_search():
         return _generate_credits()
 
     place_doc = search_by_header(place, 'places')
-    name_doc = search_by_header(name, 'familyNames')
+    name_doc = search_by_header(name, 'familyNames', mode='starts_with')
     # fsearch() expects a dictionary of lists and returns Mongo cursor
     ftree_args = {}
     if name:
