@@ -144,7 +144,7 @@ class Ugc(db.Document):
 def setup_users():
     for role_name in ('user', 'admin'):
         if not user_datastore.find_role(role_name):
-            logger.debug('Creating role %s' % role_name)
+            logger.debug('Creating role {}'.format(role_name))
             user_datastore.create_role(name=role_name)
 
     user_role = user_datastore.find_role('user')
@@ -297,13 +297,14 @@ def create_user(user_dict):
         name = user_dict['name']
         enc_password = encrypt_password(user_dict['password'])
     except KeyError as e:
-        e_message = '%s key is missing from data' % e
+        e_message = '{} key is missing from data'.format(e)
         logger.debug(e_message)
         abort(400, e_message)
 
     user_exists = user_datastore.get_user(email)
     if user_exists:
-        e_message = 'User %s with email %s already exists' % (str(user_exists.id), email)
+        e_message = 'User {} with email {} already exists'.format(
+                                        str(user_exists.id), email)
         logger.debug(e_message)
         abort(409, e_message)
 
@@ -746,7 +747,7 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
         lang = 'En'
 
     if search_prefix:
-        regex = re.compile('^%s' % string, re.IGNORECASE)
+        regex = re.compile('^'+string, re.IGNORECASE)
     else:
         regex = re.compile(string, re.IGNORECASE)
 
@@ -1057,8 +1058,8 @@ def manage_user(user_id=None):
         if is_admin(current_user):
             return user_handler(user_id, request.method, request.data)
         else:
-            logger.debug('Non-admin user %s tried to access user id %s' % (
-                                                current_user.email, user_id))
+            logger.debug('Non-admin user {} tried to access user id {}'.format(
+                                                  current_user.email, user_id))
             abort(403)
     else:
         # user access_mode
@@ -1247,7 +1248,7 @@ def save_user_content():
         clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
         return humanify({'md': clean_md})
     else:
-        abort(500, 'Failed to save %s' % filename)
+        abort(500, 'Failed to save {}'.format(filename))
 
 @app.route('/search')
 def general_search():
