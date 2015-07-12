@@ -978,10 +978,11 @@ def get_image_url(image_id):
 def get_video_url(video_id):
     video_bucket_url = conf.video_bucket_url
     collection = data_db['movies']
-    # Only filtered by rights and status videos were uploaded
+    # Search only within the movies filtered by rights, display status and work status
     video = collection.find_one({'MovieFileId': video_id,
                                  'RightsDesc': 'Full',
                                  'StatusDesc': 'Completed',
+                                 'DisplayStatusDesc': {'$nin': ['Internal Use']},
                                  'MoviePath': {'$nin': [None, 'None']}})
     if video:
         video_path = video['MoviePath']
