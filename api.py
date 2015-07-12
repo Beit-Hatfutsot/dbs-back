@@ -705,7 +705,7 @@ def search_by_header(string, collection):
         lang = 'He'
     else:
         lang = 'En'
-    header_regex = re.compile(string, re.IGNORECASE)
+    header_regex = re.compile('^'+string, re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
