@@ -416,14 +416,16 @@ def enrich_item(item):
             abort(404, 'No video URL was found for this movie item.')
     return item
 
-def _get_text_related(doc, max_items=3):
-    """
-    THIS IS A HACK TO MOCK REAL RELATED DATA
+def get_text_related(doc, max_items=3):
+    """Look for documents in `collections` where one or more of the words
+    from the headers (English and Hebrew) of the goven `doc` appear inside
+    UnitText1 field.
     """
     related = []
     collections = ['familyNames',
                    'places',
                    'photoUnits',
+                   'movies',
                    'personalities']
 
     en_header = doc['Header']['En']
@@ -452,6 +454,7 @@ def _get_text_related(doc, max_items=3):
                 for related_item in cursor:
                     related_item = _make_serializable(related_item)
                     if not _make_serializable(doc)['_id'] == related_item['_id']:
+                        # Exclude the doc iteself from its relateds
                         related_string = collection_name + '.' + related_item['_id']
                         related.append(related_string)
             except pymongo.errors.OperationFailure as e:
@@ -496,12 +499,12 @@ def _get_bhp_related(doc, max_items=6):
 
     if not self_collection_name:
         logger.debug('Unknown collection')
-        return _get_text_related(doc)[:max_items]
+        return get_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
         logger.debug(
                 'BHP related not supported for collection {}'.format(
                 self_collection_name))
-        return _get_text_related(doc)[:max_items]
+        return get_text_related(doc)[:max_items]
 
     # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
@@ -531,7 +534,7 @@ def _get_bhp_related(doc, max_items=6):
     # Using list -> set -> list conversion to avoid adding the same item
     # multiple times.
     if len(rv) < max_items:
-        rv.extend(_get_text_related(doc))
+        rv.extend(get_text_related(doc))
         rv = list(set(rv))
     return rv[:max_items]
 
