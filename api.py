@@ -12,8 +12,8 @@ from uuid import UUID
 
 from flask import Flask, request, abort, url_for
 from flask.ext.mongoengine import MongoEngine, ValidationError
-from flask.ext.security import Security, MongoEngineUserDatastore, \
-    UserMixin, RoleMixin, login_required
+from flask.ext.security import (Security, MongoEngineUserDatastore,
+                               UserMixin, RoleMixin, login_required)
 from flask.ext.security.utils import encrypt_password, verify_password
 from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
@@ -30,7 +30,7 @@ from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
 from utils import get_logger, upload_file, get_oid, jsonify, send_gmail
 import phonetic
 
-import pdb
+import pdb # Because Danny!
 
 # Create app
 app = Flask(__name__)
@@ -79,6 +79,11 @@ def get_serializer(secret_key=None):
     if secret_key is None:
         secret_key = app.secret_key
     return URLSafeSerializer(secret_key)
+
+def get_frontend_activation_link(user_id, referrer):
+    s = get_serializer()
+    payload = s.dumps(user_id)
+    return '{}activate_user/{}'.format(referrer, payload)
 
 def get_activation_link(user_id):
     s = get_serializer()
@@ -239,7 +244,10 @@ def dictify(m_engine_object):
     return json.loads(m_engine_object.to_json())
 
 # User management
-def user_handler(user_id, method, data):
+def user_handler(user_id, request):
+    method = request.method
+    data = request.data
+    referrer = request.referrer
     if data:
         try:
             data = json.loads(data)
@@ -256,7 +264,7 @@ def user_handler(user_id, method, data):
     elif method == 'POST':
         if not data:
             abort(400, 'No data provided')
-        return humanify(create_user(data))
+        return humanify(create_user(data, referrer))
 
     elif method == 'PUT':
         if not data:
@@ -291,7 +299,7 @@ def delete_user(user_id):
         user.delete()
         return {}
 
-def create_user(user_dict):
+def create_user(user_dict, referrer=None):
     try:
         email = user_dict['email']
         name = user_dict['name']
@@ -313,9 +321,10 @@ def create_user(user_dict):
                                         password=enc_password)
     # Add default role to a newly created user
     user_datastore.add_role_to_user(created, 'user')
-    # Send an email confirmation link
-    user_id = str(created.id)
-    _send_activation_email(user_id)
+    # Send an email confirmation link only if referrer is specified
+    if referrer:
+        user_id = str(created.id)
+        _send_activation_email(user_id, referrer)
 
     return _clean_user(created)
 
@@ -609,21 +618,31 @@ def _generate_credits(fn='credits.html'):
         logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
 
-def _send_activation_email(user_id):
+def _send_activation_email(user_id, referrer):
     user =_get_user_or_error(user_id)
     email = user.email
     name = user.name
-    activation_link = get_activation_link(user_id)
-    body = _generate_confirmation_body(name, activation_link)
+    activation_link = get_frontend_activation_link(user_id, referrer)
+    body = _generate_confirmation_body('email_verfication_template.html',
+                                      name, activation_link)
     subject = 'My Jewish Story: please confirm your email address'
-    sent = send_gmail(subject, body, email)
+    sent = send_gmail(subject, body, email, message_mode='html')
     if not sent:
         e_message = 'There was an error sending an email to {}'.format(email)
         logger.error(e_message)
         abort(500, e_message)
     return humanify({'sent': email})
 
-def _generate_confirmation_body(name, activation_link):
+def _generate_confirmation_body(template_fn, name, activation_link):
+    try:
+        fh = open(template_fn)
+        template = fh.read()
+        fh.close()
+        return template.format(name, activation_link)
+    except:
+        logger.debug("Couldn't open template file {}".format(template_fn))
+        abort(500, "Couldn't open template file")
+
     body = '''Hello {}!
     Please click on <a href="{}">activation link</a> to activate your user at My Jewish Story web site.
     If you received this email by mistake, simply delete it.
@@ -1004,6 +1023,7 @@ def get_video_url(video_id):
 # Views
 @app.route('/')
 def home():
+    print request.referrer
     # Check if the user is authenticated with JWT 
     try:
         verify_jwt()
@@ -1055,7 +1075,7 @@ def manage_user(user_id=None):
         if request.method == 'POST':
             if not 'application/json' in request.headers['Content-Type']:
                 abort(400, "Please set 'Content-Type' header to 'application/json'")
-            return user_handler(None, request.method, request.data)
+            return user_handler(None, request)
         else:
             logger.debug(e.description)
             abort(403)
@@ -1063,7 +1083,7 @@ def manage_user(user_id=None):
     if user_id:
         # admin access_mode
         if is_admin(current_user):
-            return user_handler(user_id, request.method, request.data)
+            return user_handler(user_id, request)
         else:
             logger.debug('Non-admin user {} tried to access user id {}'.format(
                                                   current_user.email, user_id))
@@ -1074,7 +1094,7 @@ def manage_user(user_id=None):
         # Deny POSTing to logged in non-admin users to avoid confusion with PUT
         if request.method == 'POST':
             abort(400, 'POST method is not supported for logged in users.')
-        return user_handler(user_id, request.method, request.data)
+        return user_handler(user_id, request)
 
 @app.route('/mjs', methods=['GET', 'PUT'])
 @jwt_required()
@@ -1249,7 +1269,7 @@ def save_user_content():
                                 'metadata': clean_md,
                                 'user_email': user_email,
                                 'user_name': user_name})
-        sent = send_gmail(subject, body, editor_address)
+        sent = send_gmail(subject, body, editor_address, message_mode='html')
         if not sent:
             logger.error('There was an error sending an email to {}'.format(editor_address))
         clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
