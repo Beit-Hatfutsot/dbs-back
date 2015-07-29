@@ -143,7 +143,7 @@ def upload_to_soundcloud(sc_client, fn):
          })
     return track.obj
 
-def send_gmail(subject, body, address):
+def send_gmail(subject, body, address, message_mode='text'):
     must_have_keys = set(['email_username',
                     'email_password',
                     'email_from'])
@@ -151,7 +151,10 @@ def send_gmail(subject, body, address):
     conf = get_conf('/etc/bhs/config.yml', must_have_keys)
 
     my_gmail = gmail.GMail(conf.email_username, conf.email_password)
-    msg = gmail.Message(subject, text=body, to=address, sender=conf.email_from)
+    if message_mode == 'html':
+        msg = gmail.Message(subject, html=body, to=address, sender=conf.email_from)
+    else:
+        msg = gmail.Message(subject, text=body, to=address, sender=conf.email_from)
     try:
         my_gmail.send(msg) 
     except  gmail.gmail.SMTPAuthenticationError as e:
