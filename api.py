@@ -80,10 +80,17 @@ def get_serializer(secret_key=None):
         secret_key = app.secret_key
     return URLSafeSerializer(secret_key)
 
-def get_frontend_activation_link(user_id, referrer):
+def get_referrer_host_url(referrer):
+    """Return referring host url for valid links or None"""
+    for protocol in ['http://', 'https://']:
+        if referrer.startswith(protocol):
+            return protocol + referrer.split(protocol)[1].split('/')[0]
+    return None
+
+def get_frontend_activation_link(user_id, referrer_host_url):
     s = get_serializer()
     payload = s.dumps(user_id)
-    return '{}activate_user/{}'.format(referrer, payload)
+    return '{}/verify_email/{}'.format(referrer_host_url, payload)
 
 def get_activation_link(user_id):
     s = get_serializer()
@@ -248,6 +255,10 @@ def user_handler(user_id, request):
     method = request.method
     data = request.data
     referrer = request.referrer
+    if referrer:
+        referrer_host_url = get_referrer_host_url(referrer)
+    else:
+        referrer_host_url = None
     if data:
         try:
             data = json.loads(data)
@@ -264,7 +275,7 @@ def user_handler(user_id, request):
     elif method == 'POST':
         if not data:
             abort(400, 'No data provided')
-        return humanify(create_user(data, referrer))
+        return humanify(create_user(data, referrer_host_url))
 
     elif method == 'PUT':
         if not data:
@@ -299,7 +310,7 @@ def delete_user(user_id):
         user.delete()
         return {}
 
-def create_user(user_dict, referrer=None):
+def create_user(user_dict, referrer_host_url=None):
     try:
         email = user_dict['email']
         name = user_dict['name']
@@ -322,9 +333,9 @@ def create_user(user_dict, referrer=None):
     # Add default role to a newly created user
     user_datastore.add_role_to_user(created, 'user')
     # Send an email confirmation link only if referrer is specified
-    if referrer:
+    if referrer_host_url:
         user_id = str(created.id)
-        _send_activation_email(user_id, referrer)
+        _send_activation_email(user_id, referrer_host_url)
 
     return _clean_user(created)
 
@@ -618,11 +629,11 @@ def _generate_credits(fn='credits.html'):
         logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
 
-def _send_activation_email(user_id, referrer):
+def _send_activation_email(user_id, referrer_host_url):
     user =_get_user_or_error(user_id)
     email = user.email
     name = user.name
-    activation_link = get_frontend_activation_link(user_id, referrer)
+    activation_link = get_frontend_activation_link(user_id, referrer_host_url)
     body = _generate_confirmation_body('email_verfication_template.html',
                                       name, activation_link)
     subject = 'My Jewish Story: please confirm your email address'
@@ -1023,7 +1034,6 @@ def get_video_url(video_id):
 # Views
 @app.route('/')
 def home():
-    print request.referrer
     # Check if the user is authenticated with JWT 
     try:
         verify_jwt()
@@ -1055,8 +1065,13 @@ def activate_user(payload):
 @app.route('/users/send_activation_email',  methods=['POST'])
 @jwt_required()
 def send_activation_email():
+    referrer = request.referrer
+    if referrer:
+        referrer_host_url = get_referrer_host_url(referrer)
+    else:
+        referrer_host_url = None
     user_id = str(current_user.id)
-    return _send_activation_email(user_id)
+    return _send_activation_email(user_id, referrer_host_url)
 
 @app.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @app.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
