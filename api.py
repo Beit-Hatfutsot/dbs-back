@@ -26,7 +26,7 @@ import pymongo
 import jinja2
 
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                             get_unit_type)
+                             get_unit_type, SEARCHABLE_COLLECTIONS)
 from utils import get_logger, upload_file, get_oid, jsonify, send_gmail
 import phonetic
 
@@ -1292,9 +1292,30 @@ def save_user_content():
     else:
         abort(500, 'Failed to save {}'.format(filename))
 
-@app.route('/search')
-def general_search():
-    pass
+@app.route('/search/<search_string>')
+def general_search(search_string, max_results=10):
+    """
+    A full text search on the specified collection,
+    or on all the SEARCHABLE_COLLECTIONS if no collection was specified.
+    """
+    collections = SEARCHABLE_COLLECTIONS
+    args = request.args
+    rv = {}
+    if 'collection' in args.keys():
+        collection_value = request.args['collection']
+        if collection_value in SEARCHABLE_COLLECTIONS:
+            collections = (collection_value,) #The trailing comma is for tuple
+
+    for collection in collections:
+        col_obj = data_db[collection]
+        text_search = {'$text': {'$search': search_string}}
+        text_search.update(show_filter)
+        score_projection = {'score': {'$meta': 'textScore'}}
+        sort_expression = [('score', {'$meta': 'textScore'})]
+        cursor = col_obj.find(text_search, score_projection).sort(sort_expression).limit(max_results)
+        rv[collection] = list(cursor)
+
+    return humanify(rv)
 
 @app.route('/wsearch')
 def wizard_search():
