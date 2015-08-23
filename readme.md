@@ -8,7 +8,7 @@ On Debian/Ubuntu run::
     $ git clone git@bitbucket.org:bhonline/bhs_api.git
     $ cd bhs_api
     $ make external_dependencies
-    $ virtualenv venev
+    $ virtualenv venv
     $ . venv/bin/activate
     $ pip install -r requirments.txt
 
