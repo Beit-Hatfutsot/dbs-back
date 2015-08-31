@@ -1,10 +1,12 @@
 import sys
+import os
 import json
 
 import pytest
 from pytest_flask.plugin import client, config
 
-sys.path.append('..')
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                             os.pardir)))
 
 import api
 

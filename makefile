@@ -27,7 +27,7 @@ reload_nginx:
 	sudo service nginx reload
 
 test:
-	(cd tests; py.test)
+	py.test tests api.py
 
 #love:
 #	$(info "Not with a computer, stupid!")

@@ -20,17 +20,15 @@ from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
 from  flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
 
-from werkzeug import secure_filename
+from werkzeug import secure_filename, Response
 
 import pymongo
 import jinja2
 
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                              get_unit_type, SEARCHABLE_COLLECTIONS)
-from utils import get_logger, upload_file, get_oid, jsonify, send_gmail
+from utils import get_logger, upload_file, get_oid, send_gmail, MongoJsonEncoder
 import phonetic
-
-import pdb # Because Danny!
 
 # Create app
 app = Flask(__name__)
@@ -172,65 +170,40 @@ user_datastore = MongoEngineUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
 
-# Stubs for custom error handlers
-@app.errorhandler(400)
-def custom_400(error):
-    # Bad Request
-    response = humanify({'error': error.description})
-    return response, 400
-
-@app.errorhandler(403)
-def custom_403(error):
-    # Forbidden
-    response = humanify({'error': error.description})
-    return response, 403
-
-@app.errorhandler(404)
-def custom_404(error):
-    # Not Found
-    response = humanify({'error': error.description})
-    return response, 404
-
-@app.errorhandler(405)
-def custom_405(error):
-    # Method not allowed
-    response = humanify({'error': error.description})
-    return response, 405
-
-@app.errorhandler(409)
-def custom_409(error):
-    # Conflict
-    response = humanify({'error': error.description})
-    return response, 409
-
-@app.errorhandler(415)
-def custom_415(error):
-    # Unsupported Media Type
-    response = humanify({'error': error.description})
-    return response, 415
-
-@app.errorhandler(500)
-def custom_500(error):
-    # Internal Server Error
-    response = humanify({'error': error.description})
-    return response, 500
+def custom_error(error):
+    return humanify({'error': error.description}, error.code)
 
 # Utility functions
-def humanify(obj):
-    'Adds newline to Json responses to make CLI debugging easier'
+def humanify(obj, status_code=200):
+    """ Gets an obj and possibly a status code and returns a flask Resonse
+        with a jsonified obj, with newlines.
+    >>> humanify({"a": 1})
+    <Response 13 bytes [200 OK]>
+    >>> humanify({"a": 1}, 404)
+    <Response 13 bytes [404 NOT FOUND]>
+    >>> humanify({"a": 1}).get_data()
+    '{\\n  "a": 1\\n}\\n'
+    >>> humanify([1,2,3]).get_data()
+    '[\\n  1, \\n  2, \\n  3\\n]\\n'
+    """
     # jsonify function doesn't work with lists
     if type(obj) == list:
-        return json.dumps(obj, default=json_util.default, indent=2) + '\n'
+        data = json.dumps(obj, default=json_util.default, indent=2) + '\n'
     elif type(obj) == pymongo.cursor.Cursor:
         rv = []
         for doc in obj:
             doc['_id'] = str(doc['_id'])
             rv.append(json.dumps(doc, default=json_util.default, indent=2))
-        return '[' + ',\n'.join(rv) + ']' + '\n'
+        data = '[' + ',\n'.join(rv) + ']' + '\n'
     else:
-        resp = jsonify(obj)
-        resp.set_data(resp.data+'\n')
-        return resp
+        data = json.dumps(obj,
+                          default=json_util.default,
+                          indent=2,
+                          cls=MongoJsonEncoder)
+        data += '\n'
+    resp = Response(data, mimetype='application/json')
+    resp.status_code = status_code
+    return resp
 
 def is_admin(flask_user_obj):
     if flask_user_obj.has_role('admin'):
@@ -1507,4 +1480,7 @@ def get_changes(from_date, to_date):
     return humanify(list(rv))
 
 if __name__ == '__main__':
+    for i in [400, 403, 404, 405, 409, 415, 500]:
+        app.error_handler_spec[None][i] = custom_error
+
     app.run('0.0.0.0')
