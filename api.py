@@ -366,11 +366,13 @@ def _fetch_item(item_id):
     if not '.' in item_id: # Need colection.id to unpack
         return {}
     collection, _id = item_id.split('.')[:2]
-    oid = get_oid(_id)
-    if not oid:
+    try:
+        _id = long(_id)
+    except ValueError:
+        logger.debug('Bad id: {}'.format(_id))
         return {}
     if collection == 'ugc':
-        item = dictify(Ugc.objects(id=oid).first())
+        item = dictify(Ugc.objects(id=_id).first())
         if item:
             item_id = item['_id']
             item = item['ugc']
@@ -379,7 +381,7 @@ def _fetch_item(item_id):
                 item['_id'] = item['_id']['$oid']
     else:
         # Return item by id without show filter - good for debugging
-        item = data_db[collection].find_one(oid)
+        item = data_db[collection].find_one(_id)
 
     if item:
         if item.has_key('Header'):
@@ -1354,7 +1356,7 @@ def get_items(item_id):
     This view returns either Json representing an item or a list of such Jsons.
     The expected item_id string is in form of "collection_name.item_id"
     and could be  split by commas - if there is only one id, the view will return
-    a single Json. 
+    a single Json.
     Only the first 10 ids will be returned for the list view to prevent abuse.
     '''
     items_list = item_id.split(',')
@@ -1371,7 +1373,6 @@ def get_items(item_id):
         except JWTError as e:
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
-        
 
     items = fetch_items(items_list[:10])
     if items:
