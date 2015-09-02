@@ -94,7 +94,7 @@ def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger.addHandler(ch)
     return logger
 
-def upload_file(file_obj, bucket, file_oid, object_md):
+def upload_file(file_obj, bucket, file_oid, object_md, make_public=False):
     '''
     Upload the file object to a bucket using credentials and object metadata.
     Object name is a part of its metadata.
@@ -115,6 +115,8 @@ def upload_file(file_obj, bucket, file_oid, object_md):
     new_key.update_metadata(object_md)
     try:
         new_key.set_contents_from_file(file_obj)
+        if make_public:
+            new_key.make_public()
     except boto.exception.GSResponseError as e:
         # Do we have the credentials file set up?
         if not os.path.exists(boto_cred_file):
