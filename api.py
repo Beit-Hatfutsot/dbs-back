@@ -366,20 +366,20 @@ def _fetch_item(item_id):
     if not '.' in item_id: # Need colection.id to unpack
         return {}
     collection, _id = item_id.split('.')[:2]
-    try:
-        _id = long(_id)
-    except ValueError:
-        logger.debug('Bad id: {}'.format(_id))
-        return {}
     if collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
         if item:
             item_id = item['_id']
-            item = item['ugc']
+            item = item['ugc'] # Getting the dict out from  mongoengine
             item['_id'] = item_id
             if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
                 item['_id'] = item['_id']['$oid']
     else:
+        try:
+            _id = long(_id)
+        except ValueError:
+            logger.debug('Bad id: {}'.format(_id))
+            return {}
         # Return item by id without show filter - good for debugging
         item = data_db[collection].find_one(_id)
 
