@@ -2,6 +2,7 @@ import logging
 import json
 import datetime
 import os
+import getpass
 
 import yaml
 import boto
@@ -93,11 +94,16 @@ def get_logger(app_name='bhs_api', fn='bhs_api.log'):
     logger.addHandler(ch)
     return logger
 
-def upload_file(file_obj, bucket, file_oid, object_md):
+def upload_file(file_obj, bucket, file_oid, object_md, make_public=False):
     '''
     Upload the file object to a bucket using credentials and object metadata.
     Object name is a part of its metadata.
     '''
+    if getpass.getuser() == 'bhs':
+        boto_cred_file = '/home/bhs/.boto'
+    else:
+        boto_cred_file = os.path.expanduser('~') + '/.boto'
+
     fn = str(file_oid)
     dest_uri = boto.storage_uri(bucket + '/' + fn, 'gs')
     try:
@@ -109,9 +115,10 @@ def upload_file(file_obj, bucket, file_oid, object_md):
     new_key.update_metadata(object_md)
     try:
         new_key.set_contents_from_file(file_obj)
+        if make_public:
+            new_key.make_public()
     except boto.exception.GSResponseError as e:
         # Do we have the credentials file set up?
-        boto_cred_file = os.path.expanduser('~') + '/.boto'
         if not os.path.exists(boto_cred_file):
             print('Credentials file {} was not found.'.format(boto_cred_file))
 

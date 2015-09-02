@@ -1233,7 +1233,7 @@ def save_user_content():
     except IOError as e:
         logger.debug('Thumbnail creation failed for {} with error: {}'.format(
             file_obj.filename, e.message))
-        
+
     # Add ugc flag to the metadata
     bhp6_md['ugc'] = True
     # Insert the metadata to the ugc collection
@@ -1242,7 +1242,7 @@ def save_user_content():
     file_oid = new_ugc.id
 
     bucket = ugc_bucket
-    saved_uri = upload_file(file_obj, bucket, file_oid, full_md) 
+    saved_uri = upload_file(file_obj, bucket, file_oid, full_md, make_public=True)
     user_email = current_user.email
     user_name = current_user.name
     if saved_uri:
@@ -1254,6 +1254,11 @@ def save_user_content():
             mjs = _init_mjs()
         mjs['unassigned'].append('ugc.{}'.format(str(file_oid)))
         update_mjs(user_oid, mjs)
+        # Add main_image_url for images (UnitType 1)
+        if bhp6_md['UnitType'] == 1:
+            ugc_image_uri = 'https://storage.googleapis.com/' + saved_uri.split('gs://')[1]
+            new_ugc['ugc']['main_image_url'] = ugc_image_uri
+            new_ugc.save()
         # Send an email to editor
         subject = 'New UGC submission'
         with open('editors_email_template') as fh:
@@ -1266,6 +1271,7 @@ def save_user_content():
         if not sent:
             logger.error('There was an error sending an email to {}'.format(editor_address))
         clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
+
         return humanify({'md': clean_md})
     else:
         abort(500, 'Failed to save {}'.format(filename))
