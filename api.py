@@ -394,7 +394,7 @@ def _fetch_item(item_id):
         return {}
 
 def enrich_item(item):
-    item['related'] = _get_bhp_related(item)
+    item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
@@ -416,16 +416,11 @@ def enrich_item(item):
 
 def get_text_related(doc, max_items=3):
     """Look for documents in `collections` where one or more of the words
-    from the headers (English and Hebrew) of the goven `doc` appear inside
+    from the headers (English and Hebrew) of the given `doc` appear inside
     UnitText1 field.
     """
     related = []
-    collections = ['familyNames',
-                   'places',
-                   'photoUnits',
-                   'movies',
-                   'personalities']
-
+    collections = SEARCHABLE_COLLECTIONS
     en_header = doc['Header']['En']
     if en_header == None:
         en_header = ''
@@ -465,7 +460,7 @@ def get_text_related(doc, max_items=3):
 
     return related
 
-def _get_bhp_related(doc, max_items=6):
+def get_bhp_related(doc, max_items=6):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
