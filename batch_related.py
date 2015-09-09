@@ -4,6 +4,7 @@ import datetime
 import logging
 
 import redis
+from elasticsearch import Elasticsearch
 
 import api
 
@@ -22,11 +23,31 @@ def get_now_str():
     now_str = datetime.datetime.strftime(now, format)
     return now_str
 
+def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, limit):
+    '''Build an mlt query and execute it'''
+    query = {'query':
+                {'mlt':
+                    {'docs': [
+                        {'_id': doc_id,
+                        '_index': index_name,
+                        '_type': doc_type}],
+                    'fields': doc_fields
+                    }
+                }
+            }
+    es = Elasticsearch('localhost')
+    results = es.search(doc_type=target_doc_type, body=query, size=limit)
+    if len(results['hits']['hits']) > 0:
+        result_doc_ids = ['{}.{}'.format(h['_type'], h['_source']['_id']) for h in results['hits']['hits']]
+        return result_doc_ids
+    else:
+        return None
 
 if __name__ == '__main__':
     collections = api.SEARCHABLE_COLLECTIONS
     api.logger.setLevel(logging.INFO)
     db = api.data_db
+    index_name = 'bhp10'
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     for collection in collections:
         if collection != 'movies':
@@ -36,8 +57,11 @@ if __name__ == '__main__':
         print 'Starting to work on {} at {}'.format(collection, get_now_str())
         print 'Collection {} has {} documents.'.format(collection, count)
         for doc in db[collection].find():
-            related = api.get_bhp_related(doc)
             key = '{}.{}'.format(collection, doc['_id'])
+            #related = api.get_bhp_related(doc)
+            related = []
+            for c in collections:
+                related.append(es_mlt_search(index_name, collection, doc['_id'], ['Header.En', 'UnitText1.En'], c, 1))
             save_redis_list(r, key, related)
 
         finished = datetime.datetime.now()
