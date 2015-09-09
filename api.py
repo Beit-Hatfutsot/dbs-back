@@ -122,7 +122,8 @@ def load_user(payload):
 
 # Create database connection object
 db = MongoEngine(app)
-data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port, slaveOK=True)[conf.data_db_name]
+client_data_db = pymongo.MongoClient(conf.data_db_host, conf.data_db_port)
+data_db = client_data_db[conf.data_db_name]
 
 # While searching for docs, we always need to filter results by their work
 # status and rights
