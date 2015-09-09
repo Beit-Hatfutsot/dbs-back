@@ -1,0 +1,41 @@
+Exporting Mongo collections to elasticsearch cluster.
+
+After Elasticsearch is installed and running on a local machine, install the mongodb river plugin:
+https://github.com/richardwilly98/elasticsearch-river-mongodb
+
+To export all the collections into ES, create a json for each collection like this:
+
+{
+  "type": "mongodb",
+  "mongodb": {
+    "servers": [
+      { "host": "127.0.0.1", "port": 27017 }
+    ],
+    "db": "bhp10",
+    "collection": "movies",
+    "options": { "secondary_read_preference": true },
+    "gridfs": false
+  },
+  "index": {
+    "name": "bhp10",
+    "type": "movies"
+  }
+}
+
+Then initialize different rivers, one per collection, with different names:
+
+curl -X PUT localhost:9200/_river/bhp10_places/_meta -d @bhp10_rivers/places.json
+curl -X PUT localhost:9200/_river/bhp10_personalities/_meta -d @bhp10_rivers/personalities.json
+...
+
+This will create a single index(bhp10) with different types(places, personalitis, etc.)
+
+The export will fail if any of the Mongo documents has an _id of null.
+Delete such documents before attempting to export a collection.
+The error shoud appear in the log: /var/log/elasticsearch/elasticsearch.log
+
+If you need to re-initialize a river, delete it and the index it created:
+
+curl -XDELETE 'localhost:9200/_river/bhp10/
+curl -XDELETE 'http://localhost:9200/bhp10/'
+
