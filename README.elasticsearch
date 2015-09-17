@@ -1,7 +1,11 @@
 Exporting Mongo collections to elasticsearch cluster.
 
 After Elasticsearch is installed and running on a local machine, install the mongodb river plugin:
-https://github.com/richardwilly98/elasticsearch-river-mongodb
+https://github.com/richardwilly98/elasticsearch-river-mongodb/wiki
+(basically:
+sudo /usr/share/elasticsearch/bin/plugin -i elasticsearch/elasticsearch-mapper-attachments/2.4.1
+sudo /usr/share/elasticsearch/bin/plugin -i com.github.richardwilly98.elasticsearch/elasticsearch-river-mongodb/2.0.9
+)
 
 To export all the collections into ES, create a json for each collection like this:
 
