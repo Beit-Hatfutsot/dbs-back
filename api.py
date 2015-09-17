@@ -394,7 +394,9 @@ def _fetch_item(item_id):
         return {}
 
 def enrich_item(item):
-    item['related'] = get_bhp_related(item)
+    if (not item.has_key('related')) or (not item['related']):
+        print 'Hit bhp related'
+        item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
@@ -411,7 +413,8 @@ def enrich_item(item):
         if video_url:
             item['video_url'] = video_url
         else:
-            abort(404, 'No video URL was found for this movie item.')
+            return {}
+            #abort(404, 'No video URL was found for this movie item.')
     return item
 
 def get_text_related(doc, max_items=3):
