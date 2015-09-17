@@ -15,7 +15,11 @@ def save_redis_list(redis, key, values):
 
 def get_redis_list(redis, key):
     """A naive wrapper around lrange"""
-    return redis.lrange(key, 0, -1)
+    try:
+        return redis.lrange(key, 0, -1)
+    except AttributeError:
+        # Key not found
+        return None
 
 def get_now_str():
     format = '%d.%h-%H:%M:%S'
@@ -48,25 +52,37 @@ if __name__ == '__main__':
     api.logger.setLevel(logging.INFO)
     db = api.data_db
     index_name = 'bhp10'
+    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
     r = redis.StrictRedis(host='localhost', port=6379, db=0)
     for collection in collections:
-        if collection != 'movies':
+        if collection == 'movies':
             continue
         started = datetime.datetime.now()
         count = db[collection].count()
         print 'Starting to work on {} at {}'.format(collection, get_now_str())
         print 'Collection {} has {} documents.'.format(collection, count)
-        for doc in db[collection].find():
+        for doc in db[collection].find({}, snapshot=True):
             key = '{}.{}'.format(collection, doc['_id'])
-            #related = api.get_bhp_related(doc)
+            ##related = api.get_bhp_related(doc)
             related = []
             for c in collections:
-                related.append(es_mlt_search(index_name, collection, doc['_id'], ['Header.En', 'UnitText1.En'], c, 1))
-            save_redis_list(r, key, related)
+                found_related = es_mlt_search(index_name, collection, doc['_id'], related_fields, c, 1)
+                if found_related:
+                    related.extend(found_related)
+            if not related:
+                print 'No related items found for {}'.format(key)
+                continue
+            else:
+                doc['related'] = related
+                db[collection].save(doc)
+                #save_redis_list(r, key, related)
+                #related = get_redis_list(r, key)
+                #related_list = [rr[2:-2] for rr in related]
+
 
         finished = datetime.datetime.now()
         per_doc_time = (finished - started).total_seconds()/count
         print '''Finished working on {} at {}.
-Related took {} seconds per document.'''.format(
+Related took {:.2f} seconds per document.'''.format(
         collection, get_now_str(), per_doc_time)
 
