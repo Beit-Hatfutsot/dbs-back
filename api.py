@@ -21,6 +21,7 @@ from  flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
 
 from werkzeug import secure_filename, Response
+from elasticsearch import Elasticsearch
 
 import pymongo
 import jinja2
@@ -395,7 +396,7 @@ def _fetch_item(item_id):
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
-        print 'Hit bhp related'
+        print 'Hit bhp related in enrich_item'
         item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
@@ -463,6 +464,42 @@ def get_text_related(doc, max_items=3):
 
     return related
 
+def get_es_text_related(doc):
+    related = []
+    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
+    collections = SEARCHABLE_COLLECTIONS
+    self_collection = _get_collection_name(doc)
+    if not self_collection:
+        logger.info('Unknown collection for document {}'.format(doc['_id']))
+        return []
+    for collection_name in collections:
+        found_related = es_mlt_search(data_db.name, self_collection, doc['_id'], related_fields, collection_name, 1)
+        if found_related:
+            related.extend(found_related)
+
+    return related
+
+
+def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, limit):
+    '''Build an mlt query and execute it'''
+    query = {'query':
+                {'mlt':
+                    {'docs': [
+                        {'_id': doc_id,
+                        '_index': index_name,
+                        '_type': doc_type}],
+                    'fields': doc_fields
+                    }
+                }
+            }
+    es = Elasticsearch('localhost')
+    results = es.search(doc_type=target_doc_type, body=query, size=limit)
+    if len(results['hits']['hits']) > 0:
+        result_doc_ids = ['{}.{}'.format(h['_type'], h['_source']['_id']) for h in results['hits']['hits']]
+        return result_doc_ids
+    else:
+        return None
+
 def get_bhp_related(doc, max_items=6):
     """
     Bring the documents that were manually marked as related to the current doc
@@ -472,7 +509,7 @@ def get_bhp_related(doc, max_items=6):
     places -> photoUnits
     personalities -> photoUnits, familyNames, places
     photoUnits -> places, personalities
-    If no manual marks are found for the document, return the result of text
+    If no manual marks are found for the document, return the result of es mlt
     related search.
     """
     # A map of fields that we check for each kind of document (by collection)
@@ -495,16 +532,17 @@ def get_bhp_related(doc, max_items=6):
 
     if not self_collection_name:
         logger.debug('Unknown collection')
-        return get_text_related(doc)[:max_items]
+        return get_es_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
         logger.debug(
                 'BHP related not supported for collection {}'.format(
                 self_collection_name))
-        return get_text_related(doc)[:max_items]
+        return get_es_text_related(doc)[:max_items]
 
     # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
     for field in fields:
+        collection = collection_names[field]
         if doc.has_key(field) and doc[field]:
             related_value = doc[field]
             if type(related_value) == list:
@@ -517,28 +555,30 @@ def get_bhp_related(doc, max_items=6):
             for i in related_value_list:
                 if not i:
                     continue
-                try:
-                    r_id = int(i)
-                    collection = collection_names[field]
-                    mongo_id =  _get_mongo_doc_id(r_id, collection)
-                    if mongo_id:
-                        rv.append(collection + '.' + mongo_id)
-                except ValueError as e:
-                    logger.debug(e.message)
+                else:
+                    i = int(i)
+                    filtered_id =  get_filtered_doc_id(i, collection)
+                    if filtered_id:
+                        rv.append(collection + '.' + filtered_id)
     # If we didn't find enough related items inside the document fields,
-    # get more items using text search.
+    # get more items using elasticsearch mlt search.
     # Using list -> set -> list conversion to avoid adding the same item
     # multiple times.
     if len(rv) < max_items:
-        rv.extend(get_text_related(doc))
+        #rv.extend(get_text_related(doc))
+        #print 'Got {} - need more items for {}'.format(rv, doc['_id'])
+        es_text_related = get_es_text_related(doc) 
+        #print 'Got {} from es related'.format(es_text_related)
+        rv.extend(es_text_related)
         rv = list(set(rv))
     return rv[:max_items]
 
-def _get_mongo_doc_id(unit_id, collection, field='UnitId'):
+def get_filtered_doc_id(unit_id, collection):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
+    Fail if the _id is not found or doesn't pass the show filter.
     '''
-    search_query = {field: unit_id}
+    search_query = {'_id': unit_id}
     search_query.update(show_filter)
     found = data_db[collection].find_one(search_query, {'_id': 1})
     if found:
