@@ -747,7 +747,7 @@ def _convert_meta_to_bhp6(upload_md, file_info):
     rv['raw'] = no_lang
     return rv
 
-def search_by_header(string, collection, mode='contains'):
+def search_by_header(string, collection, mode='starts_with'):
     if not string: # Support empty strings
         return {}
     if phonetic.is_hebrew(string):
@@ -1367,7 +1367,7 @@ def wizard_search():
         return _generate_credits()
 
     place_doc = search_by_header(place, 'places')
-    name_doc = search_by_header(name, 'familyNames', mode='starts_with')
+    name_doc = search_by_header(name, 'familyNames')
     # fsearch() expects a dictionary of lists and returns Mongo cursor
     ftree_args = {}
     if name:
