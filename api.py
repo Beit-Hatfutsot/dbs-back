@@ -21,7 +21,7 @@ from  flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
 
 from werkzeug import secure_filename, Response
-from elasticsearch import Elasticsearch
+import elasticsearch
 
 import pymongo
 import jinja2
@@ -47,6 +47,7 @@ must_have_keys = set(['secret_key',
                     'security_password_salt',
                     'user_db_host',
                     'user_db_port',
+                    'elasticsearch_host',
                     'user_db_name',
                     'data_db_host',
                     'data_db_port',
@@ -124,6 +125,9 @@ def load_user(payload):
 # Create database connection object
 db = MongoEngine(app)
 data_db = pymongo.Connection(conf.data_db_host, conf.data_db_port, slaveOK=True)[conf.data_db_name]
+
+# Create the elasticsearch connection
+es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
 # status and rights
@@ -492,8 +496,11 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
                     }
                 }
             }
-    es = Elasticsearch('localhost')
-    results = es.search(doc_type=target_doc_type, body=query, size=limit)
+    try:
+        results = es.search(doc_type=target_doc_type, body=query, size=limit)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        return None
     if len(results['hits']['hits']) > 0:
         result_doc_ids = ['{}.{}'.format(h['_type'], h['_source']['_id']) for h in results['hits']['hits']]
         return result_doc_ids
