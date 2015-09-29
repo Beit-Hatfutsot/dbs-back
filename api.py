@@ -400,7 +400,8 @@ def _fetch_item(item_id):
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
-        print 'Hit bhp related in enrich_item'
+        m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
+        logger.debug(m)
         item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
@@ -472,7 +473,7 @@ def get_es_text_related(doc):
     related = []
     related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
     collections = SEARCHABLE_COLLECTIONS
-    self_collection = _get_collection_name(doc)
+    self_collection = get_collection_name(doc)
     if not self_collection:
         logger.info('Unknown collection for document {}'.format(doc['_id']))
         return []
@@ -481,6 +482,12 @@ def get_es_text_related(doc):
         if found_related:
             related.extend(found_related)
 
+    # Filter reults
+    for item_name in related:
+        collection, _id = item_name.split('.')[:2]
+        filtered = filter_doc_id(_id, collection)
+        if filtered:
+            related.append(filtered)
     return related
 
 
@@ -535,7 +542,7 @@ def get_bhp_related(doc, max_items=6):
     # Check what is the collection name for the current doc and what are the
     # related fields that we have to check for it
     rv = []
-    self_collection_name = _get_collection_name(doc)
+    self_collection_name = get_collection_name(doc)
 
     if not self_collection_name:
         logger.debug('Unknown collection')
@@ -564,7 +571,7 @@ def get_bhp_related(doc, max_items=6):
                     continue
                 else:
                     i = int(i)
-                    filtered_id =  get_filtered_doc_id(i, collection)
+                    filtered_id =  filter_doc_id(i, collection)
                     if filtered_id:
                         rv.append(collection + '.' + filtered_id)
     # If we didn't find enough related items inside the document fields,
@@ -572,7 +579,6 @@ def get_bhp_related(doc, max_items=6):
     # Using list -> set -> list conversion to avoid adding the same item
     # multiple times.
     if len(rv) < max_items:
-        #rv.extend(get_text_related(doc))
         #print 'Got {} - need more items for {}'.format(rv, doc['_id'])
         es_text_related = get_es_text_related(doc) 
         #print 'Got {} from es related'.format(es_text_related)
@@ -580,7 +586,7 @@ def get_bhp_related(doc, max_items=6):
         rv = list(set(rv))
     return rv[:max_items]
 
-def get_filtered_doc_id(unit_id, collection):
+def filter_doc_id(unit_id, collection):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     Fail if the _id is not found or doesn't pass the show filter.
@@ -589,17 +595,29 @@ def get_filtered_doc_id(unit_id, collection):
     search_query.update(show_filter)
     found = data_db[collection].find_one(search_query, {'_id': 1})
     if found:
-        return str(found['_id'])
+        if collection == 'movies':
+            video_id = item['MovieFileId']
+            video_url = get_video_url(video_id)
+            if not video_url:
+                logger.debug('No video for {}.{}'.format(collection, unit_id))
+                return None
+        else:
+            return str(found['_id'])
     else:
-        logger.debug('UnitId {} was not found in {}'.format(unit_id, collection))
+        logger.debug("Document {}.{} didn't pass filter".format(collection, unit_id))
         return None
 
-def _get_collection_name(doc):
+def get_collection_name(doc):
     if doc.has_key('UnitType'):
         unit_type = doc['UnitType']
     else:
         return None
     return get_unit_type(unit_type)
+
+def get_item_name(doc):
+    collection_name = get_collection_name(doc)
+    item_name = '{}.{}'.format(collection_name, doc['_id'])
+    return item_name
 
 def _get_picture(picture_id):
     found = data_db['photos'].find_one({'PictureId': picture_id})
