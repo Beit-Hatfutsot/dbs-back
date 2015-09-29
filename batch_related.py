@@ -17,11 +17,9 @@ if __name__ == '__main__':
     collections = api.SEARCHABLE_COLLECTIONS
     api.logger.setLevel(logging.INFO)
     db = api.data_db
-    index_name = 'bhp10'
-    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
     for collection in collections:
-        if collection != 'places':
-            continue
+        #if collection != 'movies':
+        #    continue
         started = datetime.datetime.now()
         count = db[collection].count()
         print 'Starting to work on {} at {}'.format(collection, get_now_str())
