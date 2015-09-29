@@ -1,14 +1,33 @@
-Exporting Mongo collections to elasticsearch cluster.
+# Exporting Mongo collections to elasticsearch cluster #
 
-After Elasticsearch is installed and running on a local machine, install the mongodb river plugin:
-https://github.com/richardwilly98/elasticsearch-river-mongodb/wiki
-(basically:
+## Install ElasticSearch ##
+- Install OpenJDK  
+`sudo apt-get install openjdk-7-jre-headless`
+- Add ES key  
+`wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -`
+- Add ES package list
+```
+echo "deb http://packages.elastic.co/elasticsearch/1.7/debian stable main" | sudo tee -a /etc/apt/sources.list.d/elasticsearch-1.7.list
+sudo apt-get update
+```
+- install es package and make it autostart  
+```
+sudo apt-get install elasticsearch
+sudo service elasticsearch restart
+sudo update-rc.d elasticsearch defaults 95 10
+```
+
+## Install Mongo river ##
+After Elasticsearch is installed and running on a local machine, install the mongodb river [plugin](https://github.com/richardwilly98/elasticsearch-river-mongodb/wiki)
+```
 sudo /usr/share/elasticsearch/bin/plugin -i elasticsearch/elasticsearch-mapper-attachments/2.4.1
 sudo /usr/share/elasticsearch/bin/plugin -i com.github.richardwilly98.elasticsearch/elasticsearch-river-mongodb/2.0.9
-)
+```
 
+## Export the Mongo collections ##
 To export all the collections into ES, create a json for each collection like this:
 
+```json
 {
   "type": "mongodb",
   "mongodb": {
@@ -25,12 +44,13 @@ To export all the collections into ES, create a json for each collection like th
     "type": "movies"
   }
 }
-
+```
 Then initialize different rivers, one per collection, with different names:
-
+```
 curl -X PUT localhost:9200/_river/bhp10_places/_meta -d @bhp10_rivers/places.json
 curl -X PUT localhost:9200/_river/bhp10_personalities/_meta -d @bhp10_rivers/personalities.json
 ...
+```
 
 This will create a single index(bhp10) with different types(places, personalitis, etc.)
 
@@ -39,7 +59,7 @@ Delete such documents before attempting to export a collection.
 The error shoud appear in the log: /var/log/elasticsearch/elasticsearch.log
 
 If you need to re-initialize a river, delete it and the index it created:
-
+```
 curl -XDELETE 'localhost:9200/_river/bhp10/
 curl -XDELETE 'http://localhost:9200/bhp10/'
-
+```
