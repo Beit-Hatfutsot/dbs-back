@@ -60,6 +60,8 @@ The error shoud appear in the log: /var/log/elasticsearch/elasticsearch.log
 
 If you need to re-initialize a river, delete it and the index it created:
 ```
-curl -XDELETE 'localhost:9200/_river/bhp10/
+curl -XDELETE 'localhost:9200/_river/bhp10_places'
+curl -XDELETE 'localhost:9200/_river/bhp10_movies'
+... Proceeed for all the indeces
 curl -XDELETE 'http://localhost:9200/bhp10/'
 ```
