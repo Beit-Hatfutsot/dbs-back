@@ -1,5 +1,7 @@
 # Exporting Mongo collections to elasticsearch cluster #
 
+## Important - Elasticsearch river MUST be installed on a Mongo machine, primary or secondary ##
+
 ## Install ElasticSearch ##
 - Install OpenJDK  
 `sudo apt-get install openjdk-7-jre-headless`
@@ -22,6 +24,10 @@ After Elasticsearch is installed and running on a local machine, install the mon
 ```
 sudo /usr/share/elasticsearch/bin/plugin -i elasticsearch/elasticsearch-mapper-attachments/2.4.1
 sudo /usr/share/elasticsearch/bin/plugin -i com.github.richardwilly98.elasticsearch/elasticsearch-river-mongodb/2.0.9
+```
+IMPORTANT: Restart elasticsearch before working with rivers:  
+```
+sudo service elasticsearch restart
 ```
 
 ## Export the Mongo collections ##
