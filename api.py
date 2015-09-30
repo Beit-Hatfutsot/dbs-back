@@ -21,6 +21,7 @@ from  flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
 
 from werkzeug import secure_filename, Response
+import elasticsearch
 
 import pymongo
 import jinja2
@@ -46,6 +47,7 @@ must_have_keys = set(['secret_key',
                     'security_password_salt',
                     'user_db_host',
                     'user_db_port',
+                    'elasticsearch_host',
                     'user_db_name',
                     'data_db_host',
                     'data_db_port',
@@ -124,6 +126,9 @@ def load_user(payload):
 db = MongoEngine(app)
 client_data_db = pymongo.MongoClient(conf.data_db_host, conf.data_db_port)
 data_db = client_data_db[conf.data_db_name]
+
+# Create the elasticsearch connection
+es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
 # status and rights
@@ -367,20 +372,22 @@ def _fetch_item(item_id):
     if not '.' in item_id: # Need colection.id to unpack
         return {}
     collection, _id = item_id.split('.')[:2]
-    oid = get_oid(_id)
-    if not oid:
-        return {}
     if collection == 'ugc':
-        item = dictify(Ugc.objects(id=oid).first())
+        item = dictify(Ugc.objects(id=_id).first())
         if item:
             item_id = item['_id']
-            item = item['ugc']
+            item = item['ugc'] # Getting the dict out from  mongoengine
             item['_id'] = item_id
             if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
                 item['_id'] = item['_id']['$oid']
     else:
+        try:
+            _id = long(_id)
+        except ValueError:
+            logger.debug('Bad id: {}'.format(_id))
+            return {}
         # Return item by id without show filter - good for debugging
-        item = data_db[collection].find_one(oid)
+        item = data_db[collection].find_one(_id)
 
     if item:
         if item.has_key('Header'):
@@ -393,7 +400,10 @@ def _fetch_item(item_id):
         return {}
 
 def enrich_item(item):
-    item['related'] = _get_bhp_related(item)
+    if (not item.has_key('related')) or (not item['related']):
+        m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
+        logger.debug(m)
+        item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
@@ -410,21 +420,17 @@ def enrich_item(item):
         if video_url:
             item['video_url'] = video_url
         else:
-            abort(404, 'No video URL was found for this movie item.')
+            return {}
+            #abort(404, 'No video URL was found for this movie item.')
     return item
 
 def get_text_related(doc, max_items=3):
     """Look for documents in `collections` where one or more of the words
-    from the headers (English and Hebrew) of the goven `doc` appear inside
+    from the headers (English and Hebrew) of the given `doc` appear inside
     UnitText1 field.
     """
     related = []
-    collections = ['familyNames',
-                   'places',
-                   'photoUnits',
-                   'movies',
-                   'personalities']
-
+    collections = SEARCHABLE_COLLECTIONS
     en_header = doc['Header']['En']
     if en_header == None:
         en_header = ''
@@ -464,7 +470,52 @@ def get_text_related(doc, max_items=3):
 
     return related
 
-def _get_bhp_related(doc, max_items=6):
+def get_es_text_related(doc):
+    related = []
+    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
+    collections = SEARCHABLE_COLLECTIONS
+    self_collection = get_collection_name(doc)
+    if not self_collection:
+        logger.info('Unknown collection for document {}'.format(doc['_id']))
+        return []
+    for collection_name in collections:
+        found_related = es_mlt_search(data_db.name, self_collection, doc['_id'], related_fields, collection_name, 1)
+        if found_related:
+            related.extend(found_related)
+
+    # Filter reults
+    for item_name in related:
+        collection, _id = item_name.split('.')[:2]
+        filtered = filter_doc_id(_id, collection)
+        if filtered:
+            related.append(filtered)
+    return related
+
+
+def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, limit):
+    '''Build an mlt query and execute it'''
+    query = {'query':
+                {'mlt':
+                    {'docs': [
+                        {'_id': doc_id,
+                        '_index': index_name,
+                        '_type': doc_type}],
+                    'fields': doc_fields
+                    }
+                }
+            }
+    try:
+        results = es.search(doc_type=target_doc_type, body=query, size=limit)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        return None
+    if len(results['hits']['hits']) > 0:
+        result_doc_ids = ['{}.{}'.format(h['_type'], h['_source']['_id']) for h in results['hits']['hits']]
+        return result_doc_ids
+    else:
+        return None
+
+def get_bhp_related(doc, max_items=6):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -473,7 +524,7 @@ def _get_bhp_related(doc, max_items=6):
     places -> photoUnits
     personalities -> photoUnits, familyNames, places
     photoUnits -> places, personalities
-    If no manual marks are found for the document, return the result of text
+    If no manual marks are found for the document, return the result of es mlt
     related search.
     """
     # A map of fields that we check for each kind of document (by collection)
@@ -492,20 +543,21 @@ def _get_bhp_related(doc, max_items=6):
     # Check what is the collection name for the current doc and what are the
     # related fields that we have to check for it
     rv = []
-    self_collection_name = _get_collection_name(doc)
+    self_collection_name = get_collection_name(doc)
 
     if not self_collection_name:
         logger.debug('Unknown collection')
-        return get_text_related(doc)[:max_items]
+        return get_es_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
         logger.debug(
                 'BHP related not supported for collection {}'.format(
                 self_collection_name))
-        return get_text_related(doc)[:max_items]
+        return get_es_text_related(doc)[:max_items]
 
     # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
     for field in fields:
+        collection = collection_names[field]
         if doc.has_key(field) and doc[field]:
             related_value = doc[field]
             if type(related_value) == list:
@@ -518,42 +570,55 @@ def _get_bhp_related(doc, max_items=6):
             for i in related_value_list:
                 if not i:
                     continue
-                try:
-                    r_id = int(i)
-                    collection = collection_names[field]
-                    mongo_id =  _get_mongo_doc_id(r_id, collection)
-                    if mongo_id:
-                        rv.append(collection + '.' + mongo_id)
-                except ValueError as e:
-                    logger.debug(e.message)
+                else:
+                    i = int(i)
+                    filtered_id =  filter_doc_id(i, collection)
+                    if filtered_id:
+                        rv.append(collection + '.' + filtered_id)
     # If we didn't find enough related items inside the document fields,
-    # get more items using text search.
+    # get more items using elasticsearch mlt search.
     # Using list -> set -> list conversion to avoid adding the same item
     # multiple times.
     if len(rv) < max_items:
-        rv.extend(get_text_related(doc))
+        #print 'Got {} - need more items for {}'.format(rv, doc['_id'])
+        es_text_related = get_es_text_related(doc) 
+        #print 'Got {} from es related'.format(es_text_related)
+        rv.extend(es_text_related)
         rv = list(set(rv))
     return rv[:max_items]
 
-def _get_mongo_doc_id(unit_id, collection, field='UnitId'):
+def filter_doc_id(unit_id, collection):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
+    Fail if the _id is not found or doesn't pass the show filter.
     '''
-    search_query = {field: unit_id}
+    search_query = {'_id': unit_id}
     search_query.update(show_filter)
     found = data_db[collection].find_one(search_query, {'_id': 1})
     if found:
-        return str(found['_id'])
+        if collection == 'movies':
+            video_id = item['MovieFileId']
+            video_url = get_video_url(video_id)
+            if not video_url:
+                logger.debug('No video for {}.{}'.format(collection, unit_id))
+                return None
+        else:
+            return str(found['_id'])
     else:
-        logger.debug('UnitId {} was not found in {}'.format(unit_id, collection))
+        logger.debug("Document {}.{} didn't pass filter".format(collection, unit_id))
         return None
 
-def _get_collection_name(doc):
+def get_collection_name(doc):
     if doc.has_key('UnitType'):
         unit_type = doc['UnitType']
     else:
         return None
     return get_unit_type(unit_type)
+
+def get_item_name(doc):
+    collection_name = get_collection_name(doc)
+    item_name = '{}.{}'.format(collection_name, doc['_id'])
+    return item_name
 
 def _get_picture(picture_id):
     found = data_db['photos'].find_one({'PictureId': picture_id})
@@ -708,7 +773,7 @@ def _convert_meta_to_bhp6(upload_md, file_info):
     rv['raw'] = no_lang
     return rv
 
-def search_by_header(string, collection, mode='contains'):
+def search_by_header(string, collection, mode='starts_with'):
     if not string: # Support empty strings
         return {}
     if phonetic.is_hebrew(string):
@@ -1328,7 +1393,7 @@ def wizard_search():
         return _generate_credits()
 
     place_doc = search_by_header(place, 'places')
-    name_doc = search_by_header(name, 'familyNames', mode='starts_with')
+    name_doc = search_by_header(name, 'familyNames')
     # fsearch() expects a dictionary of lists and returns Mongo cursor
     ftree_args = {}
     if name:
@@ -1361,7 +1426,7 @@ def get_items(item_id):
     This view returns either Json representing an item or a list of such Jsons.
     The expected item_id string is in form of "collection_name.item_id"
     and could be  split by commas - if there is only one id, the view will return
-    a single Json. 
+    a single Json.
     Only the first 10 ids will be returned for the list view to prevent abuse.
     '''
     items_list = item_id.split(',')
@@ -1378,7 +1443,6 @@ def get_items(item_id):
         except JWTError as e:
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
-        
 
     items = fetch_items(items_list[:10])
     if items:
