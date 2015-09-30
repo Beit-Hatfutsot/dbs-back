@@ -18,13 +18,11 @@ if __name__ == '__main__':
     api.logger.setLevel(logging.INFO)
     db = api.data_db
     for collection in collections:
-        #if collection != 'movies':
-        #    continue
         started = datetime.datetime.now()
         count = db[collection].count()
         print 'Starting to work on {} at {}'.format(collection, get_now_str())
         print 'Collection {} has {} documents.'.format(collection, count)
-        for doc in db[collection].find({}, snapshot=True):
+        for doc in db[collection].find({}, modifiers={"$snapshot": "true"}):
             key = '{}.{}'.format(collection, doc['_id'])
             related = api.get_bhp_related(doc)
             if not related:
