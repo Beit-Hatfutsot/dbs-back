@@ -124,7 +124,8 @@ def load_user(payload):
 
 # Create database connection object
 db = MongoEngine(app)
-client_data_db = pymongo.MongoClient(conf.data_db_host, conf.data_db_port)
+client_data_db = pymongo.MongoClient(conf.data_db_host, conf.data_db_port,
+                read_preference=pymongo.ReadPreference.SECONDARY_PREFERRED)
 data_db = client_data_db[conf.data_db_name]
 
 # Create the elasticsearch connection
