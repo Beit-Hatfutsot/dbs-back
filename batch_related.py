@@ -20,13 +20,13 @@ if __name__ == '__main__':
     for collection in collections:
         started = datetime.datetime.now()
         count = db[collection].count()
-        print 'Starting to work on {} at {}'.format(collection, get_now_str())
-        print 'Collection {} has {} documents.'.format(collection, count)
+        api.logger.info('Starting to work on {} at {}'.format(collection, get_now_str()))
+        api.logger.info('Collection {} has {} documents.'.format(collection, count))
         for doc in db[collection].find({}, modifiers={"$snapshot": "true"}):
             key = '{}.{}'.format(collection, doc['_id'])
             related = api.get_bhp_related(doc)
             if not related:
-                print 'No related items found for {}'.format(key)
+                api.logger.debug('No related items found for {}'.format(key))
                 doc['related'] = []
                 db[collection].save(doc)
                 continue
@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
         finished = datetime.datetime.now()
         per_doc_time = (finished - started).total_seconds()/count
-        print '''Finished working on {} at {}.
+        api.logger.info('''Finished working on {} at {}.
 Related took {:.2f} seconds per document.'''.format(
-        collection, get_now_str(), per_doc_time)
+        collection, get_now_str(), per_doc_time))
 
