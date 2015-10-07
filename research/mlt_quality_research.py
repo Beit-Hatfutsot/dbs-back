@@ -8,6 +8,12 @@ from elasticsearch import Elasticsearch
 [(r['_score'], r['_source']['Header']['En'], r['_source']['UnitTypeDesc'])for r in es.mlt(index='bhp10', doc_type='places', id=71433, mlt_fields=related_fields, search_types=['places','personalities','photoUnits','familyNames'], search_size=40)['hits']['hits']]
 '''
 
+'''Try with search:
+es.search(doc_type='', size=1, q='UnitText1.En:Einstein')
+Or even better:
+[(r['_score'], r['_source']['Header']['En'], r['_source']['UnitTypeDesc'], r['_id'])for r in es.search(doc_type=['places'], size=40, q='UnitText1.En:Albert Einstein')['hits']['hits']]
+'''
+
 def get_related(es, doc_id, index, doc_type, mlt_fields, target_collections, limit):
     return [(r['_score'], r['_source']['Header']['En'], r['_source']['UnitTypeDesc'])for r in es.mlt(index=index, doc_type=doc_type, id=doc_id, mlt_fields=mlt_fields, search_types=target_collections, search_size=limit)['hits']['hits']]
 
