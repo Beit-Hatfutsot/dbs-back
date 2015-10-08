@@ -71,3 +71,4 @@ curl -XDELETE 'localhost:9200/_river/bhp10_movies'
 ... Proceeed for all the indeces
 curl -XDELETE 'http://localhost:9200/bhp10/'
 ```
+You can access the UI of mongo river at this URL: [http://localhost:9200/_plugin/river-mongodb/](http://localhost:9200/_plugin/river-mongodb/)
