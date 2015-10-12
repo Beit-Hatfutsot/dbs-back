@@ -516,7 +516,7 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
     else:
         return None
 
-def get_bhp_related(doc, max_items=6):
+def get_bhp_related(doc, max_items=6, bhp_only=False):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -550,10 +550,13 @@ def get_bhp_related(doc, max_items=6):
         logger.debug('Unknown collection')
         return get_es_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
-        logger.debug(
+        if not bhp_only:
+            logger.debug(
                 'BHP related not supported for collection {}'.format(
                 self_collection_name))
-        return get_es_text_related(doc)[:max_items]
+            return get_es_text_related(doc)[:max_items]
+        else:
+            return []
 
     # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
@@ -576,6 +579,15 @@ def get_bhp_related(doc, max_items=6):
                     filtered_id =  filter_doc_id(i, collection)
                     if filtered_id:
                         rv.append(collection + '.' + filtered_id)
+    if bhp_only:
+        return rv
+    ''' Symmetric related:
+    Now we have the ids of all the docs tagged as related to the given one.
+    Let's use this information to add the symmetric related links: if A poits
+    to B, then B should point to A!
+    We will push dictionaries of type {doc_id: [related1, related2, ... etc.]}
+    to a db and reduce it.
+    '''
     # If we didn't find enough related items inside the document fields,
     # get more items using elasticsearch mlt search.
     # Using list -> set -> list conversion to avoid adding the same item
