@@ -132,11 +132,15 @@ data_db = client_data_db[conf.data_db_name]
 es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
-# status and rights
+# status and rights.
+# We also filter docs that don't have any text
 show_filter = {
                 'StatusDesc': 'Completed',
                 'RightsDesc': 'Full',
-                'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
+                'DisplayStatusDesc':  {'$nin': ['Internal Use']},
+                '$or':
+                    [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
+                }
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
@@ -471,7 +475,7 @@ def get_text_related(doc, max_items=3):
 
     return related
 
-def get_es_text_related(doc):
+def get_es_text_related(doc, items_per_collection=1):
     related = []
     related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
     collections = SEARCHABLE_COLLECTIONS
@@ -480,11 +484,17 @@ def get_es_text_related(doc):
         logger.info('Unknown collection for document {}'.format(doc['_id']))
         return []
     for collection_name in collections:
-        found_related = es_mlt_search(data_db.name, self_collection, doc['_id'], related_fields, collection_name, 1)
+        found_related = es_mlt_search(
+                                    data_db.name,
+                                    self_collection,
+                                    doc['_id'],
+                                    related_fields,
+                                    collection_name,
+                                    items_per_collection)
         if found_related:
             related.extend(found_related)
 
-    # Filter reults
+    # Filter results
     for item_name in related:
         collection, _id = item_name.split('.')[:2]
         filtered = filter_doc_id(_id, collection)
