@@ -132,11 +132,15 @@ data_db = client_data_db[conf.data_db_name]
 es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
-# status and rights
+# status and rights.
+# We also filter docs that don't have any text
 show_filter = {
                 'StatusDesc': 'Completed',
                 'RightsDesc': 'Full',
-                'DisplayStatusDesc':  {'$nin': ['Internal Use']}}
+                'DisplayStatusDesc':  {'$nin': ['Internal Use']},
+                '$or':
+                    [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
+                }
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
@@ -471,7 +475,7 @@ def get_text_related(doc, max_items=3):
 
     return related
 
-def get_es_text_related(doc):
+def get_es_text_related(doc, items_per_collection=1):
     related = []
     related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
     collections = SEARCHABLE_COLLECTIONS
@@ -480,11 +484,17 @@ def get_es_text_related(doc):
         logger.info('Unknown collection for document {}'.format(doc['_id']))
         return []
     for collection_name in collections:
-        found_related = es_mlt_search(data_db.name, self_collection, doc['_id'], related_fields, collection_name, 1)
+        found_related = es_mlt_search(
+                                    data_db.name,
+                                    self_collection,
+                                    doc['_id'],
+                                    related_fields,
+                                    collection_name,
+                                    items_per_collection)
         if found_related:
             related.extend(found_related)
 
-    # Filter reults
+    # Filter results
     for item_name in related:
         collection, _id = item_name.split('.')[:2]
         filtered = filter_doc_id(_id, collection)
@@ -516,7 +526,7 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
     else:
         return None
 
-def get_bhp_related(doc, max_items=6):
+def get_bhp_related(doc, max_items=6, bhp_only=False):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -550,10 +560,13 @@ def get_bhp_related(doc, max_items=6):
         logger.debug('Unknown collection')
         return get_es_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
-        logger.debug(
+        if not bhp_only:
+            logger.debug(
                 'BHP related not supported for collection {}'.format(
                 self_collection_name))
-        return get_es_text_related(doc)[:max_items]
+            return get_es_text_related(doc)[:max_items]
+        else:
+            return []
 
     # Turn each related field into a list of BHP ids if it has content
     fields = related_fields[self_collection_name]
@@ -576,17 +589,73 @@ def get_bhp_related(doc, max_items=6):
                     filtered_id =  filter_doc_id(i, collection)
                     if filtered_id:
                         rv.append(collection + '.' + filtered_id)
-    # If we didn't find enough related items inside the document fields,
-    # get more items using elasticsearch mlt search.
-    # Using list -> set -> list conversion to avoid adding the same item
-    # multiple times.
-    if len(rv) < max_items:
-        #print 'Got {} - need more items for {}'.format(rv, doc['_id'])
-        es_text_related = get_es_text_related(doc) 
-        #print 'Got {} from es related'.format(es_text_related)
-        rv.extend(es_text_related)
-        rv = list(set(rv))
-    return rv[:max_items]
+    if bhp_only:
+        # Don't pad the results with es_mlt related
+        return rv
+    else:
+        # If we didn't find enough related items inside the document fields,
+        # get more items using elasticsearch mlt search.
+        if len(rv) < max_items:
+            es_text_related = get_es_text_related(doc)
+            rv.extend(es_text_related)
+            rv = list(set(rv))
+            # Using list -> set -> list conversion to avoid adding the same item
+            # multiple times.
+        return rv[:max_items]
+
+def invert_related_vector(vector_dict):
+    rv = []
+    key = vector_dict.keys()[0]
+    for value in vector_dict.values()[0]:
+        rv.append({value: [key]})
+    return rv
+
+def reverse_related(direct_related):
+    rv = []
+    for vector in direct_related:
+        for r in invert_related_vector(vector):
+            rv.append(r)
+
+    return rv
+
+def reduce_related(related_list):
+    reduced = {}
+    for r in related_list:
+        key = r.keys()[0]
+        value = r.values()[0]
+        if key in reduced:
+            reduced[key].extend(value)
+        else:
+            reduced[key] = value
+
+    rv = []
+    for key in reduced:
+        rv.append({key: reduced[key]})
+    return rv
+
+def unify_related_lists(l1, l2):
+    rv = l1[:]
+    rv.extend(l2)
+    return reduce_related(rv)
+
+def sort_related(related_items):
+    '''Put the more diverse items in the beginning'''
+    # Sort the related ids by collection names...
+    by_collection = {}
+    rv = []
+    for item_name in related_items:
+        collection, _id = item_name.split('.')
+        if by_collection.has_key(collection):
+            by_collection[collection].append(item_name)
+        else:
+            by_collection[collection] = [item_name]
+
+    # And pop 1 item form each collection as long as there are items
+    while [v for v in by_collection.values() if v]:
+        for c in by_collection:
+            if by_collection[c]:
+                rv.append(by_collection[c].pop())
+    return rv
 
 def filter_doc_id(unit_id, collection):
     '''

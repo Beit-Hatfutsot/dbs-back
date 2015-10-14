@@ -1,0 +1,16 @@
+{
+  "type": "mongodb",
+  "mongodb": {
+    "servers": [
+      { "host": "127.0.0.1", "port": 27017 }
+    ],
+    "db": "bhp6",
+    "collection": "movies",
+    "options": { "secondary_read_preference": true },
+    "gridfs": false
+  },
+  "index": {
+    "name": "bhp6",
+    "type": "movies"
+  }
+}
