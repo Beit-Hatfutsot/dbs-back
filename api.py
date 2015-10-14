@@ -590,25 +590,72 @@ def get_bhp_related(doc, max_items=6, bhp_only=False):
                     if filtered_id:
                         rv.append(collection + '.' + filtered_id)
     if bhp_only:
+        # Don't pad the results with es_mlt related
         return rv
-    ''' Symmetric related:
-    Now we have the ids of all the docs tagged as related to the given one.
-    Let's use this information to add the symmetric related links: if A poits
-    to B, then B should point to A!
-    We will push dictionaries of type {doc_id: [related1, related2, ... etc.]}
-    to a db and reduce it.
-    '''
-    # If we didn't find enough related items inside the document fields,
-    # get more items using elasticsearch mlt search.
-    # Using list -> set -> list conversion to avoid adding the same item
-    # multiple times.
-    if len(rv) < max_items:
-        #print 'Got {} - need more items for {}'.format(rv, doc['_id'])
-        es_text_related = get_es_text_related(doc) 
-        #print 'Got {} from es related'.format(es_text_related)
-        rv.extend(es_text_related)
-        rv = list(set(rv))
-    return rv[:max_items]
+    else:
+        # If we didn't find enough related items inside the document fields,
+        # get more items using elasticsearch mlt search.
+        if len(rv) < max_items:
+            es_text_related = get_es_text_related(doc)
+            rv.extend(es_text_related)
+            rv = list(set(rv))
+            # Using list -> set -> list conversion to avoid adding the same item
+            # multiple times.
+        return rv[:max_items]
+
+def invert_related_vector(vector_dict):
+    rv = []
+    key = vector_dict.keys()[0]
+    for value in vector_dict.values()[0]:
+        rv.append({value: [key]})
+    return rv
+
+def reverse_related(direct_related):
+    rv = []
+    for vector in direct_related:
+        for r in invert_related_vector(vector):
+            rv.append(r)
+
+    return rv
+
+def reduce_related(related_list):
+    reduced = {}
+    for r in related_list:
+        key = r.keys()[0]
+        value = r.values()[0]
+        if key in reduced:
+            reduced[key].extend(value)
+        else:
+            reduced[key] = value
+
+    rv = []
+    for key in reduced:
+        rv.append({key: reduced[key]})
+    return rv
+
+def unify_related_lists(l1, l2):
+    rv = l1[:]
+    rv.extend(l2)
+    return reduce_related(rv)
+
+def sort_related(related_items):
+    '''Put the more diverse items in the beginning'''
+    # Sort the related ids by collection names...
+    by_collection = {}
+    rv = []
+    for item_name in related_items:
+        collection, _id = item_name.split('.')
+        if by_collection.has_key(collection):
+            by_collection[collection].append(item_name)
+        else:
+            by_collection[collection] = [item_name]
+
+    # And pop 1 item form each collection as long as there are items
+    while [v for v in by_collection.values() if v]:
+        for c in by_collection:
+            if by_collection[c]:
+                rv.append(by_collection[c].pop())
+    return rv
 
 def filter_doc_id(unit_id, collection):
     '''
