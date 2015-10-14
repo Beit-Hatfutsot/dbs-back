@@ -8,12 +8,6 @@ import sys
 import api
 
 
-def get_now_str():
-    format = '%d.%h-%H:%M:%S'
-    now = datetime.datetime.now()
-    now_str = datetime.datetime.strftime(now, format)
-    return now_str
-
 def invert_related_vector(vector_dict):
     rv = []
     key = vector_dict.keys()[0]
@@ -74,7 +68,7 @@ if __name__ == '__main__':
     db = api.data_db
     show_filter = api.show_filter
 
-    print 'Pass 1 - Collecting bhp related - starting at {}'.format(get_now_str())
+    api.logger.info('Pass 1 - Collecting bhp related')
     direct_related_list = []
     for collection in collections:
         for doc in db[collection].find(show_filter, modifiers={"$snapshot": "true"}):
@@ -85,7 +79,7 @@ if __name__ == '__main__':
                 item_name = api.get_item_name(doc)
                 direct_related_list.append({item_name: related})
 
-    print 'Pass 1 finished at {}'.format(get_now_str())
+    api.logger.info('Pass 1 finished')
     # Inverting the direction of related structures and adding the result
     # to original
     reverse_related_list = reverse_related(direct_related_list)
@@ -95,7 +89,7 @@ if __name__ == '__main__':
     #with open('ur.json') as fh:
     #    unified_related_list = json.load(fh)
 
-    print 'Pass 2 - Applying bhp related - starting at {}'.format(get_now_str())
+    api.logger.info('Pass 2 - Applying bhp related')
 
     for item in unified_related_list:
         key = item.keys()[0]
@@ -107,16 +101,16 @@ if __name__ == '__main__':
             doc['bhp_related'] = value
             db[collection].save(doc)
         else:
-            print 'Problem with {}'.format(key)
+            api.logger.info('Problem with {}'.format(key))
             sys.exit(1)
 
-    print 'Pass 2 finished at {}'.format(get_now_str())
+    api.logger.info('Pass 2 finished')
 
-    print 'Pass 3 - Completing related - starting at {}'.format(get_now_str())
+    api.logger.info('Pass 3 - Completing related')
     for collection in collections:
         started = datetime.datetime.now()
         count = db[collection].count(show_filter)
-        api.logger.info('Starting to work on {} at {}'.format(collection, get_now_str()))
+        api.logger.info('Starting to work on {}'.format(collection))
         api.logger.info('Collection {} has {} valid documents.'.format(collection, count))
         for doc in db[collection].find(show_filter, modifiers={"$snapshot": "true"}):
             item_name = api.get_item_name(doc)
@@ -125,7 +119,7 @@ if __name__ == '__main__':
                 related = api.get_es_text_related(doc, items_per_collection=2)
             elif len(doc['bhp_related']) < 6:
                 # Not enough related items, get an addition from es
-                es_related = api.get_es_text_related(doc, items_per_collection=2)
+                es_related = api.get_es_text_related(doc, items_per_collection=1)
                 bhp_related = doc['bhp_related']
                 bhp_related.extend(es_related)
                 related = list(set(bhp_related))[:6]
@@ -140,8 +134,8 @@ if __name__ == '__main__':
 
         finished = datetime.datetime.now()
         per_doc_time = (finished - started).total_seconds()/count
-        api.logger.info("""Finished working on {} at {}.
+        api.logger.info("""Finished working on {}.
 Related took {:.2f} seconds per document.""".format(
-        collection, get_now_str(), per_doc_time))
+        collection, per_doc_time))
 
-    print 'Pass 3 finished at {}'.format(get_now_str())
+    api.logger.info('Pass 3 finished')
