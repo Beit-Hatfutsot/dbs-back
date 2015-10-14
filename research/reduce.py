@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+import json
+
+from pprint import pprint
+
 
 def invert_related_vector(vector_dict):
     rv = []
@@ -8,17 +12,45 @@ def invert_related_vector(vector_dict):
         rv.append({value: [key]})
     return rv
 
-def reduce_related(related):
-    reduced = {}
-    for vector in related:
+def reverse_related(direct_related):
+    rv = []
+    for vector in direct_related:
         for r in invert_related_vector(vector):
-            key = r.keys()[0]
-            value = r.values()[0]
-            if key in reduced:
-                reduced[key].extend(value)
-            else:
-                reduced[key] = value
-    return reduced
+            rv.append(r)
+
+    return rv
+
+def reduce_related(related_list):
+    reduced = {}
+    for r in related_list:
+        key = r.keys()[0]
+        value = r.values()[0]
+        if key in reduced:
+            reduced[key].extend(value)
+        else:
+            reduced[key] = value
+
+    rv = []
+    for key in reduced:
+        rv.append({key: reduced[key]})
+    return rv
+
+def unify_related_lists(l1, l2):
+    rv = l1[:]
+    rv.extend(l2)
+    return reduce_related(rv)
+
+def lists_have_same_content(l1, l2):
+    for d1, d2 in zip(sorted(l1), sorted(l2)):
+        if not dicts_have_same_content(d1, d2):
+            return False
+    return True
+
+def dicts_have_same_content(d1, d2):
+    for key in d1.keys():
+        if not sorted(d1[key]) == sorted(d2[key]):
+            return False
+    return True
 
 if __name__ == '__main__':
 
@@ -26,9 +58,8 @@ if __name__ == '__main__':
                         {'photos.1': ['places.1', 'photos.3']},
                         {'personalities.4': ['photos.5', 'photos.1']}]
 
-    db = [{'places': [{'_id': 1, 'related': []}, {'_id': 2, 'related': []}]},
-    {'photos': [{'_id': 1, 'related': []}, {'_id': 2, 'related': []}, {'_id': 3, 'related': []}, {'_id': 5, 'related': []}]},
-    {'personalities': [{'_id': 1, 'related': []}, {'_id': 2, 'related': []}, {'_id': 4, 'related': []}]}]
+    not_reduced = reverse_related(outgoing_related)
+    unified = unify_related_lists(outgoing_related, not_reduced)
 
-    print 'Direct:', outgoing_related
-    print 'Inverted:', reduce_related(outgoing_related)
+
+
