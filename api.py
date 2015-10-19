@@ -19,6 +19,7 @@ from flask.ext.cors import CORS
 from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
 from  flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
+from flask.ext.autodoc import Autodoc
 
 from werkzeug import secure_filename, Response
 import elasticsearch
@@ -33,6 +34,9 @@ import phonetic
 
 # Create app
 app = Flask(__name__)
+
+# Initialize autodoc - https://github.com/acoomans/flask-autodoc
+autodoc = Autodoc(app)
 
 # Specify the bucket name for user generated content
 ugc_bucket = 'bhs-ugc'
@@ -1144,6 +1148,10 @@ def get_video_url(video_id):
         return None
 
 # Views
+@app.route('/documentation')
+def documentation():
+    return autodoc.html()
+
 @app.route('/')
 def home():
     # Check if the user is authenticated with JWT 
@@ -1267,6 +1275,7 @@ def manage_jewish_story():
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()
+@autodoc.doc()
 def save_user_content():
     '''Logged in user POSTs a multipart request that includes a binary
     file and metadata.
@@ -1411,6 +1420,7 @@ def save_user_content():
         abort(500, 'Failed to save {}'.format(filename))
 
 @app.route('/search/<search_string>')
+@autodoc.doc()
 def general_search(search_string, max_results=10):
     """
     A full text search on the specified collection,
@@ -1491,6 +1501,7 @@ def get_suggestions(collection,string):
 
 
 @app.route('/item/<item_id>')
+@autodoc.doc()
 def get_items(item_id):
     '''
     This view returns either Json representing an item or a list of such Jsons.
@@ -1529,6 +1540,7 @@ def get_items(item_id):
         abort(404, 'Nothing found ;(')
 
 @app.route('/fsearch')
+@autodoc.doc()
 def ftree_search():
     '''
     This view searches for gedcom formatted family tree files using
@@ -1544,6 +1556,7 @@ def ftree_search():
     return humanify(results)
 
 @app.route('/get_ftree_url/<tree_number>')
+#@autodoc.doc()
 def fetch_tree(tree_number):
     try:
         tree_number = int(tree_number)
@@ -1586,8 +1599,9 @@ def fetch_images(image_ids):
 
 
 @app.route('/get_changes/<from_date>/<to_date>')
+@autodoc.doc()
 def get_changes(from_date, to_date):
-    '''
+    u'''
     Return the documents in migration_log collection where the
     'date' field is inside the from_date — to_date range.
     The records in migration_log collections are created by migration script.
