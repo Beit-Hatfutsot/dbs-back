@@ -855,9 +855,9 @@ def search_by_header(string, collection, mode='starts_with'):
     else:
         lang = 'En'
     if mode == 'starts_with':
-        header_regex = re.compile('^'+string, re.IGNORECASE)
+        header_regex = re.compile('^'+re.escape(string), re.IGNORECASE)
     else:
-        header_regex = re.compile(string, re.IGNORECASE)
+        header_regex = re.compile(re.escape(string), re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
@@ -899,9 +899,9 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
         lang = 'En'
 
     if search_prefix:
-        regex = re.compile('^'+string, re.IGNORECASE)
+        regex = re.compile('^'+re.escape(string), re.IGNORECASE)
     else:
-        regex = re.compile(string, re.IGNORECASE)
+        regex = re.compile(re.escape(string), re.IGNORECASE)
 
     found = []
     header = 'Header.{}'.format(lang)
