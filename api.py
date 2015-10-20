@@ -31,6 +31,8 @@ from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
 from utils import get_logger, upload_file, get_oid, send_gmail, MongoJsonEncoder
 import phonetic
 
+from family_tree import fwalk
+
 # Create app
 app = Flask(__name__)
 
@@ -1559,6 +1561,22 @@ def fetch_tree(tree_number):
         return humanify(rv)
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
+
+@app.route('/fwalk')
+def ftree_walk():
+    '''
+    This view gets a part of family tree starting with a given `individual_id`
+    in a given `tree_number`. These two arguments are mandatory and there is
+    a third optional argument - `radius` specifiying how many edges to traverse,
+    default is 3
+    '''
+    args = request.args
+    try:
+        results = fwalk(**args)
+    except AttributeError:
+        em = "Must receive `individual_id` and `tree_number` arguments"
+        abort(400, em)
+    return humanify(results)
 
 @app.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
