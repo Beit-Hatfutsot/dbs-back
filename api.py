@@ -10,7 +10,7 @@ import mimetypes
 import magic
 from uuid import UUID
 
-from flask import Flask, request, abort, url_for
+from flask import Flask, request, abort, url_for, render_template
 from flask.ext.mongoengine import MongoEngine, ValidationError
 from flask.ext.security import (Security, MongoEngineUserDatastore,
                                UserMixin, RoleMixin, login_required)
@@ -360,7 +360,7 @@ def update_mjs(user_oid, data):
         return new_mjs
     except ValidationError as e:
         logger.debug('Error occured while saving mjs data for user {}'.format(str(user_oid)))
-        logger.debug(e.message) 
+        logger.debug(e.message)
         abort(500, e.message)
 
 def _init_mjs():
@@ -717,18 +717,18 @@ def _get_thumbnail(doc):
                     thumbnail = picture['bin']
                     if 'PictureFileName' in picture.keys():
                         path = picture['PicturePath']
-        
+
         return {
-            'data': urllib.quote(thumbnail.encode('base-64')), 
+            'data': urllib.quote(thumbnail.encode('base-64')),
             'path': urllib.quote(path.replace('\\', '/'))
         }
-    
+
     except (KeyError, TypeError):
         return {}
 
 def _make_serializable(obj):
     # ToDo: Replace with json.dumps with default setting and check
-    # Make problematic fields Json serializable
+    # Make problematic fields json serializable
     if obj.has_key('_id'):
         obj['_id'] = str(obj['_id'])
     if obj.has_key('UpdateDate'):
@@ -783,18 +783,18 @@ def _convert_meta_to_bhp6(upload_md, file_info):
     The bhp6 format is as follows:
     {
       "Header": { # title
-        "En": "nice photo", 
+        "En": "nice photo",
         "HE": "תמונה נחמדה"
-      }, 
-      "UnitType": 1, # photo unit type 
+      },
+      "UnitType": 1, # photo unit type
       "UnitText1": { # description
-        "En": "this is a very nice photo", 
+        "En": "this is a very nice photo",
         "He": "זוהי תמונה מאוד נחמדה"
-      }, 
+      },
       "UnitText2": { # people_present
-        "En": "danny and pavel", 
+        "En": "danny and pavel",
         "He": "דני ופבל"
-      } 
+      }
     }
     '''
     # unit_types dictionary
@@ -817,7 +817,7 @@ def _convert_meta_to_bhp6(upload_md, file_info):
 
     bhp6_to_ugc = {
         'Header': 'title',
-        'UnitText1': 'description', 
+        'UnitText1': 'description',
         'UnitText2': 'people_present'
     }
 
@@ -970,7 +970,7 @@ def fsearch(max_results=5000,**kwargs):
     else:
         tree_number = None
 
-    collection = data_db['genTreeIndividuals'] 
+    collection = data_db['genTreeIndividuals']
 
     # Ensure there are indices for all the needed fields
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
@@ -979,7 +979,7 @@ def fsearch(max_results=5000,**kwargs):
         if index_key not in index_keys:
              logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
              collection.ensure_index(index_key)
-    
+
     # Sort all the arguments to those with name or place and those with year
     names_and_places = {}
     years = {}
@@ -1025,7 +1025,7 @@ def fsearch(max_results=5000,**kwargs):
             else:
                 qf = {field_name: search_str}
         else:
-            # There is a simple string search        
+            # There is a simple string search
             qf = {field_name: search_str}
 
         names_and_places[search_arg] = qf
@@ -1047,7 +1047,7 @@ def fsearch(max_results=5000,**kwargs):
             except ValueError:
                 abort(400, 'Year must be an integer')
             years[search_arg] = _generate_year_range(year)
-            
+
     year_ranges = {'birth_year': ['BSD', 'BED'],
                    'death_year': ['DSD', 'DED']}
 
@@ -1059,7 +1059,7 @@ def fsearch(max_results=5000,**kwargs):
             # Look in the MSD array
             search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}} 
             continue
-        start, end = year_ranges[item] 
+        start, end = year_ranges[item]
         search_query[start] = {'$gte': years[item]['min']}
         search_query[end] = {'$lte': years[item]['max']}
 
@@ -1150,11 +1150,11 @@ def get_video_url(video_id):
 # Views
 @app.route('/documentation')
 def documentation():
-    return autodoc.html()
+    return autodoc.html(title='My Jewish Identity API documentation')
 
 @app.route('/')
 def home():
-    # Check if the user is authenticated with JWT 
+    # Check if the user is authenticated with JWT
     try:
         verify_jwt()
         return humanify({'access': 'private'})
@@ -1297,7 +1297,7 @@ def save_user_content():
     # Check that we have a full language specific set of fields
 
     must_have_keys = {
-        '_en': {'missing': None, 'error': None}, 
+        '_en': {'missing': None, 'error': None},
         '_he': {'missing': None, 'error': None}
     }
     for lang in must_have_keys:
@@ -1327,7 +1327,7 @@ def save_user_content():
     metadata['user_id'] = str(user_oid)
     metadata['original_filename'] = filename
     metadata['Content-Type'] = mimetypes.guess_type(filename)[0]
-    
+
     # Pick the first item for all the list fields in the metadata
     clean_md = {}
     for key in metadata:
@@ -1363,7 +1363,7 @@ def save_user_content():
     if not _validate_filetype(file_info_str):
         abort(415, "File type '{}' is not supported".format(file_info_str))
 
-    # Rewind the file object 
+    # Rewind the file object
     file_obj.stream.seek(0)
     # Convert user specified metadata to BHP6 format
     bhp6_md = _convert_meta_to_bhp6(clean_md, file_info_str)
@@ -1423,8 +1423,14 @@ def save_user_content():
 @autodoc.doc()
 def general_search(search_string, max_results=10):
     """
-    A full text search on the specified collection,
-    or on all the SEARCHABLE_COLLECTIONS if no collection was specified.
+    This view initiates a full text search on the collection specified
+    in the `request.args` or on all the searchable collections if nothing
+    was specified.
+    The searchable collections are: 'movies', 'places', 'personalities',
+    'photoUnits' and 'familyNames'.
+    The view returns a json whose keys are the names of the collections and the
+    values are lists of documents found in each collection or an empty list
+    if none were found.
     """
     collections = SEARCHABLE_COLLECTIONS
     args = request.args
@@ -1480,7 +1486,7 @@ def wizard_search():
         ftree_args['last_name'] = [name]
     if place:
         ftree_args['birth_place'] = [place]
-        
+
     # We turn the cursor to list in order to serialize it
     family_trees = list(fsearch(**ftree_args))
     rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
@@ -1489,7 +1495,7 @@ def wizard_search():
 @app.route('/suggest/<collection>/<string>')
 def get_suggestions(collection,string):
     '''
-    This view returns a Json with 3 fields:
+    This view returns a json with 3 fields:
     "complete", "starts_with", "phonetic".
     Each field holds a list of up to 5 strings.
     '''
@@ -1504,11 +1510,10 @@ def get_suggestions(collection,string):
 @autodoc.doc()
 def get_items(item_id):
     '''
-    This view returns either Json representing an item or a list of such Jsons.
-    The expected item_id string is in form of "collection_name.item_id"
-    and could be  split by commas - if there is only one id, the view will return
-    a single Json.
-    Only the first 10 ids will be returned for the list view to prevent abuse.
+    This view returns a list of jsons representing one or more item(s).
+    The item_id argument is in the form of "collection_name.item_id", like
+    "personalities.112998" and could contain multiple IDs split by commas.
+    Only the first 10 ids will be returned to prevent abuse.
     '''
     items_list = item_id.split(',')
     # Check if there are items from ugc collection and test their access control
@@ -1543,9 +1548,12 @@ def get_items(item_id):
 @autodoc.doc()
 def ftree_search():
     '''
-    This view searches for gedcom formatted family tree files using
-    genTreeIndividuals collection for the files index.
+    This view initiates a search for genealogical data from the
+    genTreeIndividuals collection.
     The search supports numerous fields and unexact values for search terms.
+    For example, to get all individuals whose last name sounds like Abulafia
+    and first name is Hanna:
+    curl 'api.myjewishidentity.org/fsearch?last_name=Abulafia;phonetic&first_name=Hanna'
     '''
     args = request.args
     keys = args.keys()
@@ -1556,7 +1564,6 @@ def ftree_search():
     return humanify(results)
 
 @app.route('/get_ftree_url/<tree_number>')
-#@autodoc.doc()
 def fetch_tree(tree_number):
     try:
         tree_number = int(tree_number)
@@ -1601,10 +1608,10 @@ def fetch_images(image_ids):
 @app.route('/get_changes/<from_date>/<to_date>')
 @autodoc.doc()
 def get_changes(from_date, to_date):
-    u'''
-    Return the documents in migration_log collection where the
-    'date' field is inside the from_date — to_date range.
-    The records in migration_log collections are created by migration script.
+    '''
+    This view returns the item_ids of documents that were updated during the
+    date range specified by the arguments. The dates should be supplied in the
+    timestamp format.
     '''
     rv = set()
     # Validate the dates
@@ -1627,13 +1634,7 @@ def get_changes(from_date, to_date):
             if col == 'genTreeIndividuals':
                 continue
             else:
-                query = {'_id': ObjectId(_id)}
-                query.update(show_filter)
-                viewable_doc = data_db[col].find_one(query, {'_id': 1})
-                if not viewable_doc:
-                    logger.debug('Document {} was updated, but it is not viewable'.format(doc['item_id']))
-                    continue
-                else:
+                if filter_doc_id(_id, col):
                     rv.add(doc['item_id'])
     return humanify(list(rv))
 
