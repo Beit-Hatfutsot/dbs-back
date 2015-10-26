@@ -68,13 +68,13 @@ if __name__ == '__main__':
             item_name = get_item_name(doc)
             if not doc.has_key('bhp_related') or not doc['bhp_related']:
                 # No bhp_related, get everything from es
-                related = get_es_text_related(doc, items_per_collection=2)
+                related = sort_related(get_es_text_related(doc, items_per_collection=2))[:6]
             elif len(doc['bhp_related']) < 6:
                 # Not enough related items, get an addition from es
                 es_related = get_es_text_related(doc, items_per_collection=1)
                 bhp_related = doc['bhp_related']
                 bhp_related.extend(es_related)
-                related = list(set(bhp_related))[:6]
+                related = sort_related(list(set(bhp_related)))[:6]
             else:
                 #  Sort and cut bhp_related
                 related = sort_related(doc['bhp_related'])[:6]
