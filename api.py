@@ -698,6 +698,8 @@ def filter_doc_id(unit_id, collection):
             if not video_url:
                 logger.debug('No video for {}.{}'.format(collection, unit_id))
                 return None
+            else:
+                return str(found['_id'])
         else:
             return str(found['_id'])
     else:
