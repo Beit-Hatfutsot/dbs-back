@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     logger.info('Pass 2 finished')
 
-    logger.info('Pass 3 - Completing related')
+    logger.info('Pass 3 - Completing related and enriching documents')
     for collection in collections:
         started = datetime.datetime.now()
         count = db[collection].count(show_filter)
