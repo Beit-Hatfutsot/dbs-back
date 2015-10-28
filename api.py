@@ -690,7 +690,7 @@ def filter_doc_id(unit_id, collection):
     '''
     search_query = {'_id': unit_id}
     search_query.update(show_filter)
-    found = data_db[collection].find_one(search_query, {'_id': 1})
+    found = data_db[collection].find_one(search_query)
     if found:
         if collection == 'movies':
             video_id = found['MovieFileId']
