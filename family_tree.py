@@ -1,11 +1,10 @@
 from py2neo import Graph, Node, Relationship
 
-def fwalk(individual_id, tree_number, radius=3):
-    graph = Graph('http://{}:{}@{}:{}/db/data/'.format(
-                    args.user[0], args.user[1],
-                    args.host, args.port,
-    ))
-    w = graph.cypher.execute("""
-
-                             """)
+def fwalk(neo4j_url, individual_id, tree_id, radius=3):
+    graph = Graph(neo4j_url)
+    neighbours = graph.cypher.execute("""
+    MATCH (:Person {{id: '{}', tree_id: '{}' }})-[*1..{}]-(p:Person)
+    RETURN p
+    """.format(individual_id, tree_id, radius))
+    return map(lambda n: n.p.properties, neighbours)
 
