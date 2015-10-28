@@ -693,7 +693,7 @@ def filter_doc_id(unit_id, collection):
     found = data_db[collection].find_one(search_query, {'_id': 1})
     if found:
         if collection == 'movies':
-            video_id = item['MovieFileId']
+            video_id = found['MovieFileId']
             video_url = get_video_url(video_id)
             if not video_url:
                 logger.debug('No video for {}.{}'.format(collection, unit_id))
