@@ -1503,6 +1503,14 @@ def get_suggestions(collection,string):
     rv['starts_with'] = get_completion(collection, string)
     rv['contains'] = get_completion(collection, string, False)
     rv['phonetic'] = get_phonetic(collection, string)
+
+    # make all the words in the suggestion start with a capital letter
+    for k,v in rv.items():
+        newv = []
+        for i in v:
+            newv.append(i.title())
+        rv[k] = newv
+
     return humanify(rv)
 
 
