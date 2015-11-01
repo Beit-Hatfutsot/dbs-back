@@ -15,6 +15,7 @@ from api import (invert_related_vector,
                 show_filter,
                 get_bhp_related,
                 get_item_name,
+                enrich_item,
                 get_es_text_related)
 
 
@@ -58,7 +59,7 @@ if __name__ == '__main__':
 
     logger.info('Pass 2 finished')
 
-    logger.info('Pass 3 - Completing related')
+    logger.info('Pass 3 - Completing related and enriching documents')
     for collection in collections:
         started = datetime.datetime.now()
         count = db[collection].count(show_filter)
@@ -82,7 +83,8 @@ if __name__ == '__main__':
             if not related:
                 logger.debug('No related items found for {}'.format(item_name))
             doc['related'] = related
-            db[collection].save(doc)
+            enriched_doc = enrich_item(doc)
+            db[collection].save(enriched_doc)
 
         finished = datetime.datetime.now()
         per_doc_time = (finished - started).total_seconds()/count
