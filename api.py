@@ -367,12 +367,25 @@ def _init_mjs():
     return {'assigned': [],
             'unassigned': []}
 
-def fetch_items(item_list, debug_mode):
+def fetch_items(item_list, debug_mode=False):
+    ''' Fetch a list of items
+
+    >>> items = fetch_items(['places.73080', 'places.00000'])
+    >>> len(items)
+    2
+    >>> items[0]['_id']
+    '73080'
+    >>> items[1]
+    {}
+
+    '''
     rv = []
     for item_id in item_list:
-        item = _fetch_item(item_id, debug_mode)
-        if item:
+        try:
+            item = _fetch_item(item_id, debug_mode)
             rv.append(item)
+        except (ValueError, LookupError):
+            rv.append({})
     return rv
 
 def _fetch_item(item_id, debug_mode=False):
@@ -386,16 +399,14 @@ def _fetch_item(item_id, debug_mode=False):
     # A regular non-empty item
     >>> _fetch_item('places.73080') != {}
     True
-
-    # A non existing item
     >>> _fetch_item('places.00000')
-    {}
-
-    # An existing item with missing fields
+    Traceback (most recent call last):
+        ...
+    LookupError: item not found
     >>> _fetch_item('places.98378')
-    {}
-
-    # An existing item with missing fields in debug mode
+    Traceback (most recent call last):
+        ...
+    LookupError: item not found
     >>> _fetch_item('places.98378', debug_mode=True) != {}
     True
     """
@@ -416,20 +427,19 @@ def _fetch_item(item_id, debug_mode=False):
             _id = long(_id) # Check that we are dealing with a right id format
         except ValueError:
             logger.debug('Bad id: {}'.format(_id))
-            return {}
+            raise ValueError
 
         # Return item by id without show filter - good for debugging
         filtered = filter_doc_id(_id, collection)
-        if not filtered:
-            if not debug_mode:
-                return {}
+        if not filtered and not debug_mode:
+            raise LookupError, "item not found"
 
         item = data_db[collection].find_one(_id)
 
         if item:
             return _make_serializable(item)
         else:
-            return {}
+            return LookupError, "item is missing some fields"
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
