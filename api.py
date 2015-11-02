@@ -1592,16 +1592,21 @@ def fetch_tree(tree_number):
         abort(404, 'Tree {} not found'.format(tree_number))
 
 @app.route('/fwalk')
+@autodoc.doc()
 def ftree_walk():
     '''
-    This view gets a part of family tree starting with a given `individual_id`
-    in a given `tree_number`. These two arguments are mandatory and there is
-    a third optional argument - `radius` specifiying how many edges to traverse,
-    default is 3
+    This view returns a part of family tree starting with a given person
+    id in a given tree number. These two arguments are `p` and `t` are mandatory
+    and there is a third optional argument - `r` specifiying how many
+    edges to traverse, default is 3
     '''
     args = request.args
+
     try:
-        results = fwalk(conf.neo4j_url, **args)
+        results = fwalk(conf.neo4j_url,
+                        args['p'],
+                        args['t'],
+                        args.get('r', 3))
     except AttributeError:
         em = "Must receive `individual_id` and `tree_number` arguments"
         abort(400, em)

@@ -1,6 +1,7 @@
 import pytest
 from py2neo import Graph, Node, Relationship
 from family_tree import fwalk
+from pytest_flask.plugin import client
 
 @pytest.fixture
 def graph(request):
@@ -45,3 +46,12 @@ def test_walk(graph):
     assert len(r) == 2
     r = fwalk(str(graph.uri), individual_id="4", tree_id="1", radius=3)
     assert len(r) == 6
+
+
+def test_walk_api(graph, client):
+    r = client.get('/fwalk?p=4&t=1&r=1')
+    assert len(r.json) == 1
+    r = client.get('/fwalk?p=4&t=1&r=2')
+    assert len(r.json) == 2
+    r = client.get('/fwalk?p=4&t=1')
+    assert len(r.json) == 6
