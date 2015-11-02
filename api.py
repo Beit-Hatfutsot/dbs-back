@@ -372,12 +372,9 @@ def fetch_items(item_list, debug_mode=False):
 
     >>> items = fetch_items(['places.73080', 'places.00000'])
     >>> len(items)
-    2
+    1
     >>> items[0]['_id']
     '73080'
-    >>> items[1]
-    {}
-
     '''
     rv = []
     for item_id in item_list:
@@ -385,16 +382,17 @@ def fetch_items(item_list, debug_mode=False):
             item = _fetch_item(item_id, debug_mode)
             rv.append(item)
         except (ValueError, LookupError):
-            rv.append({})
+            continue
+
     return rv
 
 def _fetch_item(item_id, debug_mode=False):
     """
     Gets item_id string and debug_mode flag.
-    If item_id is bad or item is not found, returns an empty dict.
+    If item_id is bad or item is not found, raises an exception.
     If item is found, but doesn't pass the show_filter, the behaviour
     depends on the debug_mode: if the flag is set, the function will return
-    the item, if not, it will return an empty dict.
+    the item, if not, it will raise an exception.
 
     # A regular non-empty item
     >>> _fetch_item('places.73080') != {}
@@ -406,12 +404,12 @@ def _fetch_item(item_id, debug_mode=False):
     >>> _fetch_item('places.98378')
     Traceback (most recent call last):
         ...
-    LookupError: item not found
+    LookupError: Item didn't pass the filter
     >>> _fetch_item('places.98378', debug_mode=True) != {}
     True
     """
     if not '.' in item_id: # Need colection.id to unpack
-        return {}
+        raise ValueError
     collection, _id = item_id.split('.')[:2]
     if collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
@@ -422,6 +420,8 @@ def _fetch_item(item_id, debug_mode=False):
             if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
                 item['_id'] = item['_id']['$oid']
             return _make_serializable(item)
+        else:
+            raise LookupError
     else:
         try:
             _id = long(_id) # Check that we are dealing with a right id format
@@ -431,15 +431,18 @@ def _fetch_item(item_id, debug_mode=False):
 
         # Return item by id without show filter - good for debugging
         filtered = filter_doc_id(_id, collection)
-        if not filtered and not debug_mode:
-            raise LookupError, "item not found"
-
         item = data_db[collection].find_one(_id)
 
-        if item:
-            return _make_serializable(item)
+        if not filtered:
+            if item:
+                if debug_mode:
+                    return _make_serializable(item)
+                else:
+                    raise LookupError, "Item didn't pass the filter"
+            else:
+                raise LookupError, "item not found"
         else:
-            return LookupError, "item is missing some fields"
+            return _make_serializable(item)
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
