@@ -137,7 +137,7 @@ es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
 # status and rights.
-# We also filter docs that don't have any text
+# We also filter docs that don't have any text in the 'UnitText1' field.
 show_filter = {
                 'StatusDesc': 'Completed',
                 'RightsDesc': 'Full',
@@ -367,17 +367,49 @@ def _init_mjs():
     return {'assigned': [],
             'unassigned': []}
 
-def fetch_items(item_list):
-    if len(item_list) == 1:
-        return _fetch_item(item_list[0])
-    else:
-        rv = []
-        for item in item_list:
-            if item: # Drop empty items
-                rv.append( _fetch_item(item))
-        return rv
+def fetch_items(item_list, debug_mode=False):
+    ''' Fetch a list of items
 
-def _fetch_item(item_id):
+    >>> items = fetch_items(['places.73080', 'places.00000'])
+    >>> len(items)
+    2
+    >>> items[0]['_id']
+    '73080'
+    >>> items[1]
+    {}
+
+    '''
+    rv = []
+    for item_id in item_list:
+        try:
+            item = _fetch_item(item_id, debug_mode)
+            rv.append(item)
+        except (ValueError, LookupError):
+            rv.append({})
+    return rv
+
+def _fetch_item(item_id, debug_mode=False):
+    """
+    Gets item_id string and debug_mode flag.
+    If item_id is bad or item is not found, returns an empty dict.
+    If item is found, but doesn't pass the show_filter, the behaviour
+    depends on the debug_mode: if the flag is set, the function will return
+    the item, if not, it will return an empty dict.
+
+    # A regular non-empty item
+    >>> _fetch_item('places.73080') != {}
+    True
+    >>> _fetch_item('places.00000')
+    Traceback (most recent call last):
+        ...
+    LookupError: item not found
+    >>> _fetch_item('places.98378')
+    Traceback (most recent call last):
+        ...
+    LookupError: item not found
+    >>> _fetch_item('places.98378', debug_mode=True) != {}
+    True
+    """
     if not '.' in item_id: # Need colection.id to unpack
         return {}
     collection, _id = item_id.split('.')[:2]
@@ -389,30 +421,30 @@ def _fetch_item(item_id):
             item['_id'] = item_id
             if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
                 item['_id'] = item['_id']['$oid']
+            return _make_serializable(item)
     else:
         try:
-            _id = long(_id)
+            _id = long(_id) # Check that we are dealing with a right id format
         except ValueError:
             logger.debug('Bad id: {}'.format(_id))
-            return {}
+            raise ValueError
+
         # Return item by id without show filter - good for debugging
+        filtered = filter_doc_id(_id, collection)
+        if not filtered and not debug_mode:
+            raise LookupError, "item not found"
+
         item = data_db[collection].find_one(_id)
 
-    if item:
-        if item.has_key('Header'):
-            item = enrich_item(item)
+        if item:
+            return _make_serializable(item)
         else:
-            logger.debug('No header for item id {}'.format(str(item['_id'])))
-            return {}
-        return _make_serializable(item)
-    else:
-        return {}
+            return LookupError, "item is missing some fields"
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
         m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
         logger.debug(m)
-        item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
@@ -668,14 +700,16 @@ def filter_doc_id(unit_id, collection):
     '''
     search_query = {'_id': unit_id}
     search_query.update(show_filter)
-    found = data_db[collection].find_one(search_query, {'_id': 1})
+    found = data_db[collection].find_one(search_query)
     if found:
         if collection == 'movies':
-            video_id = item['MovieFileId']
+            video_id = found['MovieFileId']
             video_url = get_video_url(video_id)
             if not video_url:
                 logger.debug('No video for {}.{}'.format(collection, unit_id))
                 return None
+            else:
+                return str(found['_id'])
         else:
             return str(found['_id'])
     else:
@@ -1522,7 +1556,15 @@ def get_items(item_id):
     The item_id argument is in the form of "collection_name.item_id", like
     "personalities.112998" and could contain multiple IDs split by commas.
     Only the first 10 ids will be returned to prevent abuse.
+    By default we don't return the documents that fail the show_filter,
+    unless a `debug` argument was provided.
     '''
+    args = request.args
+    if 'debug' in args.keys() and args['debug']:
+        debug_mode = True
+    else:
+        debug_mode = False
+
     items_list = item_id.split(',')
     # Check if there are items from ugc collection and test their access control
     ugc_items = []
@@ -1538,7 +1580,7 @@ def get_items(item_id):
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
 
-    items = fetch_items(items_list[:10])
+    items = fetch_items(items_list[:10], debug_mode)
     if items:
         # Cast items to list
         if type(items) != list:
