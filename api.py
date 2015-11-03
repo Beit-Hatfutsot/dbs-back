@@ -407,6 +407,13 @@ def _fetch_item(item_id, debug_mode=False):
     LookupError: Item didn't pass the filter
     >>> _fetch_item('places.98378', debug_mode=True) != {}
     True
+
+    # Item was enriched
+    >>> item = _fetch_item('movies.111514')
+    >>> required_keys_set = {'main_image_url', 'video_url', 'thumbnail'}
+    >>> item_keys_set = set(item.keys())
+    >>> item_keys_set.issuperset(required_keys_set)
+    True
     """
     if not '.' in item_id: # Need colection.id to unpack
         raise ValueError
