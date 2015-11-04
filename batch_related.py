@@ -3,6 +3,7 @@
 import datetime
 import logging
 import sys
+import argparse
 
 from api import (invert_related_vector,
                 reverse_related,
@@ -18,8 +19,22 @@ from api import (invert_related_vector,
                 enrich_item,
                 get_es_text_related)
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d',
+                        '--debug',
+                        help='Save the unified related in a file',
+                        action="store_true")
+    parser.add_argument('-f',
+                        '--filename',
+                        help='The name of debug output file',
+                        default='unified_related_list.json')
+    return parser.parse_args()
+
 
 if __name__ == '__main__':
+
+    args = parse_args()
     collections = SEARCHABLE_COLLECTIONS
     logger.setLevel(logging.INFO)
     db = data_db
@@ -41,6 +56,12 @@ if __name__ == '__main__':
     # to original
     reverse_related_list = reverse_related(direct_related_list)
     unified_related_list = unify_related_lists(direct_related_list, reverse_related_list)
+
+    # Save the related info for debug
+    if args.debug:
+        with open(args.filename, 'w') as fh:
+            import json
+            json.dump(unified_related_list, fh, indent=2)
 
     logger.info('Pass 2 - Applying bhp related')
 
