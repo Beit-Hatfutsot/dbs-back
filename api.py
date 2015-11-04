@@ -572,6 +572,10 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
     else:
         return None
 
+def es_search(query, collections=None, size=14, from_=0):
+    results = es.search(q=query, doc_type=collections, size=size, from_=from_)
+    return results
+
 def get_bhp_related(doc, max_items=6, bhp_only=False):
     """
     Bring the documents that were manually marked as related to the current doc
