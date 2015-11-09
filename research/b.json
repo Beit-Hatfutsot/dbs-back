@@ -1,16 +1,24 @@
 {
     "query": {
-        "bool": {
-            "must":[ 
-               {"query_string": { "query": "*"}},
-               {"match": { "StatusDesc": "completed"}},
-               {"match": { "RightsDesc": "full"}}
-                
-            ],
-            "must_not": [
-               {"match": { "DisplayStatusDesc": "internal use" }}
-            
-            ]
+            "filtered": {
+                "query": {
+                    "query_string": { "query": "*"}
+            },
+            "filter": {
+                "bool": {
+                    "must":[ 
+                       {"term": { "StatusDesc": "completed"}},
+                       {"term": { "RightsDesc": "full"}}
+                    ],
+                    "must_not": [
+                       {"term": { "DisplayStatusDesc": "internal use" }}
+                    ],
+                    "should": [
+                        {"exists": {"field": "UnitText1.En"}},
+                        {"exists": {"field": "UnitText1.He"}}
+                    ]
+                }
+            }
         }
     }
 }
