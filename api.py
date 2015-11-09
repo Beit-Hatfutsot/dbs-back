@@ -603,10 +603,10 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
     else:
         return None
 
-def es_search(query, collection=None, size=14, from_=0):
+def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
-    body['query']['bool']['must'][0]['query_string']['query'] = query
-    results = es.search(q=query, doc_type=collection, size=size, from_=from_)
+    body['query']['bool']['must'][0]['query_string']['query'] = q
+    results = es.search(body=body, doc_type=collection, size=size, from_=from_)
     return results
 
 def get_bhp_related(doc, max_items=6, bhp_only=False):
@@ -1500,9 +1500,9 @@ def save_user_content():
     else:
         abort(500, 'Failed to save {}'.format(filename))
 
-@app.route('/search/<search_string>')
+@app.route('/search')
 @autodoc.doc()
-def general_search(search_string):
+def general_search():
     """
     This view initiates a full text search on the collection specified
     in the `request.args` or on all the searchable collections if nothing
@@ -1515,13 +1515,15 @@ def general_search(search_string):
     The view returns a json representing elasticsearch response.
     """
     args = request.args
-    parameters = {'collection': None, 'size': 14, 'from_': 0}
+    parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
     for param in parameters.keys():
         if args.has_key(param):
             parameters[param] = args[param]
-    parameters['query'] = search_string
-    rv = es_search(**parameters)
-    return humanify(rv)
+    if not parameters['q']:
+        abort(400, 'You must specify a search query')
+    else:
+        rv = es_search(**parameters)
+        return humanify(rv)
 
 @app.route('/wsearch')
 def wizard_search():
