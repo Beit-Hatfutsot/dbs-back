@@ -146,33 +146,49 @@ show_filter = {
                     [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
                 }
 
-es_show_filter ={
+es_show_filter = {
   'query': {
-    'bool': {
-      'must_not': [
-        {
-          'match': {
-            'DisplayStatusDesc': 'internal use'
-          }
+    'filtered': {
+      'filter': {
+        'bool': {
+          'should': [
+            {
+              'exists': {
+                'field': 'UnitText1.En'
+              }
+            },
+            {
+              'exists': {
+                'field': 'UnitText1.He'
+              }
+            }
+          ],
+          'must_not': [
+            {
+              'term': {
+                'DisplayStatusDesc': 'internal use'
+              }
+            }
+          ],
+          'must': [
+            {
+              'term': {
+                'StatusDesc': 'completed'
+              }
+            },
+            {
+              'term': {
+                'RightsDesc': 'full'
+              }
+            }
+          ]
         }
-      ],
-      'must': [
-        {
-          'query_string': {
-            'query': '*'
-          }
-        },
-        {
-          'match': {
-            'StatusDesc': 'completed'
-          }
-        },
-        {
-          'match': {
-            'RightsDesc': 'full'
-          }
+      },
+      'query': {
+        'query_string': {
+          'query': '*'
         }
-      ]
+      }
     }
   }
 }
@@ -605,7 +621,7 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
 
 def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
-    body['query']['bool']['must'][0]['query_string']['query'] = q
+    body['query']['filtered']['query']['query_string']['query'] = q
     results = es.search(body=body, doc_type=collection, size=size, from_=from_)
     return results
 
@@ -1504,15 +1520,16 @@ def save_user_content():
 @autodoc.doc()
 def general_search():
     """
-    This view initiates a full text search on the collection specified
-    in the `request.args` or on all the searchable collections if nothing
-    was specified.
+    This view initiates a full text search for `request.args.q` on the
+    collection specified in the `request.args.collection` or on all the
+    searchable collections if nothing was specified.
     The searchable collections are: 'movies', 'places', 'personalities',
     'photoUnits' and 'familyNames'.
-    In addition to collection, the view could be passed `from_` and `size` arguments.
+    In addition to `q` and `collection`, the view could be passed `from_`
+    and `size` arguments.
     `from_` specifies an integer for scrolling the result set and `size` specifies
     the maximum amount of documents in response.
-    The view returns a json representing elasticsearch response.
+    The view returns a json with the elasticsearch response.
     """
     args = request.args
     parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
