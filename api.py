@@ -146,6 +146,37 @@ show_filter = {
                     [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
                 }
 
+es_show_filter ={
+  'query': {
+    'bool': {
+      'must_not': [
+        {
+          'match': {
+            'DisplayStatusDesc': 'internal use'
+          }
+        }
+      ],
+      'must': [
+        {
+          'query_string': {
+            'query': '*'
+          }
+        },
+        {
+          'match': {
+            'StatusDesc': 'completed'
+          }
+        },
+        {
+          'match': {
+            'RightsDesc': 'full'
+          }
+        }
+      ]
+    }
+  }
+}
+
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
     description = db.StringField(max_length=255)
@@ -572,8 +603,10 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
     else:
         return None
 
-def es_search(query, collections=None, size=14, from_=0):
-    results = es.search(q=query, doc_type=collections, size=size, from_=from_)
+def es_search(query, collection=None, size=14, from_=0):
+    body = es_show_filter
+    body['query']['bool']['must'][0]['query_string']['query'] = query
+    results = es.search(q=query, doc_type=collection, size=size, from_=from_)
     return results
 
 def get_bhp_related(doc, max_items=6, bhp_only=False):
@@ -1469,34 +1502,25 @@ def save_user_content():
 
 @app.route('/search/<search_string>')
 @autodoc.doc()
-def general_search(search_string, max_results=10):
+def general_search(search_string):
     """
     This view initiates a full text search on the collection specified
     in the `request.args` or on all the searchable collections if nothing
     was specified.
     The searchable collections are: 'movies', 'places', 'personalities',
     'photoUnits' and 'familyNames'.
-    The view returns a json whose keys are the names of the collections and the
-    values are lists of documents found in each collection or an empty list
-    if none were found.
+    In addition to collection, the view could be passed `from_` and `size` arguments.
+    `from_` specifies an integer for scrolling the result set and `size` specifies
+    the maximum amount of documents in response.
+    The view returns a json representing elasticsearch response.
     """
-    collections = SEARCHABLE_COLLECTIONS
     args = request.args
-    rv = {}
-    if 'collection' in args.keys():
-        collection_value = request.args['collection']
-        if collection_value in SEARCHABLE_COLLECTIONS:
-            collections = (collection_value,) #The trailing comma is for tuple
-
-    for collection in collections:
-        col_obj = data_db[collection]
-        text_search = {'$text': {'$search': search_string}}
-        text_search.update(show_filter)
-        score_projection = {'score': {'$meta': 'textScore'}}
-        sort_expression = [('score', {'$meta': 'textScore'})]
-        cursor = col_obj.find(text_search, score_projection).sort(sort_expression).limit(max_results)
-        rv[collection] = list(cursor)
-
+    parameters = {'collection': None, 'size': 14, 'from_': 0}
+    for param in parameters.keys():
+        if args.has_key(param):
+            parameters[param] = args[param]
+    parameters['query'] = search_string
+    rv = es_search(**parameters)
     return humanify(rv)
 
 @app.route('/wsearch')
