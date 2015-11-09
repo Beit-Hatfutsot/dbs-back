@@ -1,0 +1,16 @@
+{
+    "query": {
+        "bool": {
+            "must":[ 
+               {"query_string": { "query": "*"}},
+               {"match": { "StatusDesc": "completed"}},
+               {"match": { "RightsDesc": "full"}}
+                
+            ],
+            "must_not": [
+               {"match": { "DisplayStatusDesc": "internal use" }}
+            
+            ]
+        }
+    }
+}
