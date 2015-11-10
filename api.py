@@ -415,14 +415,17 @@ def _init_mjs():
             'unassigned': []}
 
 def fetch_items(item_list, debug_mode=False):
-    ''' Fetch a list of items
-
-    >>> items = fetch_items(['places.73080', 'places.00000'])
+    '''
+    # Fetch 2 items - 1 good and 1 bad
+    >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
+    >>> item_id = 'movies.{}'.format(movie_id)
+    >>> items = fetch_items([item_id, 'places.00000'])
     >>> len(items)
     1
-    >>> items[0]['_id']
-    '73080'
+    >>> int(items[0]['_id']) ==  int(movie_id)
+    True
     '''
+
     rv = []
     for item_id in item_list:
         try:
@@ -441,27 +444,38 @@ def _fetch_item(item_id, debug_mode=False):
     depends on the debug_mode: if the flag is set, the function will return
     the item, if not, it will raise an exception.
 
-    # A regular non-empty item
-    >>> _fetch_item('places.73080') != {}
+    # A regular non-empty item - setup
+    >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
+    >>> item_id = 'movies.{}'.format(movie_id)
+    >>> item = _fetch_item(item_id)
+    >>> item != {}
     True
+
+    # Bad id
     >>> _fetch_item('places.00000')
     Traceback (most recent call last):
         ...
     LookupError: item not found
-    >>> _fetch_item('places.98378')
+
+    # Item that doesn't pass filter
+    >>> bad_filter_id = data_db.movies.find_one({"StatusDesc": "Edit"}, {'_id': 1})['_id']
+    >>> bad_filter_item_id = 'movies.{}'.format(bad_filter_id)
+    >>> _fetch_item(bad_filter_item_id)
     Traceback (most recent call last):
         ...
     LookupError: Item didn't pass the filter
-    >>> _fetch_item('places.98378', debug_mode=True) != {}
+
+    # Item that doesn't pass filter could be fetched in debug mode
+    >>> _fetch_item(bad_filter_item_id, debug_mode=True) != {}
     True
 
     # Item was enriched
-    >>> item = _fetch_item('movies.111514')
     >>> required_keys_set = {'main_image_url', 'video_url', 'thumbnail'}
     >>> item_keys_set = set(item.keys())
     >>> item_keys_set.issuperset(required_keys_set)
     True
     """
+
     if not '.' in item_id: # Need colection.id to unpack
         raise ValueError
     collection, _id = item_id.split('.')[:2]
