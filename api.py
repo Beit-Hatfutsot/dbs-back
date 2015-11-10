@@ -146,6 +146,53 @@ show_filter = {
                     [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
                 }
 
+es_show_filter = {
+  'query': {
+    'filtered': {
+      'filter': {
+        'bool': {
+          'should': [
+            {
+              'exists': {
+                'field': 'UnitText1.En'
+              }
+            },
+            {
+              'exists': {
+                'field': 'UnitText1.He'
+              }
+            }
+          ],
+          'must_not': [
+            {
+              'term': {
+                'DisplayStatusDesc': 'internal use'
+              }
+            }
+          ],
+          'must': [
+            {
+              'term': {
+                'StatusDesc': 'completed'
+              }
+            },
+            {
+              'term': {
+                'RightsDesc': 'full'
+              }
+            }
+          ]
+        }
+      },
+      'query': {
+        'query_string': {
+          'query': '*'
+        }
+      }
+    }
+  }
+}
+
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
     description = db.StringField(max_length=255)
@@ -571,6 +618,12 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
         return result_doc_ids
     else:
         return None
+
+def es_search(q, collection=None, size=14, from_=0):
+    body = es_show_filter
+    body['query']['filtered']['query']['query_string']['query'] = q
+    results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+    return results
 
 def get_bhp_related(doc, max_items=6, bhp_only=False):
     """
@@ -1463,37 +1516,31 @@ def save_user_content():
     else:
         abort(500, 'Failed to save {}'.format(filename))
 
-@app.route('/search/<search_string>')
+@app.route('/search')
 @autodoc.doc()
-def general_search(search_string, max_results=10):
+def general_search():
     """
-    This view initiates a full text search on the collection specified
-    in the `request.args` or on all the searchable collections if nothing
-    was specified.
+    This view initiates a full text search for `request.args.q` on the
+    collection specified in the `request.args.collection` or on all the
+    searchable collections if nothing was specified.
     The searchable collections are: 'movies', 'places', 'personalities',
     'photoUnits' and 'familyNames'.
-    The view returns a json whose keys are the names of the collections and the
-    values are lists of documents found in each collection or an empty list
-    if none were found.
+    In addition to `q` and `collection`, the view could be passed `from_`
+    and `size` arguments.
+    `from_` specifies an integer for scrolling the result set and `size` specifies
+    the maximum amount of documents in response.
+    The view returns a json with the elasticsearch response.
     """
-    collections = SEARCHABLE_COLLECTIONS
     args = request.args
-    rv = {}
-    if 'collection' in args.keys():
-        collection_value = request.args['collection']
-        if collection_value in SEARCHABLE_COLLECTIONS:
-            collections = (collection_value,) #The trailing comma is for tuple
-
-    for collection in collections:
-        col_obj = data_db[collection]
-        text_search = {'$text': {'$search': search_string}}
-        text_search.update(show_filter)
-        score_projection = {'score': {'$meta': 'textScore'}}
-        sort_expression = [('score', {'$meta': 'textScore'})]
-        cursor = col_obj.find(text_search, score_projection).sort(sort_expression).limit(max_results)
-        rv[collection] = list(cursor)
-
-    return humanify(rv)
+    parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
+    for param in parameters.keys():
+        if args.has_key(param):
+            parameters[param] = args[param]
+    if not parameters['q']:
+        abort(400, 'You must specify a search query')
+    else:
+        rv = es_search(**parameters)
+        return humanify(rv)
 
 @app.route('/wsearch')
 def wizard_search():
