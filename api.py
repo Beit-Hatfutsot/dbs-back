@@ -165,8 +165,8 @@ es_show_filter = {
           ],
           'must_not': [
             {
-              'term': {
-                'DisplayStatusDesc': 'internal use'
+              'regexp': {
+                'DisplayStatusDesc': 'internal'
               }
             }
           ],
