@@ -6,7 +6,7 @@
                        {"term": { "RightsDesc": "full"}}
                     ],
                     "must_not": [
-                       {"term": { "DisplayStatusDesc": "internal use" }}
+                        {"regexp": { "DisplayStatusDesc": "internal"}}
                     ],
                     "should": [
                         {"exists": {"field": "UnitText1.En"}},
