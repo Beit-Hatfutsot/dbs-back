@@ -1705,7 +1705,6 @@ def ftree_search():
     tree_number
     The tree_number field value could be an integer with a valid tree number,
     like 7806
-    _______________________________________________________________________
     '''
     args = request.args
     keys = args.keys()
