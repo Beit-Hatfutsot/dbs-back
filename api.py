@@ -654,7 +654,11 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
 def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
     body['query']['filtered']['query']['query_string']['query'] = q
-    results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+    try:
+        results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        return None
     return results
 
 def get_bhp_related(doc, max_items=6, bhp_only=False):
@@ -1573,6 +1577,8 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
+        if not rv:
+            abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)
 
 @app.route('/wsearch')
