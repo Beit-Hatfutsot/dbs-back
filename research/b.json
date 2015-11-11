@@ -1,7 +1,7 @@
 {
     "filter": {
         "bool": {
-            "must":[ 
+            "must":[
                 {"term": { "StatusDesc": "completed"}},
                 {"term": { "RightsDesc": "full"}}
             ],
@@ -9,8 +9,14 @@
                 {"regexp": { "DisplayStatusDesc": "internal"}}
             ],
             "should": [
-                {"exists": {"field": "UnitText1.En"}},
-                {"exists": {"field": "UnitText1.He"}}
+                {"and": [
+                    {"exists": {"field": "UnitText1.En"}},
+                    {"script": {"script": "doc['UnitText1.En'].empty == false"}}
+                ]},
+                {"and": [
+                    {"exists": {"field": "UnitText1.He"}},
+                    {"script": {"script": "doc['UnitText1.He'].empty == false"}}
+                ]}
             ]
         }
     }
