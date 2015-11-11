@@ -1201,6 +1201,7 @@ def fsearch(max_results=5000,**kwargs):
                   'G': 1,    # Gender
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1,   # Marriage places as comma separated string
+                  'GTF': 1,  # Tree file UUID
                   'EditorRemarks': 1}
 
     if 'debug' in search_dict.keys():
