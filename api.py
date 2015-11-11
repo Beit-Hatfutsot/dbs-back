@@ -153,14 +153,32 @@ es_show_filter = {
         'bool': {
           'should': [
             {
-              'exists': {
-                'field': 'UnitText1.En'
-              }
+              'and': [
+                {
+                  'exists': {
+                    'field': 'UnitText1.En'
+                  }
+                },
+                {
+                  'script': {
+                    'script': "doc['UnitText1.En'].empty == false"
+                  }
+                }
+              ]
             },
             {
-              'exists': {
-                'field': 'UnitText1.He'
-              }
+              'and': [
+                {
+                  'exists': {
+                    'field': 'UnitText1.He'
+                  }
+                },
+                {
+                  'script': {
+                    'script': "doc['UnitText1.He'].empty == false"
+                  }
+                }
+              ]
             }
           ],
           'must_not': [
