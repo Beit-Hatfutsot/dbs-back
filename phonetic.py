@@ -294,7 +294,9 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    db = pymongo.Connection()[args.database]
+    client_data_db = pymongo.MongoClient()
+    db = client_data_db[args.database]
+
     collection = db[args.collection]
     if args.exact:
         retval = get_exact_phonetic_matches(args.search, collection)
