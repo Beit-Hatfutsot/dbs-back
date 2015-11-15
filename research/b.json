@@ -1,24 +1,23 @@
 {
-    "query": {
-            "filtered": {
-                "query": {
-                    "query_string": { "query": "*"}
-            },
-            "filter": {
-                "bool": {
-                    "must":[ 
-                       {"term": { "StatusDesc": "completed"}},
-                       {"term": { "RightsDesc": "full"}}
-                    ],
-                    "must_not": [
-                       {"term": { "DisplayStatusDesc": "internal use" }}
-                    ],
-                    "should": [
-                        {"exists": {"field": "UnitText1.En"}},
-                        {"exists": {"field": "UnitText1.He"}}
-                    ]
-                }
-            }
+    "filter": {
+        "bool": {
+            "must":[
+                {"term": { "StatusDesc": "completed"}},
+                {"term": { "RightsDesc": "full"}}
+            ],
+            "must_not": [
+                {"regexp": { "DisplayStatusDesc": "internal"}}
+            ],
+            "should": [
+                {"and": [
+                    {"exists": {"field": "UnitText1.En"}},
+                    {"script": {"script": "doc['UnitText1.En'].empty == false"}}
+                ]},
+                {"and": [
+                    {"exists": {"field": "UnitText1.He"}},
+                    {"script": {"script": "doc['UnitText1.He'].empty == false"}}
+                ]}
+            ]
         }
     }
 }

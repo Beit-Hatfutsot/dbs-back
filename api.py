@@ -153,20 +153,38 @@ es_show_filter = {
         'bool': {
           'should': [
             {
-              'exists': {
-                'field': 'UnitText1.En'
-              }
+              'and': [
+                {
+                  'exists': {
+                    'field': 'UnitText1.En'
+                  }
+                },
+                {
+                  'script': {
+                    'script': "doc['UnitText1.En'].empty == false"
+                  }
+                }
+              ]
             },
             {
-              'exists': {
-                'field': 'UnitText1.He'
-              }
+              'and': [
+                {
+                  'exists': {
+                    'field': 'UnitText1.He'
+                  }
+                },
+                {
+                  'script': {
+                    'script': "doc['UnitText1.He'].empty == false"
+                  }
+                }
+              ]
             }
           ],
           'must_not': [
             {
-              'term': {
-                'DisplayStatusDesc': 'internal use'
+              'regexp': {
+                'DisplayStatusDesc': 'internal'
               }
             }
           ],
@@ -636,7 +654,11 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
 def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
     body['query']['filtered']['query']['query_string']['query'] = q
-    results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+    try:
+        results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        return None
     return results
 
 def get_bhp_related(doc, max_items=6, bhp_only=False):
@@ -1201,6 +1223,7 @@ def fsearch(max_results=5000,**kwargs):
                   'G': 1,    # Gender
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1,   # Marriage places as comma separated string
+                  'GTF': 1,  # Tree file UUID
                   'EditorRemarks': 1}
 
     if 'debug' in search_dict.keys():
@@ -1554,6 +1577,8 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
+        if not rv:
+            abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)
 
 @app.route('/wsearch')
@@ -1669,12 +1694,42 @@ def get_items(item_id):
 @autodoc.doc()
 def ftree_search():
     '''
-    This view initiates a search for genealogical data from the
-    genTreeIndividuals collection.
+    This view initiates a search for Beit HaTfutsot genealogical data.
     The search supports numerous fields and unexact values for search terms.
     For example, to get all individuals whose last name sounds like Abulafia
     and first name is Hanna:
     curl 'api.myjewishidentity.org/fsearch?last_name=Abulafia;phonetic&first_name=Hanna'
+ 
+    The full list of fields and their possible options follows:
+    _______________________________________________________________________
+    first_name
+    maiden_name
+    last_name
+    birth_place
+    marriage_place
+    death_place
+    The *_place and *_name fields could be specified exactly,
+    by the prefix (this is the only kind of "regex" we currently support)
+    or phonetically.
+    To match by the last name yehuda, use yehuda
+    To match by the last names that start with yehud, use yehuda;prefix
+    To match by the last names that sound like yehud, use yehuda;phonetic
+    _______________________________________________________________________
+    birth_year
+    marriage_year
+    death_year
+    The *_year fields could be specified as an integer with an optional fudge
+    factor signified by a tilda, like 1907~2
+    The query for birth_year 1907 will match the records from this year only,
+    while the query for 1907~2 will match the records from 1905, 1906, 1907
+    1908 and 1909, making the match wider.
+    _______________________________________________________________________
+    sex
+    The sex field value could be either m or f.
+    _______________________________________________________________________
+    tree_number
+    The tree_number field value could be an integer with a valid tree number,
+    like 7806
     '''
     args = request.args
     keys = args.keys()
