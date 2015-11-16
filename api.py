@@ -1562,15 +1562,17 @@ def save_user_content():
 def general_search():
     """
     This view initiates a full text search for `request.args.q` on the
-    collection specified in the `request.args.collection` or on all the
+    collection(s) specified in the `request.args.collection` or on all the
     searchable collections if nothing was specified.
+    To search in 2 or more but not all collections, separate the arguments
+    by comma: `collection=movies,places`
     The searchable collections are: 'movies', 'places', 'personalities',
     'photoUnits' and 'familyNames'.
     In addition to `q` and `collection`, the view could be passed `from_`
     and `size` arguments.
     `from_` specifies an integer for scrolling the result set and `size` specifies
     the maximum amount of documents in response.
-    The view returns a json with the elasticsearch response.
+    The view returns a json with an elasticsearch response.
     """
     args = request.args
     parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
