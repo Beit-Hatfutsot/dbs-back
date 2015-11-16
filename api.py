@@ -653,7 +653,11 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
 
 def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
-    body['query']['filtered']['query']['query_string']['query'] = q
+    query_body = body['query']['filtered']['query']['query_string']
+    query_body['query'] = q
+    # Boost the header by  2:
+    # https://www.elastic.co/guide/en/elasticsearch/reference/1.7/query-dsl-query-string-query.html
+    query_body['fields'] = ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He']
     try:
         results = es.search(body=body, doc_type=collection, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
