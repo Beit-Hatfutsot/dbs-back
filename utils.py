@@ -150,6 +150,20 @@ def upload_to_soundcloud(sc_client, fn):
          })
     return track.obj
 
+def fail_show_filter(show_filter, doc):
+    rv = []
+    for k in show_filter.keys():
+        if k == '$or':
+            if (not doc['UnitText1']['En']) and (not doc['UnitText1']['He']):
+                rv.append(('UnitText1', doc['UnitText1']))
+        elif k == 'DisplayStatusDesc':
+            if doc[k] == show_filter[k]['$nin'][0]:
+                rv.append((k, doc[k]))
+        else:
+            if doc[k] != show_filter[k]:
+                rv.append((k, doc[k]))
+    return rv
+
 def send_gmail(subject, body, address, message_mode='text'):
     must_have_keys = set(['email_username',
                     'email_password',
