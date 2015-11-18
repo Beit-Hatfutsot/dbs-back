@@ -665,7 +665,7 @@ def es_search(q, collection=None, size=14, from_=0):
         return None
     return results
 
-def get_bhp_related(doc, max_items=6, bhp_only=False):
+def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -718,7 +718,7 @@ def get_bhp_related(doc, max_items=6, bhp_only=False):
                 # and others are inside lists
                 related_value_list = [i['PlaceIds'] for i in related_value]
             else:
-                related_value_list = related_value.split(',')
+                related_value_list = related_value.split(delimeter)
 
             for i in related_value_list:
                 if not i:
