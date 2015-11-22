@@ -1624,8 +1624,13 @@ def wizard_search():
         ftree_args['birth_place'] = [place]
 
     # We turn the cursor to list in order to serialize it
-    family_trees = list(fsearch(**ftree_args))
-    rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
+    tree_found = list(fsearch(max_results=1, **ftree_args))
+    if not tree_found:
+        del ftree_args['birth_place']
+        tree_found = list(fsearch(max_results=1, **ftree_args))
+    rv = {'place': place_doc, 'name': name_doc}
+    if tree_found:
+        rv['ftree_args'] = ftree_args
     return humanify(rv)
 
 @app.route('/suggest/<collection>/<string>')
