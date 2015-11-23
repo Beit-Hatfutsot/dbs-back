@@ -1061,7 +1061,7 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-def fsearch(max_results=5000,**kwargs):
+def fsearch(max_results=None,**kwargs):
     '''
     Search in the genTreeIindividuals table or try to fetch a gedcom file.
     Names and places could be matched exactly, by the prefix match
@@ -1233,7 +1233,9 @@ def fsearch(max_results=5000,**kwargs):
     if 'debug' in search_dict.keys():
         projection = None
 
-    results = collection.find(search_query, projection).limit(max_results)
+    results = collection.find(search_query, projection)
+    if max_results:
+        results = results.limit(max_results)
     if results.count() > 0:
         logger.debug('Found {} results'.format(results.count()))
         return results
