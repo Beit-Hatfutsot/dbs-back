@@ -1628,7 +1628,7 @@ def wizard_search():
 
     # We turn the cursor to list in order to serialize it
     tree_found = list(fsearch(max_results=1, **ftree_args))
-    if not tree_found:
+    if not tree_found and 'birth_place' in ftree_args:
         del ftree_args['birth_place']
         tree_found = list(fsearch(max_results=1, **ftree_args))
     rv = {'place': place_doc, 'name': name_doc}
