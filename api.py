@@ -659,7 +659,7 @@ def es_search(q, collection=None, size=14, from_=0):
     # https://www.elastic.co/guide/en/elasticsearch/reference/1.7/query-dsl-query-string-query.html
     query_body['fields'] = ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He']
     try:
-        results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+        results = es.search(index=data_db.name, body=body, doc_type=collection, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
         logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
         return None
