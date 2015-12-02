@@ -26,13 +26,15 @@ def graph(request):
     rels = [ Relationship(nodes[0], "FATHER_OF", nodes[1]),
              Relationship(nodes[1], "FATHER_OF", nodes[4]),
              Relationship(nodes[1], "FATHER_OF", nodes[5]),
+             Relationship(nodes[1], "SPOUSE", nodes[0]),
              Relationship(nodes[2], "MOTHER_OF", nodes[4]),
              Relationship(nodes[4], "FATHER_OF", nodes[7]),
              Relationship(nodes[4], "FATHER_OF", nodes[8]),
              Relationship(nodes[4], "FATHER_OF", nodes[9]),
+             Relationship(nodes[3], "SPOUSE", nodes[4]),
              Relationship(nodes[3], "MOTHER_OF", nodes[7]),
-             Relationship(nodes[2], "MOTHER_OF", nodes[8]),
-             Relationship(nodes[2], "MOTHER_OF", nodes[9]),
+             Relationship(nodes[3], "MOTHER_OF", nodes[8]),
+             Relationship(nodes[3], "MOTHER_OF", nodes[9]),
             ]
     g.create(*nodes)
     g.create(*rels)
@@ -40,18 +42,24 @@ def graph(request):
 
 
 def test_walk(graph):
-    r = fwalk(str(graph.uri), individual_id="4", tree_id="1", radius=1)
-    assert len(r) == 1
-    r = fwalk(str(graph.uri), individual_id="4", tree_id="1", radius=2)
-    assert len(r) == 2
-    r = fwalk(str(graph.uri), individual_id="4", tree_id="1", radius=3)
-    assert len(r) == 6
+    n = graph.cypher.execute_one("MATCH (n:Person {name: 'mother'}) return n")
+    id = int(n.ref.split('/')[1])
+    r = fwalk(graph, individual_id=id, radius=0)
+    assert len(r.keys()) == 1
+    r = fwalk(graph, individual_id=id, radius=1)
+    assert len(r.keys()) == 5
+    r = fwalk(graph, individual_id=id, radius=2)
+    assert len(r.keys()) == 8
+    r = fwalk(graph, individual_id=id, radius=3)
+    assert len(r.keys()) == 9
 
 
 def test_walk_api(graph, client):
-    r = client.get('/fwalk?p=4&t=1&r=1')
-    assert len(r.json) == 1
-    r = client.get('/fwalk?p=4&t=1&r=2')
-    assert len(r.json) == 2
-    r = client.get('/fwalk?p=4&t=1')
-    assert len(r.json) == 6
+    n = graph.cypher.execute_one("MATCH (n:Person {name: 'mother'}) return n")
+    id = int(n.ref.split('/')[1])
+    r = client.get('/fwalk?i={}&r=1'.format(id))
+    assert len(r.json.keys()) == 5
+    r = client.get('/fwalk?i={}&r=2'.format(id))
+    assert len(r.json.keys()) == 8
+    r = client.get('/fwalk?i={}'.format(id))
+    assert len(r.json.keys()) == 5

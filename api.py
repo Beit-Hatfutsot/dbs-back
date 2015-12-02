@@ -26,6 +26,7 @@ import elasticsearch
 
 import pymongo
 import jinja2
+from py2neo import Graph
 
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                              get_unit_type, SEARCHABLE_COLLECTIONS)
@@ -1596,20 +1597,26 @@ def fetch_tree(tree_number):
 def ftree_walk():
     '''
     This view returns a part of family tree starting with a given person
-    id in a given tree number. These two arguments are `p` and `t` are mandatory
-    and there is a third optional argument - `r` specifiying how many
-    edges to traverse, default is 3
+    id. These `i` argument is for individual id. 
+    There is a second optional argument - `r` specifiying how many
+    edges to traverse, default is 1
     '''
     args = request.args
 
-    try:
-        results = fwalk(conf.neo4j_url,
-                        args['p'],
-                        args['t'],
-                        args.get('r', 3))
-    except AttributeError:
-        em = "Must receive `individual_id` and `tree_number` arguments"
+    em = "Must receive `i`ndividual and `t`ree ids"
+    i = args.get('i', False)
+    if not i:
         abort(400, em)
+
+    try:
+        r = int(args.get('r', 1))
+    except ValueError:
+        abort(400, '`r` must be a positive integer')
+    if r > 9:
+        abort(400, '`r` can not be larger than 9')
+
+    graph = Graph(conf.neo4j_url)
+    results = fwalk(graph, i, r)
     return humanify(results)
 
 @app.route('/get_image_urls/<image_ids>')
