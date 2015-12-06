@@ -14,9 +14,13 @@ sudo apt-get update
 ```
 - install es package and make it autostart  
 ```
-sudo apt-get install elasticsearch
-sudo service elasticsearch restart
+sudo apt-get install -y elasticsearch
 sudo update-rc.d elasticsearch defaults 95 10
+```
+- Enable groovy scripting for ES
+```
+echo "script.engine.groovy.inline.search: on" | sudo tee -a /etc/elasticsearch/elasticsearch.yml
+sudo service elasticsearch restart
 ```
 
 ## Install Mongo river ##

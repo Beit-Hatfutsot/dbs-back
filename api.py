@@ -141,7 +141,7 @@ es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
 # status and rights.
-# We also filter docs that don't have any text
+# We also filter docs that don't have any text in the 'UnitText1' field.
 show_filter = {
                 'StatusDesc': 'Completed',
                 'RightsDesc': 'Full',
@@ -149,6 +149,71 @@ show_filter = {
                 '$or':
                     [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
                 }
+
+es_show_filter = {
+  'query': {
+    'filtered': {
+      'filter': {
+        'bool': {
+          'should': [
+            {
+              'and': [
+                {
+                  'exists': {
+                    'field': 'UnitText1.En'
+                  }
+                },
+                {
+                  'script': {
+                    'script': "doc['UnitText1.En'].empty == false"
+                  }
+                }
+              ]
+            },
+            {
+              'and': [
+                {
+                  'exists': {
+                    'field': 'UnitText1.He'
+                  }
+                },
+                {
+                  'script': {
+                    'script': "doc['UnitText1.He'].empty == false"
+                  }
+                }
+              ]
+            }
+          ],
+          'must_not': [
+            {
+              'regexp': {
+                'DisplayStatusDesc': 'internal'
+              }
+            }
+          ],
+          'must': [
+            {
+              'term': {
+                'StatusDesc': 'completed'
+              }
+            },
+            {
+              'term': {
+                'RightsDesc': 'full'
+              }
+            }
+          ]
+        }
+      },
+      'query': {
+        'query_string': {
+          'query': '*'
+        }
+      }
+    }
+  }
+}
 
 class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
@@ -371,19 +436,70 @@ def _init_mjs():
     return {'assigned': [],
             'unassigned': []}
 
-def fetch_items(item_list):
-    if len(item_list) == 1:
-        return _fetch_item(item_list[0])
-    else:
-        rv = []
-        for item in item_list:
-            if item: # Drop empty items
-                rv.append( _fetch_item(item))
-        return rv
+def fetch_items(item_list, debug_mode=False):
+    '''
+    # Fetch 2 items - 1 good and 1 bad
+    >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
+    >>> item_id = 'movies.{}'.format(movie_id)
+    >>> items = fetch_items([item_id, 'places.00000'])
+    >>> len(items)
+    1
+    >>> int(items[0]['_id']) ==  int(movie_id)
+    True
+    '''
 
-def _fetch_item(item_id):
+    rv = []
+    for item_id in item_list:
+        try:
+            item = _fetch_item(item_id, debug_mode)
+            rv.append(item)
+        except (ValueError, LookupError):
+            continue
+
+    return rv
+
+def _fetch_item(item_id, debug_mode=False):
+    """
+    Gets item_id string and debug_mode flag.
+    If item_id is bad or item is not found, raises an exception.
+    If item is found, but doesn't pass the show_filter, the behaviour
+    depends on the debug_mode: if the flag is set, the function will return
+    the item, if not, it will raise an exception.
+
+    # A regular non-empty item - setup
+    >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
+    >>> item_id = 'movies.{}'.format(movie_id)
+    >>> item = _fetch_item(item_id)
+    >>> item != {}
+    True
+
+    # Bad id
+    >>> _fetch_item('places.00000')
+    Traceback (most recent call last):
+        ...
+    LookupError: item not found
+
+    # Item that doesn't pass filter
+    >>> bad_filter_id = data_db.movies.find_one({"StatusDesc": "Edit"}, {'_id': 1})['_id']
+    >>> bad_filter_item_id = 'movies.{}'.format(bad_filter_id)
+    >>> _fetch_item(bad_filter_item_id)
+    Traceback (most recent call last):
+        ...
+    LookupError: Item didn't pass the filter
+
+    # Item that doesn't pass filter could be fetched in debug mode
+    >>> _fetch_item(bad_filter_item_id, debug_mode=True) != {}
+    True
+
+    # Item was enriched
+    >>> required_keys_set = {'main_image_url', 'video_url', 'thumbnail'}
+    >>> item_keys_set = set(item.keys())
+    >>> item_keys_set.issuperset(required_keys_set)
+    True
+    """
+
     if not '.' in item_id: # Need colection.id to unpack
-        return {}
+        raise ValueError
     collection, _id = item_id.split('.')[:2]
     if collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
@@ -393,30 +509,35 @@ def _fetch_item(item_id):
             item['_id'] = item_id
             if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
                 item['_id'] = item['_id']['$oid']
+            return _make_serializable(item)
+        else:
+            raise LookupError
     else:
         try:
-            _id = long(_id)
+            _id = long(_id) # Check that we are dealing with a right id format
         except ValueError:
             logger.debug('Bad id: {}'.format(_id))
-            return {}
+            raise ValueError
+
         # Return item by id without show filter - good for debugging
+        filtered = filter_doc_id(_id, collection)
         item = data_db[collection].find_one(_id)
 
-    if item:
-        if item.has_key('Header'):
-            item = enrich_item(item)
+        if not filtered:
+            if item:
+                if debug_mode:
+                    return _make_serializable(item)
+                else:
+                    raise LookupError, "Item didn't pass the filter"
+            else:
+                raise LookupError, "item not found"
         else:
-            logger.debug('No header for item id {}'.format(str(item['_id'])))
-            return {}
-        return _make_serializable(item)
-    else:
-        return {}
+            return _make_serializable(item)
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
         m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
         logger.debug(m)
-        item['related'] = get_bhp_related(item)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
@@ -533,6 +654,20 @@ def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, lim
         return result_doc_ids
     else:
         return None
+
+def es_search(q, collection=None, size=14, from_=0):
+    body = es_show_filter
+    query_body = body['query']['filtered']['query']['query_string']
+    query_body['query'] = q
+    # Boost the header by  2:
+    # https://www.elastic.co/guide/en/elasticsearch/reference/1.7/query-dsl-query-string-query.html
+    query_body['fields'] = ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He']
+    try:
+        results = es.search(body=body, doc_type=collection, size=size, from_=from_)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        return None
+    return results
 
 def get_bhp_related(doc, max_items=6, bhp_only=False):
     """
@@ -672,14 +807,16 @@ def filter_doc_id(unit_id, collection):
     '''
     search_query = {'_id': unit_id}
     search_query.update(show_filter)
-    found = data_db[collection].find_one(search_query, {'_id': 1})
+    found = data_db[collection].find_one(search_query)
     if found:
         if collection == 'movies':
-            video_id = item['MovieFileId']
+            video_id = found['MovieFileId']
             video_url = get_video_url(video_id)
             if not video_url:
                 logger.debug('No video for {}.{}'.format(collection, unit_id))
                 return None
+            else:
+                return str(found['_id'])
         else:
             return str(found['_id'])
     else:
@@ -851,17 +988,18 @@ def _convert_meta_to_bhp6(upload_md, file_info):
     rv['raw'] = no_lang
     return rv
 
-def search_by_header(string, collection, mode='starts_with'):
+def search_by_header(string, collection, starts_with=True):
     if not string: # Support empty strings
         return {}
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
         lang = 'En'
-    if mode == 'starts_with':
-        header_regex = re.compile('^'+re.escape(string), re.IGNORECASE)
+    string_re = re.escape(string)
+    if starts_with:
+        header_regex = re.compile('^'+string_re, re.IGNORECASE)
     else:
-        header_regex = re.compile(re.escape(string), re.IGNORECASE)
+        header_regex = re.compile('^{}$'.format(string_re), re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
@@ -928,7 +1066,7 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-def fsearch(max_results=5000,**kwargs):
+def fsearch(max_results=None,**kwargs):
     '''
     Search in the genTreeIindividuals table or try to fetch a gedcom file.
     Names and places could be matched exactly, by the prefix match
@@ -1094,12 +1232,15 @@ def fsearch(max_results=5000,**kwargs):
                   'G': 1,    # Gender
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1,   # Marriage places as comma separated string
+                  'GTF': 1,  # Tree file UUID
                   'EditorRemarks': 1}
 
     if 'debug' in search_dict.keys():
         projection = None
 
-    results = collection.find(search_query, projection).limit(max_results)
+    results = collection.find(search_query, projection)
+    if max_results:
+        results = results.limit(max_results)
     if results.count() > 0:
         logger.debug('Found {} results'.format(results.count()))
         return results
@@ -1423,37 +1564,35 @@ def save_user_content():
     else:
         abort(500, 'Failed to save {}'.format(filename))
 
-@app.route('/search/<search_string>')
+@app.route('/search')
 @autodoc.doc()
-def general_search(search_string, max_results=10):
+def general_search():
     """
-    This view initiates a full text search on the collection specified
-    in the `request.args` or on all the searchable collections if nothing
-    was specified.
+    This view initiates a full text search for `request.args.q` on the
+    collection(s) specified in the `request.args.collection` or on all the
+    searchable collections if nothing was specified.
+    To search in 2 or more but not all collections, separate the arguments
+    by comma: `collection=movies,places`
     The searchable collections are: 'movies', 'places', 'personalities',
     'photoUnits' and 'familyNames'.
-    The view returns a json whose keys are the names of the collections and the
-    values are lists of documents found in each collection or an empty list
-    if none were found.
+    In addition to `q` and `collection`, the view could be passed `from_`
+    and `size` arguments.
+    `from_` specifies an integer for scrolling the result set and `size` specifies
+    the maximum amount of documents in response.
+    The view returns a json with an elasticsearch response.
     """
-    collections = SEARCHABLE_COLLECTIONS
     args = request.args
-    rv = {}
-    if 'collection' in args.keys():
-        collection_value = request.args['collection']
-        if collection_value in SEARCHABLE_COLLECTIONS:
-            collections = (collection_value,) #The trailing comma is for tuple
-
-    for collection in collections:
-        col_obj = data_db[collection]
-        text_search = {'$text': {'$search': search_string}}
-        text_search.update(show_filter)
-        score_projection = {'score': {'$meta': 'textScore'}}
-        sort_expression = [('score', {'$meta': 'textScore'})]
-        cursor = col_obj.find(text_search, score_projection).sort(sort_expression).limit(max_results)
-        rv[collection] = list(cursor)
-
-    return humanify(rv)
+    parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
+    for param in parameters.keys():
+        if args.has_key(param):
+            parameters[param] = args[param]
+    if not parameters['q']:
+        abort(400, 'You must specify a search query')
+    else:
+        rv = es_search(**parameters)
+        if not rv:
+            abort(500, 'Sorry, the search cluster appears to be down')
+        return humanify(rv)
 
 @app.route('/wsearch')
 def wizard_search():
@@ -1482,8 +1621,8 @@ def wizard_search():
     if place == 'havat_taninim' and name == 'tick-tock':
         return _generate_credits()
 
-    place_doc = search_by_header(place, 'places')
-    name_doc = search_by_header(name, 'familyNames')
+    place_doc = search_by_header(place, 'places', starts_with=False)
+    name_doc = search_by_header(name, 'familyNames', starts_with=False)
     # fsearch() expects a dictionary of lists and returns Mongo cursor
     ftree_args = {}
     if name:
@@ -1492,8 +1631,13 @@ def wizard_search():
         ftree_args['birth_place'] = [place]
 
     # We turn the cursor to list in order to serialize it
-    family_trees = list(fsearch(**ftree_args))
-    rv = {'place': place_doc, 'name': name_doc, 'individuals': family_trees}
+    tree_found = list(fsearch(max_results=1, **ftree_args))
+    if not tree_found and name and 'birth_place' in ftree_args:
+        del ftree_args['birth_place']
+        tree_found = list(fsearch(max_results=1, **ftree_args))
+    rv = {'place': place_doc, 'name': name_doc}
+    if tree_found:
+        rv['ftree_args'] = ftree_args
     return humanify(rv)
 
 @app.route('/suggest/<collection>/<string>')
@@ -1526,7 +1670,15 @@ def get_items(item_id):
     The item_id argument is in the form of "collection_name.item_id", like
     "personalities.112998" and could contain multiple IDs split by commas.
     Only the first 10 ids will be returned to prevent abuse.
+    By default we don't return the documents that fail the show_filter,
+    unless a `debug` argument was provided.
     '''
+    args = request.args
+    if 'debug' in args.keys() and args['debug']:
+        debug_mode = True
+    else:
+        debug_mode = False
+
     items_list = item_id.split(',')
     # Check if there are items from ugc collection and test their access control
     ugc_items = []
@@ -1542,7 +1694,7 @@ def get_items(item_id):
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
 
-    items = fetch_items(items_list[:10])
+    items = fetch_items(items_list[:10], debug_mode)
     if items:
         # Cast items to list
         if type(items) != list:
@@ -1560,12 +1712,42 @@ def get_items(item_id):
 @autodoc.doc()
 def ftree_search():
     '''
-    This view initiates a search for genealogical data from the
-    genTreeIndividuals collection.
+    This view initiates a search for Beit HaTfutsot genealogical data.
     The search supports numerous fields and unexact values for search terms.
     For example, to get all individuals whose last name sounds like Abulafia
     and first name is Hanna:
     curl 'api.myjewishidentity.org/fsearch?last_name=Abulafia;phonetic&first_name=Hanna'
+ 
+    The full list of fields and their possible options follows:
+    _______________________________________________________________________
+    first_name
+    maiden_name
+    last_name
+    birth_place
+    marriage_place
+    death_place
+    The *_place and *_name fields could be specified exactly,
+    by the prefix (this is the only kind of "regex" we currently support)
+    or phonetically.
+    To match by the last name yehuda, use yehuda
+    To match by the last names that start with yehud, use yehuda;prefix
+    To match by the last names that sound like yehud, use yehuda;phonetic
+    _______________________________________________________________________
+    birth_year
+    marriage_year
+    death_year
+    The *_year fields could be specified as an integer with an optional fudge
+    factor signified by a tilda, like 1907~2
+    The query for birth_year 1907 will match the records from this year only,
+    while the query for 1907~2 will match the records from 1905, 1906, 1907
+    1908 and 1909, making the match wider.
+    _______________________________________________________________________
+    sex
+    The sex field value could be either m or f.
+    _______________________________________________________________________
+    tree_number
+    The tree_number field value could be an integer with a valid tree number,
+    like 7806
     '''
     args = request.args
     keys = args.keys()
