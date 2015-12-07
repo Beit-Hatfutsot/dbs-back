@@ -12,6 +12,9 @@ echo
 
 if [ "$1" != "" ];
     then host_name=$1
+    if [ "$2" != "" ];
+        then index_name=$2
+    fi
 fi
 
 
