@@ -5,29 +5,56 @@ from pytest_flask.plugin import client
 
 @pytest.fixture
 def graph(request):
-    g = Graph("http://neo4j:bhonline@localhost:7474/db/data")
+    ''' a fixture to add a simple family tree graph
+                    +-----------------+
+                    |great grandfather|
+                    +-----------------+
+                    FATHER_OF|
+                        +-----v-----+               +-----------+
+                        |grandfather+-----spouse----+grandmother|
+                        +-----+-----+               +-----+-----+
+                            +---------+        +--------+
+                                FATHER_OF|        |MOTHER_OF
+                            +---------+-+------+--------+
+                            |           |               |
+        +------+        +-----v+       +--v--+         +--v-+
+        |father+---S----+mother|       |uncle|         |aunt|
+        +--+---+        +---+--+       +-----+         +----+
+            +-----+    +-----+
+        FATHER_OF|    |MOTHER_OF
+        +-------------++----------+
+        |             |           |
+    +---v----+   +----v---+    +--v---+
+    |brother1|   |brother2|    |sister|
+    +--------+   +--------+    +------+
+
+    '''
     def fin():
         g.cypher.execute("MATCH (n { tree_id: '1' }) optional match (n)-[r]-() delete n,r")
     request.addfinalizer(fin)
 
+    g = Graph("http://neo4j:bhonline@localhost:7474/db/data")
     nodes = [
-        Node("Person", tree_id='1', id='1', name="grandfather's father"),
-        Node("Person", tree_id='1', id='2', name="grandfather"),
-        Node("Person", tree_id='1', id='3', name="grandmother"),
-        Node("Person", tree_id='1', id='4', name="mother"),
-        Node("Person", tree_id='1', id='5', name="father"),
-        Node("Person", tree_id='1', id='6', name="uncle"),
-        Node("Person", tree_id='1', id='7', name="aunt"),
-        Node("Person", tree_id='1', id='8', name="brother"),
-        Node("Person", tree_id='1', id='9', name="brother"),
-        Node("Person", tree_id='1', id='10', name="sister"),
+        Node("INDI", tree_id='1', id='1', NAME="grandfather's father", SEX='M'),
+        Node("INDI", tree_id='1', id='2', NAME="grandfather", SEX='M'),
+        Node("INDI", tree_id='1', id='3', NAME="grandmother", SEX='F'),
+        Node("INDI", tree_id='1', id='4', NAME="mother", SEX='F'),
+        Node("INDI", tree_id='1', id='5', NAME="father", SEX='M'),
+        Node("INDI", tree_id='1', id='6', NAME="uncle", SEX='M'),
+        Node("INDI", tree_id='1', id='7', NAME="aunt", SEX='F'),
+        Node("INDI", tree_id='1', id='8', NAME="brother1", SEX='M'),
+        Node("INDI", tree_id='1', id='9', NAME="brother2", SEX='M'),
+        Node("INDI", tree_id='1', id='10', NAME="sister", SEX='F'),
     ]
 
     rels = [ Relationship(nodes[0], "FATHER_OF", nodes[1]),
-             Relationship(nodes[1], "FATHER_OF", nodes[4]),
+             Relationship(nodes[1], "FATHER_OF", nodes[3]),
              Relationship(nodes[1], "FATHER_OF", nodes[5]),
+             Relationship(nodes[1], "FATHER_OF", nodes[6]),
              Relationship(nodes[1], "SPOUSE", nodes[0]),
-             Relationship(nodes[2], "MOTHER_OF", nodes[4]),
+             Relationship(nodes[2], "MOTHER_OF", nodes[3]),
+             Relationship(nodes[2], "MOTHER_OF", nodes[5]),
+             Relationship(nodes[2], "MOTHER_OF", nodes[6]),
              Relationship(nodes[4], "FATHER_OF", nodes[7]),
              Relationship(nodes[4], "FATHER_OF", nodes[8]),
              Relationship(nodes[4], "FATHER_OF", nodes[9]),
@@ -40,26 +67,34 @@ def graph(request):
     g.create(*rels)
     return g
 
-
 def test_walk(graph):
-    n = graph.cypher.execute_one("MATCH (n:Person {name: 'mother'}) return n")
+
+    just_name = lambda a: a.get('name', 'unknown')
+    # first get the id of our mother
+    n = graph.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
     id = int(n.ref.split('/')[1])
-    r = fwalk(graph, individual_id=id, radius=0)
-    assert len(r.keys()) == 1
-    r = fwalk(graph, individual_id=id, radius=1)
-    assert len(r.keys()) == 5
-    r = fwalk(graph, individual_id=id, radius=2)
-    assert len(r.keys()) == 8
-    r = fwalk(graph, individual_id=id, radius=3)
-    assert len(r.keys()) == 9
+
+    mother = fwalk(graph, individual_id=id)
+    assert mother['name'] == 'mother'
+    parents = set(map(just_name, mother['parents']))
+    assert parents == set(['grandmother', 'grandfather'])
+    children = set(map(just_name, mother['children']))
+    assert children == set(['brother1', 'brother2', 'sister'])
+    partners = set(map(just_name, mother['partners']))
+    assert partners == set(['father'])
+    siblings = set(map(just_name, mother['siblings']))
+    assert siblings == set(['uncle', 'aunt'])
+    # now test that great grandfather is there
+    for p in mother['parents']:
+        if p['name'] == 'grandfather':
+            greatgrandfathers = set(map(just_name, p['parents']))
+            assert greatgrandfathers == set(["grandfather's father"])
 
 
 def test_walk_api(graph, client):
-    n = graph.cypher.execute_one("MATCH (n:Person {name: 'mother'}) return n")
+    n = graph.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
     id = int(n.ref.split('/')[1])
-    r = client.get('/fwalk?i={}&r=1'.format(id))
-    assert len(r.json.keys()) == 5
-    r = client.get('/fwalk?i={}&r=2'.format(id))
-    assert len(r.json.keys()) == 8
     r = client.get('/fwalk?i={}'.format(id))
-    assert len(r.json.keys()) == 5
+    mother = r.json
+    assert mother['id'] == str(id)
+    assert len(mother.keys()) == 8

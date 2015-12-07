@@ -1780,25 +1780,16 @@ def ftree_walk():
     '''
     This view returns a part of family tree starting with a given person
     id. These `i` argument is for individual id. 
-    There is a second optional argument - `r` specifiying how many
-    edges to traverse, default is 1
     '''
     args = request.args
 
-    em = "Must receive `i`ndividual and `t`ree ids"
+    em = "Must receive `i`ndividual ids"
     i = args.get('i', False)
     if not i:
         abort(400, em)
 
-    try:
-        r = int(args.get('r', 1))
-    except ValueError:
-        abort(400, '`r` must be a positive integer')
-    if r > 9:
-        abort(400, '`r` can not be larger than 9')
-
     graph = Graph(conf.neo4j_url)
-    results = fwalk(graph, i, r)
+    results = fwalk(graph, i)
     return humanify(results)
 
 @app.route('/get_image_urls/<image_ids>')
