@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 related = sort_related(list(set(bhp_related)))[:6]
             else:
                 #  Sort and cut bhp_related
-                related = sort_related(doc['bhp_related'])[:6]
+                related = sort_related(list(set(doc['bhp_related'])))[:6]
 
             if not related:
                 logger.debug('No related items found for {}'.format(item_name))
