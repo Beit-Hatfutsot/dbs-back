@@ -26,11 +26,14 @@ import elasticsearch
 
 import pymongo
 import jinja2
+from py2neo import Graph
 
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                              get_unit_type, SEARCHABLE_COLLECTIONS)
 from utils import get_logger, upload_file, get_oid, send_gmail, MongoJsonEncoder
 import phonetic
+
+from family_tree import fwalk
 
 # Create app
 app = Flask(__name__)
@@ -56,6 +59,7 @@ must_have_keys = set(['secret_key',
                     'data_db_host',
                     'data_db_port',
                     'data_db_name',
+                    'neo4j_url',
                     'image_bucket_url',
                     'video_bucket_url'])
 
@@ -1628,7 +1632,7 @@ def wizard_search():
 
     # We turn the cursor to list in order to serialize it
     tree_found = list(fsearch(max_results=1, **ftree_args))
-    if not tree_found:
+    if not tree_found and name and 'birth_place' in ftree_args:
         del ftree_args['birth_place']
         tree_found = list(fsearch(max_results=1, **ftree_args))
     rv = {'place': place_doc, 'name': name_doc}
@@ -1769,6 +1773,24 @@ def fetch_tree(tree_number):
         return humanify(rv)
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
+
+@app.route('/fwalk')
+@autodoc.doc()
+def ftree_walk():
+    '''
+    This view returns a part of family tree starting with a given person
+    id. These `i` argument is for individual id. 
+    '''
+    args = request.args
+
+    em = "Must receive `i`ndividual ids"
+    i = args.get('i', False)
+    if not i:
+        abort(400, em)
+
+    graph = Graph(conf.neo4j_url)
+    results = fwalk(graph, i)
+    return humanify(results)
 
 @app.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
