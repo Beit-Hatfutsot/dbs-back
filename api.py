@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
+import inspect
 from datetime import timedelta, datetime
 import json
 from bson import json_util, ObjectId
@@ -35,6 +37,7 @@ import phonetic
 
 from family_tree import fwalk
 
+CONF_FILE = '/etc/bhs/config.yml'
 # Create app
 app = Flask(__name__)
 
@@ -63,7 +66,12 @@ must_have_keys = set(['secret_key',
                     'image_bucket_url',
                     'video_bucket_url'])
 
-conf = get_conf('/etc/bhs/config.yml', must_have_keys)
+# load the conf file. use local copy if nothing in the system
+if os.path.exists(CONF_FILE):
+    conf = get_conf(CONF_FILE, must_have_keys)
+else:
+    current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) # script directory
+    conf = get_conf(os.path.join(current_dir, 'conf', 'bhs_config.yaml'), must_have_keys)
 
 # Set app config
 app.config['DEBUG'] = True
