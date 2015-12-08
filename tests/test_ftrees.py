@@ -13,16 +13,16 @@ def graph(request):
                         +-----v-----+               +-----------+
                         |grandfather+-----spouse----+grandmother|
                         +-----+-----+               +-----+-----+
-                            +---------+        +--------+
+                              +----------+        +-------+
                                 FATHER_OF|        |MOTHER_OF
-                            +---------+-+------+--------+
+                            +-----------++--------+-----+
                             |           |               |
         +------+        +-----v+       +--v--+         +--v-+
         |father+---S----+mother|       |uncle|         |aunt|
         +--+---+        +---+--+       +-----+         +----+
-            +-----+    +-----+
+           +-----+    +-----+
         FATHER_OF|    |MOTHER_OF
-        +-------------++----------+
+        +-------------+-----------+
         |             |           |
     +---v----+   +----v---+    +--v---+
     |brother1|   |brother2|    |sister|
@@ -45,6 +45,7 @@ def graph(request):
         Node("INDI", tree_id='1', id='8', NAME="brother1", SEX='M'),
         Node("INDI", tree_id='1', id='9', NAME="brother2", SEX='M'),
         Node("INDI", tree_id='1', id='10', NAME="sister", SEX='F'),
+        Node("INDI", tree_id='1', id='11', SEX='F'),
     ]
 
     rels = [ Relationship(nodes[0], "FATHER_OF", nodes[1]),
@@ -62,6 +63,7 @@ def graph(request):
              Relationship(nodes[3], "MOTHER_OF", nodes[7]),
              Relationship(nodes[3], "MOTHER_OF", nodes[8]),
              Relationship(nodes[3], "MOTHER_OF", nodes[9]),
+             Relationship(nodes[3], "MOTHER_OF", nodes[10]),
             ]
     g.create(*nodes)
     g.create(*rels)
@@ -79,7 +81,7 @@ def test_walk(graph):
     parents = set(map(just_name, mother['parents']))
     assert parents == set(['grandmother', 'grandfather'])
     children = set(map(just_name, mother['children']))
-    assert children == set(['brother1', 'brother2', 'sister'])
+    assert children == set(['brother1', 'brother2', 'sister', ''])
     partners = set(map(just_name, mother['partners']))
     assert partners == set(['father'])
     siblings = set(map(just_name, mother['siblings']))

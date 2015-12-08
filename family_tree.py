@@ -171,6 +171,8 @@ def never_call():
 
 
 def nameof(name):
+    if not name:
+        return ''
     parts = [x.strip() for x in name.split('/')]
     if "," in parts[0]:
         parts[0] = parts[0].split(",")
