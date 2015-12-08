@@ -38,7 +38,7 @@ def graph(request):
         Node("INDI", tree_id='1', id='1', NAME="grandfather's father", SEX='M'),
         Node("INDI", tree_id='1', id='2', NAME="grandfather", SEX='M'),
         Node("INDI", tree_id='1', id='3', NAME="grandmother", SEX='F'),
-        Node("INDI", tree_id='1', id='4', NAME="mother", SEX='F'),
+        Node("INDI", tree_id='1', id='4', NAME="mother", SEX='F', birth_year=1940),
         Node("INDI", tree_id='1', id='5', NAME="father", SEX='M'),
         Node("INDI", tree_id='1', id='6', NAME="uncle", SEX='M'),
         Node("INDI", tree_id='1', id='7', NAME="aunt", SEX='F'),
@@ -78,6 +78,7 @@ def test_walk(graph):
 
     mother = fwalk(graph, individual_id=id)
     assert mother['name'] == 'mother'
+    assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
     assert parents == set(['grandmother', 'grandfather'])
     children = set(map(just_name, mother['children']))

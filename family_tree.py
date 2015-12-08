@@ -21,6 +21,7 @@ class People(dict):
             this[pid] = person
         return this[pid]
 
+
 def fwalk(graph, individual_id):
     tx = graph.cypher.begin()
     tx.append("""
@@ -71,11 +72,14 @@ def fwalk(graph, individual_id):
         parent['props']['parents'] = [copy(people[x]['props'])
                                      for x in parent['parents']]
 
+    p['id'] = individual_id
     p['children'] = [people[x]['props'] for x in p['children']]
     p['partners'] = [people[x]['props'] for x in p['partners']]
     p['parents'] = [people[x]['props'] for x in p['parents']]
     p['siblings'] = [people[x]['props'] for x in p['siblings']]
-    p.update(copy(p['props']))
+    # copy all the properties from the node but keep all the keys lower case
+    for k,v in results[0][0].n.properties.items():
+        p[k.lower()] = v
     del p['props']
     return p
 
@@ -99,75 +103,6 @@ def parse_hor(graph, people, results):
         person = people.add_node(i[0])
         ret.add(person['props']['id'])
     return ret
-
-def never_call():
-    # Find all individuals
-    ids = {}
-    for rec in records:
-        family = None
-        fid = pid = None
-        for node in rec.n, rec.f:
-            if "FAM" in node.labels:
-                fid = get_node_id(node)
-                family = families.setdefault(fid,{'children':[], 'partners':[]})
-            if "INDI" in node.labels:
-                pid = get_node_id(node)
-                props = node.properties
-                if pid not in ids:
-                    idx = len(people)
-                    try:
-                        name = nameof(props['NAME'])
-                    except KeyError:
-                        name = ''
-                    person = {'children':set(), 'parents':set(),
-                              'partners':set(), 'siblings':set(),
-                              'active_partner':None,
-                              'props':{'sex':props.get('SEX', 'U'),
-                                       'name':name,
-                                       'id':pid}}
-                    people.append(person)
-                    ids[pid] = idx
-                else:
-                    person=people[ids[pid]]
-        for rel in rec.r:
-            typ = rel.type
-            # assert(pid == int(rel['startNode']))
-            # assert(fid == int(rel['endNode']))
-            pid = get_node_id(rel.nodes[0])
-            fid = get_node_id(rel.nodes[1])
-            if typ=='CHILD_IN':
-                try:
-                    families[fid]['children'].append(pid)
-                except KeyError:
-                    families[fid] = {'children': [pid], 'partners': []}
-            elif typ=='WIFE_IN' or typ=='HUSBAND_IN':
-                try:
-                    families[fid]['partners'].append(pid)
-                except KeyError:
-                    families[fid] = {'children': [], 'partners': [pid]}
-            else:
-                assert(False)
-
-    for family in families.values():
-        for c in family['children']:
-            kid = people[ids[c]]
-            for s in family['children']:
-                if s != c:
-                    kid['siblings'].add(ids[s])
-            for p in family['partners']:
-                parent = people[ids[p]]
-                kid['parents'].add(ids[p])
-                parent['children'].add(ids[c])
-        for p in family['partners']:
-            parent = people[ids[p]]
-            for r in family['partners']:
-                if r != p:
-                    parent['partners'].add(ids[r])
-
-    def cp(d):
-        ret = {}
-        ret.update(d)
-        return ret
 
 
 def nameof(name):
