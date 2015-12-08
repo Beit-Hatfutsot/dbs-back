@@ -72,7 +72,6 @@ def fwalk(graph, individual_id):
         parent['props']['parents'] = [copy(people[x]['props'])
                                      for x in parent['parents']]
 
-    p['id'] = individual_id
     p['children'] = [people[x]['props'] for x in p['children']]
     p['partners'] = [people[x]['props'] for x in p['partners']]
     p['parents'] = [people[x]['props'] for x in p['parents']]
@@ -80,6 +79,7 @@ def fwalk(graph, individual_id):
     # copy all the properties from the node but keep all the keys lower case
     for k,v in results[0][0].n.properties.items():
         p[k.lower()] = v
+    p['id'] = individual_id
     del p['props']
     return p
 

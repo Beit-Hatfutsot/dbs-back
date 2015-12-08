@@ -1,7 +1,9 @@
 import pytest
 from py2neo import Graph, Node, Relationship
-from family_tree import fwalk
 from pytest_flask.plugin import client
+
+from family_tree import fwalk
+from api import conf
 
 @pytest.fixture
 def graph(request):
@@ -33,7 +35,7 @@ def graph(request):
         g.cypher.execute("MATCH (n { tree_id: '1' }) optional match (n)-[r]-() delete n,r")
     request.addfinalizer(fin)
 
-    g = Graph("http://neo4j:bhonline@localhost:7474/db/data")
+    g = Graph(conf.neo4j_url)
     nodes = [
         Node("INDI", tree_id='1', id='1', NAME="grandfather's father", SEX='M'),
         Node("INDI", tree_id='1', id='2', NAME="grandfather", SEX='M'),
@@ -100,4 +102,4 @@ def test_walk_api(graph, client):
     r = client.get('/fwalk?i={}'.format(id))
     mother = r.json
     assert mother['id'] == str(id)
-    assert len(mother.keys()) == 8
+    assert len(mother.keys()) == 10
