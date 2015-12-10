@@ -49,7 +49,9 @@ def fwalk(graph, individual_id):
     tx.append("""
               MATCH (n)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)
               WHERE ID(n)={}
-              RETURN children, r
+              OPTIONAL MATCH (children)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)
+              WHERE p <> n
+              RETURN children, r, p
               """.format(individual_id))
     # need to add the data from the r: n.r is an array of Rellationships
     results = tx.commit()
@@ -60,12 +62,15 @@ def fwalk(graph, individual_id):
     p['partners'] = parse_hor(graph, people, results[2])
     p['siblings'] = parse_hor(graph, people, results[3])
 
-
-    # gather grandchildren
+    # gather grandchildren and other parent
     for i in p['children']:
         child = people[i]
         child['props']['children'] = [copy(people[x]['props'])
                                       for x in child['children']]
+
+        child['props']['parents'] = [copy(people[x]['props'])
+                                      for x in child['parents']]
+
     # gather grandparents
     for i in p['parents']:
         parent = people[i]
@@ -86,8 +91,6 @@ def fwalk(graph, individual_id):
 def parse_ver(graph, people, results):
     for i in results:
         for rel in i[1]:
-            for n in rel.nodes:
-                people.add_node(n)
             src = people.add_node(rel.nodes[0])
             dst = people.add_node(rel.nodes[1])
             if rel.type == 'FATHER_OF' or rel.type=='MOTHER_OF':
@@ -95,6 +98,11 @@ def parse_ver(graph, people, results):
                 dst['parents'].add(src['props']['id'])
             else:
                 assert False
+        # for children we add parents
+        if len(i) > 2 and i[2]:
+            child = people.add_node(i[0])
+            parent = people.add_node(i[2])
+            child['parents'].add(parent['props']['id'])
 
 
 def parse_hor(graph, people, results):

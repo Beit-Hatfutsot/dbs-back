@@ -61,6 +61,7 @@ def graph(request):
              Relationship(nodes[4], "FATHER_OF", nodes[7]),
              Relationship(nodes[4], "FATHER_OF", nodes[8]),
              Relationship(nodes[4], "FATHER_OF", nodes[9]),
+             Relationship(nodes[4], "FATHER_OF", nodes[10]),
              Relationship(nodes[3], "SPOUSE", nodes[4]),
              Relationship(nodes[3], "MOTHER_OF", nodes[7]),
              Relationship(nodes[3], "MOTHER_OF", nodes[8]),
@@ -94,6 +95,9 @@ def test_walk(graph):
         if p['name'] == 'grandfather':
             greatgrandfathers = set(map(just_name, p['parents']))
             assert greatgrandfathers == set(["grandfather's father"])
+    # test that all the children have a father
+    for i in mother['children']:
+        assert set(map(just_name, i['parents'])) == set(['father', 'mother'])
 
 
 def test_walk_api(graph, client):
