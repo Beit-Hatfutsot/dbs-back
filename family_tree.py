@@ -12,14 +12,44 @@ class People(dict):
                 name = nameof(props['NAME'])
             except KeyError:
                 name = ''
-            person = {'children':set(), 'parents':set(),
-                        'partners':set(), 'siblings':set(),
-                        'active_partner':None,
-                        'props':{'sex':props.get('SEX', 'U'),
+            person = {'children': set(), 'parents': set(),
+                      'partners': set(), 'siblings': set(),
+                      'order': {'birth_year': props.get('birth_year', 9999),
+                                'marriage_year': props.get('birth_year', 9999),
+                               },
+                      'props': {'sex':props.get('SEX', 'U'),
                                 'name':name,
-                                'id':pid}}
+                                'id':pid,
+                               },
+                      }
             this[pid] = person
         return this[pid]
+
+    def get_props_array(self, ids, shallow_copy=False, order_by_parents=False):
+        ''' gets an array of `ids` and return a sorted array where each cell
+            holds the `props` of the element.
+            There's an optional switch - `shallow_copy` that tells whether
+            to copy the props.
+        '''
+        def get_props(id):
+            props = self[id]['props']
+            if shallow_copy:
+                props = copy(props)
+            return props
+
+        def order(x, y):
+            px = self[x]
+            py = self[y]
+            ret = 0
+            if order_by_parents:
+                ret = cmp(sorted(list(px['parents'])),
+                          sorted(list(py['parents'])))
+            return ret or \
+                   cmp(px['order']['birth_year'], py['order']['birth_year']) or \
+                   cmp(px['props']['name'], py['props']['name'])
+
+        sorted_ids = sorted(ids, order)
+        return map(get_props, sorted_ids)
 
 
 def fwalk(graph, individual_id):
@@ -65,22 +95,21 @@ def fwalk(graph, individual_id):
     # gather grandchildren and other parent
     for i in p['children']:
         child = people[i]
-        child['props']['children'] = [copy(people[x]['props'])
-                                      for x in child['children']]
-
-        child['props']['parents'] = [copy(people[x]['props'])
-                                      for x in child['parents']]
+        child['props']['children'] = people.get_props_array(child['children'],
+                                                            shallow_copy=True)
+        child['props']['parents'] = people.get_props_array(child['parents'],
+                                                            shallow_copy=True)
 
     # gather grandparents
     for i in p['parents']:
         parent = people[i]
-        parent['props']['parents'] = [copy(people[x]['props'])
-                                     for x in parent['parents']]
+        parent['props']['parents'] = people.get_props_array(parent['parents'],
+                                                            shallow_copy=True)
 
-    p['children'] = [people[x]['props'] for x in p['children']]
-    p['partners'] = [people[x]['props'] for x in p['partners']]
-    p['parents'] = [people[x]['props'] for x in p['parents']]
-    p['siblings'] = [people[x]['props'] for x in p['siblings']]
+    p['children'] = people.get_props_array(p['children'],  order_by_parents=True)
+    p['partners'] = people.get_props_array(p['partners'])
+    p['parents'] = people.get_props_array(p['parents'])
+    p['siblings'] = people.get_props_array(p['siblings'])
     # copy all the properties from the node but keep all the keys lower case
     for k,v in results[0][0].n.properties.items():
         p[k.lower()] = v

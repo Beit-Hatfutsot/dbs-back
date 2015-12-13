@@ -44,9 +44,9 @@ def graph(request):
         Node("INDI", tree_id='1', id='5', NAME="father", SEX='M'),
         Node("INDI", tree_id='1', id='6', NAME="uncle", SEX='M'),
         Node("INDI", tree_id='1', id='7', NAME="aunt", SEX='F'),
-        Node("INDI", tree_id='1', id='8', NAME="brother1", SEX='M'),
-        Node("INDI", tree_id='1', id='9', NAME="brother2", SEX='M'),
-        Node("INDI", tree_id='1', id='10', NAME="sister", SEX='F'),
+        Node("INDI", tree_id='1', id='8', NAME="brother1", SEX='M', birth_year=1965),
+        Node("INDI", tree_id='1', id='9', NAME="brother2", SEX='M', birth_year=1963),
+        Node("INDI", tree_id='1', id='10', NAME="sister", SEX='F', birth_year=1964),
         Node("INDI", tree_id='1', id='11', SEX='F'),
     ]
 
@@ -84,8 +84,8 @@ def test_walk(graph):
     assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
     assert parents == set(['grandmother', 'grandfather'])
-    children = set(map(just_name, mother['children']))
-    assert children == set(['brother1', 'brother2', 'sister', ''])
+    children = map(just_name, mother['children'])
+    assert children == ['brother2', 'sister', 'brother1', '']
     partners = set(map(just_name, mother['partners']))
     assert partners == set(['father'])
     siblings = set(map(just_name, mother['siblings']))
