@@ -1,9 +1,11 @@
 virtual_env = ~/venv
 
+branch ?= master
+
 all: test pull venv reload
 
 pull:
-	git pull origin master
+	git checkout $(branch) && git pull origin $(branch)
 
 venv: $(virtual_env)/bin/activate
 
