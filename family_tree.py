@@ -54,7 +54,13 @@ class People(dict):
 
 def fwalk(graph, args):
     tx = graph.cypher.begin()
-    if "t" in args:
+    if "t" in args and "i" in args:
+        i = args["i"]
+        # Add opening and closing `#` if missing
+        if i[0] != '@':
+            i = '@'+ i
+        if i[-1] != '@':
+            i = i + '@'
         where_clause = "WHERE n.tree_id='{}' AND n.id='{}'".format(args["t"],
                                                                args["i"])
     elif "i" in args:
