@@ -1800,7 +1800,7 @@ def ftree_walk():
     try:
         results = fwalk(graph, args)
     except AttributeError, e:
-        abort(400, e)
+        abort(400, str(e))
 
     return humanify(results)
 

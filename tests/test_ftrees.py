@@ -111,3 +111,8 @@ def test_bad_params(graph, client):
     assert r.status_code == 400
     r = client.get('/fwalk?t=aaa')
     assert r.status_code == 400
+
+
+def test_unknown_id(graph, client):
+    r = client.get('/fwalk?i=10800')
+    assert r.status_code == 400

@@ -60,7 +60,7 @@ def fwalk(graph, args):
     elif "i" in args:
         where_clause = "WHERE ID(n)={}".format(args["i"])
     else:
-        raise AttribueError("I need either an i and an optional to find a person")
+        raise AttributeError("I need either an i and an optional to find a person")
 
     tx.append(" ".join((
         "MATCH (n)",
@@ -89,7 +89,11 @@ def fwalk(graph, args):
     # need to add the data from the r: n.r is an array of Rellationships
     results = tx.commit()
     people = People()
-    p = people.add_node(results[0][0].n)
+    try:
+        p = people.add_node(results[0][0].n)
+    except IndexError:
+        raise AttributeError("Failed to find the person you're looking for. Sorry")
+
     parse_ver(graph, people, results[1])
     parse_ver(graph, people, results[4])
     p['partners'] = parse_hor(graph, people, results[2])
