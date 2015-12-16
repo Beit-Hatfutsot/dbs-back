@@ -79,7 +79,7 @@ def test_walk(graph):
     n = graph.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
     id = int(n.ref.split('/')[1])
 
-    mother = fwalk(graph, individual_id=id)
+    mother = fwalk(graph, {"i": id})
     assert mother['name'] == 'mother'
     assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
@@ -101,9 +101,13 @@ def test_walk(graph):
 
 
 def test_walk_api(graph, client):
-    n = graph.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
-    id = int(n.ref.split('/')[1])
-    r = client.get('/fwalk?i={}'.format(id))
+    r = client.get('/fwalk?i=4&t=1')
     mother = r.json
-    assert mother['id'] == str(id)
     assert len(mother.keys()) == 10
+
+
+def test_bad_params(graph, client):
+    r = client.get('/fwalk')
+    assert r.status_code == 400
+    r = client.get('/fwalk?t=aaa')
+    assert r.status_code == 400

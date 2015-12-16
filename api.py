@@ -1797,7 +1797,11 @@ def ftree_walk():
         abort(400, em)
 
     graph = Graph(conf.neo4j_url)
-    results = fwalk(graph, i)
+    try:
+        results = fwalk(graph, args)
+    except AttributeError, e:
+        abort(400, e)
+
     return humanify(results)
 
 @app.route('/get_image_urls/<image_ids>')

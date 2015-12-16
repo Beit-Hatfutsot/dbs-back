@@ -52,37 +52,40 @@ class People(dict):
         return map(get_props, sorted_ids)
 
 
-def fwalk(graph, individual_id):
+def fwalk(graph, args):
     tx = graph.cypher.begin()
-    tx.append("""
-              MATCH (n)
-              WHERE ID(n)={}
-              RETURN n
-              """.format(individual_id))
-    tx.append("""
-              MATCH (n)<-[r:FATHER_OF|:MOTHER_OF*1..2]-(parents:INDI)
-              WHERE ID(n)={}
-              RETURN parents, r
-              """.format(individual_id))
-    tx.append("""
-              MATCH (n)-[:SPOUSE]-(spouses:INDI)
-              WHERE ID(n)={}
-              RETURN spouses
-              """.format(individual_id))
+    if "t" in args:
+        where_clause = "WHERE n.tree_id='{}' AND n.id='{}'".format(args["t"],
+                                                               args["i"])
+    elif "i" in args:
+        where_clause = "WHERE ID(n)={}".format(args["i"])
+    else:
+        raise AttribueError("I need either an i and an optional to find a person")
+
+    tx.append(" ".join((
+        "MATCH (n)",
+        where_clause,
+        "RETURN n, ID(n)")))
+    tx.append(" ".join((
+        "MATCH (n)<-[r:FATHER_OF|:MOTHER_OF*1..2]-(parents:INDI)",
+        where_clause,
+        "RETURN parents, r")))
+    tx.append(" ".join((
+        "MATCH (n)-[:SPOUSE]-(spouses:INDI)",
+        where_clause,
+        "RETURN spouses")))
     # siblings
-    tx.append("""
-              MATCH (n)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)
-              WHERE ID(n)={}
-              RETURN siblings
-              """.format(individual_id))
+    tx.append(" ".join((
+        "MATCH (n)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)",
+        where_clause,
+        "RETURN siblings")))
     # children
-    tx.append("""
-              MATCH (n)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)
-              WHERE ID(n)={}
-              OPTIONAL MATCH (children)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)
-              WHERE p <> n
-              RETURN children, r, p
-              """.format(individual_id))
+    tx.append(" ".join((
+        "MATCH (n)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)",
+        where_clause,
+        "OPTIONAL MATCH (children)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)",
+        "WHERE p <> n",
+        "RETURN children, r, p")))
     # need to add the data from the r: n.r is an array of Rellationships
     results = tx.commit()
     people = People()
@@ -113,7 +116,7 @@ def fwalk(graph, individual_id):
     # copy all the properties from the node but keep all the keys lower case
     for k,v in results[0][0].n.properties.items():
         p[k.lower()] = v
-    p['id'] = individual_id
+    p['id'] = str(results[0][0][1])
     del p['props']
     return p
 
