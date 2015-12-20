@@ -61,8 +61,7 @@ def fwalk(graph, args):
             i = '@'+ i
         if i[-1] != '@':
             i = i + '@'
-        where_clause = "WHERE n.tree_id='{}' AND n.id='{}'".format(args["t"],
-                                                               args["i"])
+        where_clause = "WHERE n.tree_id='{}' AND n.id='{}'".format(args["t"], i)
     elif "i" in args:
         where_clause = "WHERE ID(n)={}".format(args["i"])
     else:
