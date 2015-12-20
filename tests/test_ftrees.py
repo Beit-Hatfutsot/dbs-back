@@ -37,17 +37,17 @@ def graph(request):
 
     g = Graph(conf.neo4j_url)
     nodes = [
-        Node("INDI", tree_id='1', id='1', NAME="grandfather's father", SEX='M'),
-        Node("INDI", tree_id='1', id='2', NAME="grandfather", SEX='M'),
-        Node("INDI", tree_id='1', id='3', NAME="grandmother", SEX='F'),
-        Node("INDI", tree_id='1', id='4', NAME="mother", SEX='F', birth_year=1940),
-        Node("INDI", tree_id='1', id='5', NAME="father", SEX='M'),
-        Node("INDI", tree_id='1', id='6', NAME="uncle", SEX='M'),
-        Node("INDI", tree_id='1', id='7', NAME="aunt", SEX='F'),
-        Node("INDI", tree_id='1', id='8', NAME="brother1", SEX='M', birth_year=1965),
-        Node("INDI", tree_id='1', id='9', NAME="brother2", SEX='M', birth_year=1963),
-        Node("INDI", tree_id='1', id='10', NAME="sister", SEX='F', birth_year=1964),
-        Node("INDI", tree_id='1', id='11', SEX='F'),
+        Node("INDI", tree_id='1', id='@1@', NAME="grandfather's father", SEX='M'),
+        Node("INDI", tree_id='1', id='@2@', NAME="grandfather", SEX='M'),
+        Node("INDI", tree_id='1', id='@3@', NAME="grandmother", SEX='F'),
+        Node("INDI", tree_id='1', id='@4@', NAME="mother", SEX='F', birth_year=1940),
+        Node("INDI", tree_id='1', id='@5@', NAME="father", SEX='M'),
+        Node("INDI", tree_id='1', id='@6@', NAME="uncle", SEX='M'),
+        Node("INDI", tree_id='1', id='@7@', NAME="aunt", SEX='F'),
+        Node("INDI", tree_id='1', id='@8@', NAME="brother1", SEX='M', birth_year=1965),
+        Node("INDI", tree_id='1', id='@9@', NAME="brother2", SEX='M', birth_year=1963),
+        Node("INDI", tree_id='1', id='@10@', NAME="sister", SEX='F', birth_year=1964),
+        Node("INDI", tree_id='1', id='@11@', SEX='F'),
     ]
 
     rels = [ Relationship(nodes[0], "FATHER_OF", nodes[1]),
