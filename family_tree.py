@@ -68,25 +68,25 @@ def fwalk(graph, args):
         raise AttributeError("I need either an i and an optional to find a person")
 
     tx.append(" ".join((
-        "MATCH (n)",
+        "MATCH (n:INDI)",
         where_clause,
         "RETURN n, ID(n)")))
     tx.append(" ".join((
-        "MATCH (n)<-[r:FATHER_OF|:MOTHER_OF*1..2]-(parents:INDI)",
+        "MATCH (n:INDI)<-[r:FATHER_OF|:MOTHER_OF*1..2]-(parents:INDI)",
         where_clause,
         "RETURN parents, r")))
     tx.append(" ".join((
-        "MATCH (n)-[:SPOUSE]-(spouses:INDI)",
+        "MATCH (n:INDI)-[:SPOUSE]-(spouses:INDI)",
         where_clause,
         "RETURN spouses")))
     # siblings
     tx.append(" ".join((
-        "MATCH (n)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)",
+        "MATCH (n:INDI)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)",
         where_clause,
         "RETURN siblings")))
     # children
     tx.append(" ".join((
-        "MATCH (n)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)",
+        "MATCH (n:INDI)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)",
         where_clause,
         "OPTIONAL MATCH (children)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)",
         "WHERE p <> n",
