@@ -6,8 +6,8 @@ from family_tree import fwalk
 from api import conf
 
 @pytest.fixture
-def graph(request):
-    ''' a fixture to add a simple family tree graph
+def simple_family(request):
+    ''' a fixture to add a simple family tree
                     +-----------------+
                     |great grandfather|
                     +-----------------+
@@ -72,14 +72,66 @@ def graph(request):
     g.create(*rels)
     return g
 
-def test_walk(graph):
+@pytest.fixture
+def complex_family(request):
+    ''' a fixture to add a complex family tree
+
+    +------+          +-----------+          +-----+          +-------+
+    |Rivka +-+SPOUSE+-+    Elo    +-+SPOUSE+-+Giza +-+SPOUSE+-+Volvek |
+    +---+--+          +-----+-----+          +--+--+          +-------+
+        |                   |                   |                 |
+        +----------+        |      +-------------------------+    |
+        |          |        |      |            |            |    |
+    +---------------+------+----+------------+  |            |    |
+    |  |          | |           | |          |  |            |    |
+    +-+--+-+      +-+-+---+     +-+-+---+     ++-+----+      ++----++
+    |Nurit |      |Miriam |     |Lea    |     |Rachel |      |Hayuta|
+    +------+      +-------+     +-------+     +-------+      +------+
+
+    '''
+    def fin():
+        g.cypher.execute("MATCH (n { tree_id: '1' }) optional match (n)-[r]-() delete n,r")
+    request.addfinalizer(fin)
+
+    g = Graph(conf.neo4j_url)
+    nodes = [
+        Node("INDI", tree_id='1', id='@1@', NAME="Rivka", SEX='F'),
+        Node("INDI", tree_id='1', id='@2@', NAME="Elo", SEX='M'),
+        Node("INDI", tree_id='1', id='@3@', NAME="Giza", SEX='F'),
+        Node("INDI", tree_id='1', id='@4@', NAME="Volvek", SEX='M'),
+        Node("INDI", tree_id='1', id='@5@', NAME="Nurit", SEX='F'),
+        Node("INDI", tree_id='1', id='@6@', NAME="Miriam", SEX='F'),
+        Node("INDI", tree_id='1', id='@7@', NAME="Lea", SEX='F'),
+        Node("INDI", tree_id='1', id='@8@', NAME="Rachel", SEX='F'),
+        Node("INDI", tree_id='1', id='@9@', NAME="Hayuta", SEX='F'),
+    ]
+
+    rels = [ Relationship(nodes[0], "MOTHER_OF", nodes[4]),
+             Relationship(nodes[0], "MOTHER_OF", nodes[5]),
+             Relationship(nodes[1], "FATHER_OF", nodes[4]),
+             Relationship(nodes[1], "FATHER_OF", nodes[5]),
+             Relationship(nodes[1], "FATHER_OF", nodes[6]),
+             Relationship(nodes[1], "FATHER_OF", nodes[7]),
+             Relationship(nodes[2], "MOTHER_OF", nodes[6]),
+             Relationship(nodes[2], "MOTHER_OF", nodes[7]),
+             Relationship(nodes[2], "MOTHER_OF", nodes[8]),
+             Relationship(nodes[3], "FATHER_OF", nodes[8]),
+             Relationship(nodes[0], "SPOUSE", nodes[1]),
+             Relationship(nodes[1], "SPOUSE", nodes[2]),
+             Relationship(nodes[2], "SPOUSE", nodes[3]),
+            ]
+    g.create(*nodes)
+    g.create(*rels)
+    return g
+
+def test_walk(simple_family):
 
     just_name = lambda a: a.get('name', 'unknown')
     # first get the id of our mother
-    n = graph.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
+    n = simple_family.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
     id = int(n.ref.split('/')[1])
 
-    mother = fwalk(graph, {"i": id})
+    mother = fwalk(simple_family, {"i": id})
     assert mother['name'] == 'mother'
     assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
@@ -100,19 +152,46 @@ def test_walk(graph):
         assert set(map(just_name, i['parents'])) == set(['father', 'mother'])
 
 
-def test_walk_api(graph, client):
+def test_walk_api(simple_family, client):
     r = client.get('/fwalk?i=4&t=1')
     mother = r.json
     assert len(mother.keys()) == 10
 
 
-def test_bad_params(graph, client):
+def test_bad_params(simple_family, client):
     r = client.get('/fwalk')
     assert r.status_code == 400
     r = client.get('/fwalk?t=aaa')
     assert r.status_code == 400
 
 
-def test_unknown_id(graph, client):
+def test_unknown_id(simple_family, client):
     r = client.get('/fwalk?i=10800')
     assert r.status_code == 400
+
+def test_half_sisters(complex_family):
+    just_name = lambda a: a.get('name', 'unknown')
+    # first get the id of our mother
+    n = complex_family.cypher.execute_one("MATCH (n:INDI {NAME: 'Rachel'}) return n")
+    id = int(n.ref.split('/')[1])
+    rachel = fwalk(complex_family, {"i": id})
+    siblings = set(map(just_name, rachel['siblings']))
+    assert siblings == set(['Lea', 'Hayuta', 'Miriam', 'Nurit'])
+    for i in rachel['siblings']:
+        p = set(map(just_name, i['parents']))
+        if i['name'] == 'Lea':
+            assert p == set(['Giza', 'Elo'])
+        if i['name'] == 'Hayute':
+            assert p == set(['Giza', 'Volvek'])
+        if i['name'] == 'Miriam' or i['name'] == 'Nurit':
+            assert p == set(['Elo', 'Rivka'])
+    for i in rachel['parents']:
+        c = set(map(just_name, i['children']))
+        if i['name'] == 'Giza':
+            assert c == set(['Rachel', 'Lea', 'Hayuta'])
+        if i['name'] == 'Rivka':
+            assert c == set(['Miriam', 'Nurit'])
+        if i['name'] == 'Elo':
+            assert c == set(['Miriam', 'Nurit', 'Rachel', 'Lea'])
+        if i['name'] == 'Volvek':
+            assert c == set(['Hayuta'])

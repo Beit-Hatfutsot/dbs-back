@@ -81,9 +81,10 @@ def fwalk(graph, args):
         "RETURN spouses")))
     # siblings
     tx.append(" ".join((
-        "MATCH (n:INDI)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)",
+        "MATCH (n:INDI)<-[:FATHER_OF|:MOTHER_OF]-(p1:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)",
         where_clause,
-        "RETURN siblings")))
+        "OPTIONAL MATCH (p2)-[:FATHER_OF|:MOTHER_OF]->(siblings)",
+        "RETURN siblings, p1, p2")))
     # children
     tx.append(" ".join((
         "MATCH (n:INDI)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)",
@@ -112,16 +113,24 @@ def fwalk(graph, args):
         child['props']['parents'] = people.get_props_array(child['parents'],
                                                             shallow_copy=True)
 
-    # gather grandparents
+    # gather grandparents and ~siblings
     for i in p['parents']:
         parent = people[i]
         parent['props']['parents'] = people.get_props_array(parent['parents'],
                                                             shallow_copy=True)
+        parent['props']['children'] = people.get_props_array(parent['children'],
+                                                            shallow_copy=True)
 
-    p['children'] = people.get_props_array(p['children'],  order_by_parents=True)
+    # gather step parents
+    for i in p['siblings']:
+        sibling = people[i]
+        sibling['props']['parents'] = people.get_props_array(sibling['parents'],
+                                                            shallow_copy=True)
+
+    p['children'] = people.get_props_array(p['children'], order_by_parents=True)
     p['partners'] = people.get_props_array(p['partners'])
     p['parents'] = people.get_props_array(p['parents'])
-    p['siblings'] = people.get_props_array(p['siblings'])
+    p['siblings'] = people.get_props_array(p['siblings'], order_by_parents=True)
     # copy all the properties from the node but keep all the keys lower case
     for k,v in results[0][0].n.properties.items():
         p[k.lower()] = v
@@ -145,11 +154,14 @@ def parse_ver(graph, people, results):
             parent = people.add_node(i[2])
             child['parents'].add(parent['props']['id'])
 
-
 def parse_hor(graph, people, results):
     ret = set()
     for i in results:
         person = people.add_node(i[0])
+        for j in range(1, len(i)):
+            parent = people.add_node(i[j])
+            person['parents'].add(parent['props']['id'])
+            parent['children'].add(person['props']['id'])
         ret.add(person['props']['id'])
     return ret
 
