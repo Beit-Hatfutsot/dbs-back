@@ -70,7 +70,7 @@ def simple_family(request):
             ]
     g.create(*nodes)
     g.create(*rels)
-    return g
+    return g, nodes
 
 @pytest.fixture
 def complex_family(request):
@@ -145,16 +145,16 @@ def complex_family(request):
             ]
     g.create(*nodes)
     g.create(*rels)
-    return g
+    return g, nodes
 
 def test_walk(simple_family):
 
+    g, nodes = simple_family
     just_name = lambda a: a.get('name', 'unknown')
     # first get the id of our mother
-    n = simple_family.cypher.execute_one("MATCH (n:INDI {NAME: 'mother'}) return n")
-    id = int(n.ref.split('/')[1])
+    id = nodes[3].ref[5:]
 
-    mother = fwalk(simple_family, {"i": id})
+    mother = fwalk(g, {"i": id})
     assert mother['name'] == 'mother'
     assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
@@ -193,11 +193,11 @@ def test_unknown_id(simple_family, client):
     assert r.status_code == 400
 
 def test_half_sisters(complex_family):
+    g, nodes = complex_family
     just_name = lambda a: a.get('name', 'unknown')
     # first get the id of our mother
-    n = complex_family.cypher.execute_one("MATCH (n:INDI {NAME: 'Rachel'}) return n")
-    id = int(n.ref.split('/')[1])
-    rachel = fwalk(complex_family, {"i": id})
+    id = nodes[7].ref[5:]
+    rachel = fwalk(g, {"i": id})
     siblings = set(map(just_name, rachel['siblings']))
     assert siblings == set(['Lea', 'Hayuta', 'Miriam', 'Nurit'])
     for i in rachel['siblings']:
