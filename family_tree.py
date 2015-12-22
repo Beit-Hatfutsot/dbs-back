@@ -127,7 +127,7 @@ def fwalk(graph, args):
     # copy all the properties from the node but keep all the keys lower case
     for k,v in results[0][0].n.properties.items():
         p[k.lower()] = v
-    p['id'] = str(results[0][0][1])
+    p['id'] = p_id
     del p['props']
     return p
 

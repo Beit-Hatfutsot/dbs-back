@@ -155,6 +155,7 @@ def test_walk(simple_family):
     id = nodes[3].ref[5:]
 
     mother = fwalk(g, {"i": id})
+    assert mother['id'] == id
     assert mother['name'] == 'mother'
     assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
