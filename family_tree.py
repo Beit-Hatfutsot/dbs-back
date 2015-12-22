@@ -1,11 +1,9 @@
 from copy import copy
 
-get_node_id = lambda node: node.ref[5:]
-
 class People(dict):
 
     def add_node(this, node):
-        pid = get_node_id(node)
+        pid = node.ref[5:]
         props = node.properties
         if pid not in this:
             try:
@@ -68,42 +66,35 @@ def fwalk(graph, args):
         raise AttributeError("I need either an i and an optional to find a person")
 
     tx.append(" ".join((
-        "MATCH (n:INDI)",
+        "MATCH (n:INDI)-[r:FATHER_OF|:MOTHER_OF|:SPOUSE*1..3]-(o:INDI)",
         where_clause,
-        "RETURN n, ID(n)")))
-    tx.append(" ".join((
-        "MATCH (n:INDI)<-[r:FATHER_OF|:MOTHER_OF*1..2]-(parents:INDI)",
-        where_clause,
-        "RETURN parents, r")))
-    tx.append(" ".join((
-        "MATCH (n:INDI)-[:SPOUSE]-(spouses:INDI)",
-        where_clause,
-        "RETURN spouses")))
-    # siblings
-    tx.append(" ".join((
-        "MATCH (n:INDI)<-[:FATHER_OF|:MOTHER_OF]-(p1:INDI)-[:FATHER_OF|:MOTHER_OF]->(siblings:INDI)",
-        where_clause,
-        "OPTIONAL MATCH (p2)-[:FATHER_OF|:MOTHER_OF]->(siblings)",
-        "RETURN siblings, p1, p2")))
-    # children
-    tx.append(" ".join((
-        "MATCH (n:INDI)-[r:FATHER_OF|:MOTHER_OF*1..2]->(children)",
-        where_clause,
-        "OPTIONAL MATCH (children)<-[:FATHER_OF|:MOTHER_OF]-(p:INDI)",
-        "WHERE p <> n",
-        "RETURN children, r, p")))
+        "RETURN n, r")))
+
     # need to add the data from the r: n.r is an array of Rellationships
     results = tx.commit()
     people = People()
     try:
         p = people.add_node(results[0][0].n)
+        p_id = p['props']['id']
     except IndexError:
         raise AttributeError("Failed to find the person you're looking for. Sorry")
 
-    parse_ver(graph, people, results[1])
-    parse_ver(graph, people, results[4])
-    p['partners'] = parse_hor(graph, people, results[2])
-    p['siblings'] = parse_hor(graph, people, results[3])
+    for i in results[0]:
+        for rel in i.r:
+            src = people.add_node(rel.nodes[0])
+            dst = people.add_node(rel.nodes[1])
+            if rel.type == 'FATHER_OF' or rel.type == 'MOTHER_OF':
+                src['children'].add(dst['props']['id'])
+                dst['parents'].add(src['props']['id'])
+            else:
+                src['partners'].add(dst['props']['id'])
+                dst['partners'].add(src['props']['id'])
+
+    # collect the siblings
+    for id, n in people.items():
+        if id != p_id and p['parents'].intersection(n['parents']):
+            p['siblings'].add(id)
+            n['siblings'].add(p_id)
 
     # gather grandchildren and other parent
     for i in p['children']:
@@ -111,6 +102,8 @@ def fwalk(graph, args):
         child['props']['children'] = people.get_props_array(child['children'],
                                                             shallow_copy=True)
         child['props']['parents'] = people.get_props_array(child['parents'],
+                                                            shallow_copy=True)
+        child['props']['partners'] = people.get_props_array(child['partners'],
                                                             shallow_copy=True)
 
     # gather grandparents and ~siblings
@@ -137,33 +130,6 @@ def fwalk(graph, args):
     p['id'] = str(results[0][0][1])
     del p['props']
     return p
-
-def parse_ver(graph, people, results):
-    for i in results:
-        for rel in i[1]:
-            src = people.add_node(rel.nodes[0])
-            dst = people.add_node(rel.nodes[1])
-            if rel.type == 'FATHER_OF' or rel.type=='MOTHER_OF':
-                src['children'].add(dst['props']['id'])
-                dst['parents'].add(src['props']['id'])
-            else:
-                assert False
-        # for children we add parents
-        if len(i) > 2 and i[2]:
-            child = people.add_node(i[0])
-            parent = people.add_node(i[2])
-            child['parents'].add(parent['props']['id'])
-
-def parse_hor(graph, people, results):
-    ret = set()
-    for i in results:
-        person = people.add_node(i[0])
-        for j in range(1, len(i)):
-            parent = people.add_node(i[j])
-            person['parents'].add(parent['props']['id'])
-            parent['children'].add(person['props']['id'])
-        ret.add(person['props']['id'])
-    return ret
 
 
 def nameof(name):

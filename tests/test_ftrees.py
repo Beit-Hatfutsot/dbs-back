@@ -86,7 +86,18 @@ def complex_family(request):
     |  |          | |           | |          |  |            |    |
     +-+--+-+      +-+-+---+     +-+-+---+     ++-+----+      ++----++
     |Nurit |      |Miriam |     |Lea    |     |Rachel |      |Hayuta|
-    +------+      +-------+     +-------+     +-------+      +------+
+    +------+      +-------+     +-------+     +---+---+      +------+
+                                                |
+                                +--------------+
+        +--------+          +--------+          +------+
+        |Shlomi  +-+SPOUSE+-+Michal  +-+SPOUSE+-+Yossi |
+        +---+----+          +---+----+          +---+--+
+            |                   |                   |
+            |                   |                   |
+            |    +---------+    |      +-------+    |
+            +----+Yehonatan+----+------+Adi    +----+
+                 +---------+           +-------+
+
 
     '''
     def fin():
@@ -104,6 +115,11 @@ def complex_family(request):
         Node("INDI", tree_id='1', id='@7@', NAME="Lea", SEX='F'),
         Node("INDI", tree_id='1', id='@8@', NAME="Rachel", SEX='F'),
         Node("INDI", tree_id='1', id='@9@', NAME="Hayuta", SEX='F'),
+        Node("INDI", tree_id='1', id='@10@', NAME="Michal", SEX='F'),
+        Node("INDI", tree_id='1', id='@11@', NAME="Yossi", SEX='M'),
+        Node("INDI", tree_id='1', id='@12@', NAME="Shlomi", SEX='M'),
+        Node("INDI", tree_id='1', id='@13@', NAME="Adi", SEX='F'),
+        Node("INDI", tree_id='1', id='@14@', NAME="Yehonatan", SEX='M'),
     ]
 
     rels = [ Relationship(nodes[0], "MOTHER_OF", nodes[4]),
@@ -119,6 +135,13 @@ def complex_family(request):
              Relationship(nodes[0], "SPOUSE", nodes[1]),
              Relationship(nodes[1], "SPOUSE", nodes[2]),
              Relationship(nodes[2], "SPOUSE", nodes[3]),
+             Relationship(nodes[7], "MOTHER_OF", nodes[9]),
+             Relationship(nodes[9], "SPOUSE", nodes[10]),
+             Relationship(nodes[9], "SPOUSE", nodes[11]),
+             Relationship(nodes[9], "MOTHER_OF", nodes[12]),
+             Relationship(nodes[9], "MOTHER_OF", nodes[13]),
+             Relationship(nodes[10], "FATHER_OF", nodes[12]),
+             Relationship(nodes[11], "FATHER_OF", nodes[13]),
             ]
     g.create(*nodes)
     g.create(*rels)
@@ -195,3 +218,8 @@ def test_half_sisters(complex_family):
             assert c == set(['Miriam', 'Nurit', 'Rachel', 'Lea'])
         if i['name'] == 'Volvek':
             assert c == set(['Hayuta'])
+    assert map(just_name, rachel['children']) == ['Michal']
+    michal = rachel['children'][0]
+    p = set(map(just_name, michal['partners']))
+    assert p == set(['Shlomi', 'Yossi'])
+
