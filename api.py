@@ -449,22 +449,27 @@ def fetch_items(item_list, debug_mode=False):
     # Fetch 2 items - 1 good and 1 bad
     >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
     >>> item_id = 'movies.{}'.format(movie_id)
-    >>> items = fetch_items([item_id, 'places.00000'])
+    >>> items, errors = fetch_items([item_id, 'places.00000'])
     >>> len(items)
     1
     >>> int(items[0]['_id']) ==  int(movie_id)
     True
+    >>> errors[0]
+    'places.00000:item not found'
     '''
 
+    errors = []
     rv = []
     for item_id in item_list:
         try:
             item = _fetch_item(item_id, debug_mode)
             rv.append(item)
-        except (ValueError, LookupError):
-            continue
+        except (ValueError, LookupError) as e:
+            msg = ':'.join((item_id, str(e)))
+            errors.append(msg)
 
-    return rv
+    return rv, errors
+
 
 def _fetch_item(item_id, debug_mode=False):
     """
@@ -1702,7 +1707,7 @@ def get_items(item_id):
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
 
-    items = fetch_items(items_list[:10], debug_mode)
+    items, errors = fetch_items(items_list[:10], debug_mode)
     if items:
         # Cast items to list
         if type(items) != list:
@@ -1714,7 +1719,7 @@ def get_items(item_id):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
     else:
-        abort(404, 'Nothing found ;(')
+        abort(404, ';'.join(errors))
 
 @app.route('/fsearch')
 @autodoc.doc()
