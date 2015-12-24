@@ -111,6 +111,8 @@ def fwalk(graph, args):
         parent = people[i]
         parent['props']['parents'] = people.get_props_array(parent['parents'],
                                                             shallow_copy=True)
+        parent['props']['partners'] = people.get_props_array(parent['partners'],
+                                                            shallow_copy=True)
         parent['props']['children'] = people.get_props_array(parent['children'],
                                                             shallow_copy=True)
 

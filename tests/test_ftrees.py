@@ -209,18 +209,18 @@ def test_half_sisters(complex_family):
             assert p == set(['Giza', 'Volvek'])
         if i['name'] == 'Miriam' or i['name'] == 'Nurit':
             assert p == set(['Elo', 'Rivka'])
+    parents = set(map(just_name, rachel['parents']))
+    assert parents == set(['Giza', 'Elo'])
     for i in rachel['parents']:
         c = set(map(just_name, i['children']))
+        p = set(map(just_name, i['partners']))
         if i['name'] == 'Giza':
             assert c == set(['Rachel', 'Lea', 'Hayuta'])
-        if i['name'] == 'Rivka':
-            assert c == set(['Miriam', 'Nurit'])
+            assert p == set(['Elo', 'Volvek'])
         if i['name'] == 'Elo':
             assert c == set(['Miriam', 'Nurit', 'Rachel', 'Lea'])
-        if i['name'] == 'Volvek':
-            assert c == set(['Hayuta'])
+            assert p == set(['Giza', 'Rivka'])
     assert map(just_name, rachel['children']) == ['Michal']
     michal = rachel['children'][0]
     p = set(map(just_name, michal['partners']))
     assert p == set(['Shlomi', 'Yossi'])
-
