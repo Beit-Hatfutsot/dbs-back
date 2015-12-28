@@ -628,8 +628,7 @@ def get_es_text_related(doc, items_per_collection=1):
     for collection_name in collections:
         found_related = es_mlt_search(
                                     data_db.name,
-                                    self_collection,
-                                    doc['_id'],
+                                    doc,
                                     related_fields,
                                     collection_name,
                                     items_per_collection)
@@ -645,23 +644,23 @@ def get_es_text_related(doc, items_per_collection=1):
     return related
 
 
-def es_mlt_search(index_name, doc_type, doc_id, doc_fields, target_doc_type, limit):
+def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
     '''Build an mlt query and execute it'''
     query = {'query':
-                {'mlt':
-                    {'docs': [
-                        {'_id': doc_id,
-                        '_index': index_name,
-                        '_type': doc_type}],
-                    'fields': doc_fields
-                    }
+              {'mlt':
+                {'fields': doc_fields,
+                'docs':
+                  [
+                    {'doc': doc}
+                  ],
                 }
+              }
             }
     try:
-        results = es.search(doc_type=target_doc_type, body=query, size=limit)
+        results = es.search(doc_type=target_collection, body=query, size=limit)
     except elasticsearch.exceptions.ConnectionError as e:
         logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
-        return None
+        raise e
     if len(results['hits']['hits']) > 0:
         result_doc_ids = ['{}.{}'.format(h['_type'], h['_source']['_id']) for h in results['hits']['hits']]
         return result_doc_ids
