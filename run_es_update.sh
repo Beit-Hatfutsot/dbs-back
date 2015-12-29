@@ -1,5 +1,10 @@
 #!/bin/bash -e
 
+# For the first run:
+# - populate .ssh with bhs keys
+# - virtualenv ~/venv
+# - sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev python-dev
+
 branch=dev
 base=`dirname $0`
 
