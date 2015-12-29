@@ -224,3 +224,6 @@ def test_half_sisters(complex_family):
     michal = rachel['children'][0]
     p = set(map(just_name, michal['partners']))
     assert p == set(['Shlomi', 'Yossi'])
+    adi = michal['children'][0]
+    assert adi['name'] == 'Adi'
+    assert set(map(just_name,adi['parents'])) == set(['Yossi','Michal'])

@@ -99,6 +99,10 @@ def fwalk(graph, args):
     # gather grandchildren and other parent
     for i in p['children']:
         child = people[i]
+        for j in child['children']:
+            grandchild = people[j]
+            grandchild['props']['parents'] = people.get_props_array(
+                grandchild['parents'], shallow_copy=True)
         child['props']['children'] = people.get_props_array(child['children'],
                                                             shallow_copy=True)
         child['props']['parents'] = people.get_props_array(child['parents'],
