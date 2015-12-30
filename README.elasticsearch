@@ -1,7 +1,3 @@
-# Exporting Mongo collections to elasticsearch cluster #
-
-## Important - Elasticsearch river MUST be installed on a Mongo machine, primary or secondary ##
-
 ## Install ElasticSearch ##
 - Install OpenJDK  
 `sudo apt-get install openjdk-7-jre-headless`
@@ -22,57 +18,8 @@ sudo update-rc.d elasticsearch defaults 95 10
 echo "script.engine.groovy.inline.search: on" | sudo tee -a /etc/elasticsearch/elasticsearch.yml
 sudo service elasticsearch restart
 ```
-
-## Install Mongo river ##
-After Elasticsearch is installed and running on a local machine, install the mongodb river [plugin](https://github.com/richardwilly98/elasticsearch-river-mongodb/wiki)
-```
-sudo /usr/share/elasticsearch/bin/plugin -i elasticsearch/elasticsearch-mapper-attachments/2.4.1
-sudo /usr/share/elasticsearch/bin/plugin -i com.github.richardwilly98.elasticsearch/elasticsearch-river-mongodb/2.0.9
-```
-IMPORTANT: Restart elasticsearch before working with rivers:  
-```
-sudo service elasticsearch restart
-```
-
-## Export the Mongo collections ##
-To export all the collections into ES, create a json for each collection like this:
-
-```json
-{
-  "type": "mongodb",
-  "mongodb": {
-    "servers": [
-      { "host": "127.0.0.1", "port": 27017 }
-    ],
-    "db": "bhp10",
-    "collection": "movies",
-    "options": { "secondary_read_preference": true },
-    "gridfs": false
-  },
-  "index": {
-    "name": "bhp10",
-    "type": "movies"
-  }
-}
-```
-Then initialize different rivers, one per collection, with different names:
-```
-curl -X PUT localhost:9200/_river/bhp10_places/_meta -d @bhp10_rivers/places.json
-curl -X PUT localhost:9200/_river/bhp10_personalities/_meta -d @bhp10_rivers/personalities.json
-...
-```
-
-This will create a single index(bhp10) with different types(places, personalitis, etc.)
-
-The export will fail if any of the Mongo documents has an _id of null.
-Delete such documents before attempting to export a collection.
-The error shoud appear in the log: /var/log/elasticsearch/elasticsearch.log
-
-If you need to re-initialize a river, delete it and the index it created:
-```
-curl -XDELETE 'localhost:9200/_river/bhp10_places'
-curl -XDELETE 'localhost:9200/_river/bhp10_movies'
-... Proceeed for all the indeces
-curl -XDELETE 'http://localhost:9200/bhp10/'
-```
-You can access the UI of mongo river at this URL: [http://localhost:9200/_plugin/river-mongodb/](http://localhost:9200/_plugin/river-mongodb/)
+## Exporting Mongo collections to elasticsearch cluster 
+We copy all the relevant data from Mongo to Elasticsearch using
+dump_mongo_to_es.py script.  
+The script is run by cron as a part of migration process on bhs-infra
+and independently on mongo2

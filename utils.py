@@ -151,6 +151,9 @@ def upload_to_soundcloud(sc_client, fn):
     return track.obj
 
 def fail_show_filter(show_filter, doc):
+    """Return a list of (key, value) tuples of offending values if the `doc`
+    fails `show_filter` or an empty list if the `doc` passes the filter.
+    """
     rv = []
     for k in show_filter.keys():
         if k == '$or':
