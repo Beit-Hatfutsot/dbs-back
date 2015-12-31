@@ -5,6 +5,11 @@ from pytest_flask.plugin import client
 from family_tree import fwalk
 from api import conf
 
+def delete_test_graph(g):
+    g.cypher.execute("MATCH (n:Tree {test: true})\
+                        OPTIONAL MATCH n-[r]-() DELETE r,n")
+    g.cypher.execute("MATCH (n:INDI {test: true})\
+                        OPTIONAL MATCH n-[r]-() DELETE r,n")
 @pytest.fixture
 def simple_family(request):
     ''' a fixture to add a simple family tree
@@ -31,23 +36,23 @@ def simple_family(request):
     +--------+   +--------+    +------+
 
     '''
-    def fin():
-        g.cypher.execute("MATCH (n { tree_id: '1' }) optional match (n)-[r]-() delete n,r")
-    request.addfinalizer(fin)
 
     g = Graph(conf.neo4j_url)
+
+    request.addfinalizer(lambda: delete_test_graph(g))
+    t = Node("Tree", test=True, tree_number=1, id='@1@')
     nodes = [
-        Node("INDI", tree_id='1', id='@1@', NAME="grandfather's father", SEX='M'),
-        Node("INDI", tree_id='1', id='@2@', NAME="grandfather", SEX='M'),
-        Node("INDI", tree_id='1', id='@3@', NAME="grandmother", SEX='F'),
-        Node("INDI", tree_id='1', id='@4@', NAME="mother", SEX='F', birth_year=1940),
-        Node("INDI", tree_id='1', id='@5@', NAME="father", SEX='M'),
-        Node("INDI", tree_id='1', id='@6@', NAME="uncle", SEX='M'),
-        Node("INDI", tree_id='1', id='@7@', NAME="aunt", SEX='F'),
-        Node("INDI", tree_id='1', id='@8@', NAME="brother1", SEX='M', birth_year=1965),
-        Node("INDI", tree_id='1', id='@9@', NAME="brother2", SEX='M', birth_year=1963),
-        Node("INDI", tree_id='1', id='@10@', NAME="sister", SEX='F', birth_year=1964),
-        Node("INDI", tree_id='1', id='@11@', SEX='F'),
+        Node("INDI", test=True, id='@1@', NAME="grandfather's father", SEX='M'),
+        Node("INDI", test=True, id='@2@', NAME="grandfather", SEX='M'),
+        Node("INDI", test=True, id='@3@', NAME="grandmother", SEX='F'),
+        Node("INDI", test=True,id='@4@', NAME="mother", SEX='F', birth_year=1940),
+        Node("INDI", test=True,id='@5@', NAME="father", SEX='M'),
+        Node("INDI", test=True,id='@6@', NAME="uncle", SEX='M'),
+        Node("INDI", test=True,id='@7@', NAME="aunt", SEX='F'),
+        Node("INDI", test=True,id='@8@', NAME="brother1", SEX='M', birth_year=1965),
+        Node("INDI", test=True,id='@9@', NAME="brother2", SEX='M', birth_year=1963),
+        Node("INDI", test=True,id='@10@', NAME="sister", SEX='F', birth_year=1964),
+        Node("INDI", test=True,id='@11@', SEX='F'),
     ]
 
     rels = [ Relationship(nodes[0], "FATHER_OF", nodes[1]),
@@ -68,8 +73,13 @@ def simple_family(request):
              Relationship(nodes[3], "MOTHER_OF", nodes[9]),
              Relationship(nodes[3], "MOTHER_OF", nodes[10]),
             ]
+    for i in nodes:
+        rels.append(Relationship(i, "LEAF_IN", t))
+    nodes.append(t)
     g.create(*nodes)
     g.create(*rels)
+    g.cypher.execute("CREATE INDEX ON :INDI(test)")
+    g.cypher.execute("CREATE INDEX ON :Tree(test)")
     return g, nodes
 
 @pytest.fixture
@@ -100,26 +110,25 @@ def complex_family(request):
 
 
     '''
-    def fin():
-        g.cypher.execute("MATCH (n { tree_id: '1' }) optional match (n)-[r]-() delete n,r")
-    request.addfinalizer(fin)
 
     g = Graph(conf.neo4j_url)
+    request.addfinalizer(lambda: delete_test_graph(g))
+    t = Node("Tree", test=True, tree_number=2, id='@1@')
     nodes = [
-        Node("INDI", tree_id='1', id='@1@', NAME="Rivka", SEX='F'),
-        Node("INDI", tree_id='1', id='@2@', NAME="Elo", SEX='M'),
-        Node("INDI", tree_id='1', id='@3@', NAME="Giza", SEX='F'),
-        Node("INDI", tree_id='1', id='@4@', NAME="Volvek", SEX='M'),
-        Node("INDI", tree_id='1', id='@5@', NAME="Nurit", SEX='F'),
-        Node("INDI", tree_id='1', id='@6@', NAME="Miriam", SEX='F'),
-        Node("INDI", tree_id='1', id='@7@', NAME="Lea", SEX='F'),
-        Node("INDI", tree_id='1', id='@8@', NAME="Rachel", SEX='F'),
-        Node("INDI", tree_id='1', id='@9@', NAME="Hayuta", SEX='F'),
-        Node("INDI", tree_id='1', id='@10@', NAME="Michal", SEX='F'),
-        Node("INDI", tree_id='1', id='@11@', NAME="Yossi", SEX='M'),
-        Node("INDI", tree_id='1', id='@12@', NAME="Shlomi", SEX='M'),
-        Node("INDI", tree_id='1', id='@13@', NAME="Adi", SEX='F'),
-        Node("INDI", tree_id='1', id='@14@', NAME="Yehonatan", SEX='M'),
+        Node("INDI", test=True, id='@1@', NAME="Rivka", SEX='F'),
+        Node("INDI", test=True, id='@2@', NAME="Elo", SEX='M'),
+        Node("INDI", test=True, id='@3@', NAME="Giza", SEX='F'),
+        Node("INDI", test=True, id='@4@', NAME="Volvek", SEX='M'),
+        Node("INDI", test=True, id='@5@', NAME="Nurit", SEX='F'),
+        Node("INDI", test=True, id='@6@', NAME="Miriam", SEX='F'),
+        Node("INDI", test=True, id='@7@', NAME="Lea", SEX='F'),
+        Node("INDI", test=True, id='@8@', NAME="Rachel", SEX='F'),
+        Node("INDI", test=True, id='@9@', NAME="Hayuta", SEX='F'),
+        Node("INDI", test=True, id='@10@', NAME="Michal", SEX='F'),
+        Node("INDI", test=True, id='@11@', NAME="Yossi", SEX='M'),
+        Node("INDI", test=True, id='@12@', NAME="Shlomi", SEX='M'),
+        Node("INDI", test=True, id='@13@', NAME="Adi", SEX='F'),
+        Node("INDI", test=True, id='@14@', NAME="Yehonatan", SEX='M'),
     ]
 
     rels = [ Relationship(nodes[0], "MOTHER_OF", nodes[4]),
@@ -143,6 +152,9 @@ def complex_family(request):
              Relationship(nodes[10], "FATHER_OF", nodes[12]),
              Relationship(nodes[11], "FATHER_OF", nodes[13]),
             ]
+    for i in nodes:
+        rels.append(Relationship(i, "LEAF_IN", t))
+    nodes.append(t)
     g.create(*nodes)
     g.create(*rels)
     return g, nodes
@@ -151,11 +163,8 @@ def test_walk(simple_family):
 
     g, nodes = simple_family
     just_name = lambda a: a.get('name', 'unknown')
-    # first get the id of our mother
-    id = nodes[3].ref[5:]
-
-    mother = fwalk(g, {"i": id})
-    assert mother['id'] == id
+    # get the data for our mother
+    mother = fwalk(g, tree_number=1, node_id="4")
     assert mother['name'] == 'mother'
     assert mother['birth_year'] == 1940
     parents = set(map(just_name, mother['parents']))
@@ -177,20 +186,13 @@ def test_walk(simple_family):
 
 
 def test_walk_api(simple_family, client):
-    r = client.get('/fwalk?i=4&t=1')
+    r = client.get('/fwalk/1/4')
     mother = r.json
     assert len(mother.keys()) == 10
 
 
-def test_bad_params(simple_family, client):
-    r = client.get('/fwalk')
-    assert r.status_code == 400
-    r = client.get('/fwalk?t=aaa')
-    assert r.status_code == 400
-
-
 def test_unknown_id(simple_family, client):
-    r = client.get('/fwalk?i=10800')
+    r = client.get('/fwalk/10/10800')
     assert r.status_code == 400
 
 def test_half_sisters(complex_family):
@@ -198,7 +200,7 @@ def test_half_sisters(complex_family):
     just_name = lambda a: a.get('name', 'unknown')
     # first get the id of our mother
     id = nodes[7].ref[5:]
-    rachel = fwalk(g, {"i": id})
+    rachel = fwalk(g, tree_number=2, node_id="8")
     siblings = set(map(just_name, rachel['siblings']))
     assert siblings == set(['Lea', 'Hayuta', 'Miriam', 'Nurit'])
     for i in rachel['siblings']:

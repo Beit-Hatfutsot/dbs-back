@@ -1797,23 +1797,16 @@ def fetch_tree(tree_number):
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
 
-@app.route('/fwalk')
+@app.route('/fwalk/<tree_number>/<node_id>')
 @autodoc.doc()
-def ftree_walk():
+def ftree_walk(tree_number, node_id):
     '''
-    This view returns a part of family tree starting with a given person
-    id. These `i` argument is for individual id. 
+    This view returns a part of family tree starting with a given tree number
+    and node id.
     '''
-    args = request.args
-
-    em = "Must receive `i`ndividual ids"
-    i = args.get('i', False)
-    if not i:
-        abort(400, em)
-
     graph = Graph(conf.neo4j_url)
     try:
-        results = fwalk(graph, args)
+        results = fwalk(graph, tree_number, node_id)
     except AttributeError, e:
         abort(400, str(e))
 

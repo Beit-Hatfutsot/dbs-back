@@ -3,8 +3,8 @@ from copy import copy
 class People(dict):
 
     def add_node(this, node):
-        pid = node.ref[5:]
         props = node.properties
+        pid = props['id'][1:-1]
         if pid not in this:
             try:
                 name = nameof(props['NAME'])
@@ -50,36 +50,27 @@ class People(dict):
         return map(get_props, sorted_ids)
 
 
-def fwalk(graph, args):
-    tx = graph.cypher.begin()
-    if "t" in args and "i" in args:
-        i = args["i"]
-        # Add opening and closing `#` if missing
-        if i[0] != '@':
-            i = '@'+ i
-        if i[-1] != '@':
-            i = i + '@'
-        where_clause = "WHERE n.tree_id='{}' AND n.id='{}'".format(args["t"], i)
-    elif "i" in args:
-        where_clause = "WHERE ID(n)={}".format(args["i"])
-    else:
-        raise AttributeError("I need either an i and an optional to find a person")
+def fwalk(graph, tree_number, node_id):
+    # Add opening and closing `#` if missing
+    if node_id != '@':
+        node_id = '@'+ node_id
+    if node_id[-1] != '@':
+        node_id = node_id + '@'
 
-    tx.append(" ".join((
-        "MATCH (n:INDI)-[r:FATHER_OF|:MOTHER_OF|:SPOUSE*1..3]-(o:INDI)",
-        where_clause,
-        "RETURN n, r")))
+    results = graph.cypher.execute("".join((
+        "MATCH (t:Tree {tree_number: {t}})<-[:LEAF_IN]-(n:INDI {id: {i}})",
+        "-[r:FATHER_OF|:MOTHER_OF|:SPOUSE*1..3]-(o:INDI) ",
+        "RETURN n, r")), t=int(tree_number), i=node_id)
 
     # need to add the data from the r: n.r is an array of Rellationships
-    results = tx.commit()
     people = People()
     try:
-        p = people.add_node(results[0][0].n)
+        p = people.add_node(results[0].n)
         p_id = p['props']['id']
     except IndexError:
         raise AttributeError("Failed to find the person you're looking for. Sorry")
 
-    for i in results[0]:
+    for i in results:
         for rel in i.r:
             src = people.add_node(rel.nodes[0])
             dst = people.add_node(rel.nodes[1])
@@ -131,7 +122,7 @@ def fwalk(graph, args):
     p['parents'] = people.get_props_array(p['parents'])
     p['siblings'] = people.get_props_array(p['siblings'], order_by_parents=True)
     # copy all the properties from the node but keep all the keys lower case
-    for k,v in results[0][0].n.properties.items():
+    for k,v in results[0].n.properties.items():
         p[k.lower()] = v
     p['id'] = p_id
     del p['props']
