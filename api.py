@@ -28,7 +28,6 @@ import elasticsearch
 
 import pymongo
 import jinja2
-from py2neo import Graph
 
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                              get_unit_type, SEARCHABLE_COLLECTIONS)
@@ -1804,9 +1803,8 @@ def ftree_walk(tree_number, node_id):
     This view returns a part of family tree starting with a given tree number
     and node id.
     '''
-    graph = Graph(conf.neo4j_url)
     try:
-        results = fwalk(graph, tree_number, node_id)
+        results = fwalk(tree_number, node_id)
     except AttributeError, e:
         abort(400, str(e))
 
