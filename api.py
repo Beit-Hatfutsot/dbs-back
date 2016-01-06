@@ -1768,9 +1768,12 @@ def ftree_search():
     '''
     args = request.args
     keys = args.keys()
-    if not ('last_name' in keys or 'birth_place' in keys or 'individual_id' in keys):
-        em = "At least one of 'last_name', 'birth_place' or 'individual_id' fields is required"
-        abort(400, em)
+    if len(keys) == 0:
+        em = "At least one search field has to be specified"
+        abort (400, em)
+    if len(keys) == 1 and keys[0]=='sex':
+        em = "Sex only is not enough"
+        abort (400, em)
     results = fsearch(**args)
     return humanify(results)
 
