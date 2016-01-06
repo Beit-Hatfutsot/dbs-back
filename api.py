@@ -503,11 +503,6 @@ def _fetch_item(item_id, debug_mode=False):
     >>> _fetch_item(bad_filter_item_id, debug_mode=True) != {}
     True
 
-    # Item was enriched
-    >>> required_keys_set = {'main_image_url', 'video_url', 'thumbnail'}
-    >>> item_keys_set = set(item.keys())
-    >>> item_keys_set.issuperset(required_keys_set)
-    True
     """
 
     if not '.' in item_id: # Need colection.id to unpack
