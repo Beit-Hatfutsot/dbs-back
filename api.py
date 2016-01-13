@@ -34,7 +34,6 @@ from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
 from utils import get_logger, upload_file, get_oid, send_gmail, MongoJsonEncoder
 import phonetic
 
-from family_tree import fwalk
 
 CONF_FILE = '/etc/bhs/config.yml'
 # Create app
@@ -1801,12 +1800,17 @@ def ftree_walk(tree_number, node_id):
     This view returns a part of family tree starting with a given tree number
     and node id.
     '''
+    dest_bucket_name = os.path.join('/data', 'bhs-familytrees-json',
+                                    str(tree_number),node_id+'.json')
     try:
-        results = fwalk(tree_number, node_id)
-    except AttributeError, e:
-        abort(400, str(e))
-
-    return humanify(results)
+        fd = open(dest_bucket_name)
+    except IOError, e:
+        abort(404, str(e))
+    data = fd.read()
+    fd.close()
+    resp = Response(data, mimetype='application/json')
+    resp.status_code = 200
+    return resp
 
 @app.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
