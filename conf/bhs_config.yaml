@@ -25,5 +25,3 @@ ftree_bucket_url: https://storage.googleapis.com/bhs-familytrees
 video_bucket_url: https://storage.googleapis.com/bhs-videos
 
 elasticsearch_host: bhs-infra
-
-neo4j_url: http://neo4j:bhonline@146.148.125.14:7474/db/data

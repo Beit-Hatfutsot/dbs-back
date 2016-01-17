@@ -60,7 +60,6 @@ must_have_keys = set(['secret_key',
                     'data_db_host',
                     'data_db_port',
                     'data_db_name',
-                    'neo4j_url',
                     'image_bucket_url',
                     'video_bucket_url'])
 
