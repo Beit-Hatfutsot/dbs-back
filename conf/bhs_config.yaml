@@ -5,7 +5,7 @@ security_password_hash: pbkdf2_sha512
 security_password_salt: 68XDri7fdCi1dCkN2Prs
 
 # Data DB
-data_db_host: bhs-infra
+data_db_host: 104.155.92.186
 data_db_port: 27017
 data_db_name: bhp6
 

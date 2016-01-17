@@ -2,7 +2,7 @@ virtual_env = env
 
 branch ?= master
 
-all: pull test reload
+all: pull venv test reload
 
 pull:
 	git checkout $(branch) && git pull origin $(branch)
@@ -16,9 +16,9 @@ external_dependencies:
 	sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev > /dev/null
 
 reload:
+	sudo cp conf/api_uwsgi.ini /etc/uwsgi/vassals
 	sudo service uwsgi reload
 
 test:
-	. $(virtual_env)/bin/activate
-	py.test tests
+	. $(virtual_env)/bin/activate; py.test tests apy.py
 
