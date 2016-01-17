@@ -20,5 +20,5 @@ reload:
 	sudo service uwsgi reload
 
 test:
-	. $(virtual_env)/bin/activate; py.test tests apy.py
+	. $(virtual_env)/bin/activate; py.test tests
 
