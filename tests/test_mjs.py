@@ -17,7 +17,7 @@ def test_mjs(client, request, get_auth_header):
     res = client.get('/mjs', headers=headers)
     assert len(res.json['items']) == 1
     item = res.json['items'][0]
-    assert item['_id'] == '123'
+    assert item['id'] == 'photoUnits.123'
     assert item['branches'] == [False, False, False, False]
 
     res = client.post('/mjs/1/name', headers=headers,
@@ -35,7 +35,7 @@ def test_mjs(client, request, get_auth_header):
     res = client.get('/mjs', headers=headers)
     assert len(res.json['items']) == 1
     item = res.json['items'][0]
-    assert item['_id'] == '123'
+    assert item['id'] == 'photoUnits.123'
     assert item['branches'] == [True, False, False, False]
 
     res = client.delete('/mjs/1/photoUnits.123', headers=headers)
@@ -43,7 +43,7 @@ def test_mjs(client, request, get_auth_header):
     res = client.get('/mjs', headers=headers)
     assert len(res.json['items']) == 1
     item = res.json['items'][0]
-    assert item['_id'] == '123'
+    assert item['id'] == 'photoUnits.123'
     assert item['branches'] == [False, False, False, False]
     res = client.delete('/mjs/photoUnits.123', headers=headers)
     assert res.status_code == 200

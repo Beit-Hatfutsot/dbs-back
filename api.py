@@ -433,10 +433,9 @@ def update_user(user_id, user_dict):
 def get_mjs(user):
     ret = []
     if user.my_story:
-        items, errors = fetch_items([i.item_id for i in user.my_story])
-        for item, branches in zip(items, [i.branches for i in user.my_story]):
-            item['branches'] = branches
-            ret.append(item)
+        for i in user.my_story:
+            ret.append({'id': i.item_id,
+                        'branches': i.branches })
     return ret
 
 def update_mjs(user_oid, data):
