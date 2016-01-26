@@ -224,6 +224,10 @@ class Role(db.Document, RoleMixin):
     name = db.StringField(max_length=80, unique=True)
     description = db.StringField(max_length=255)
 
+class StoryLine(db.EmbeddedDocument):
+    item_id = db.StringField(max_length=64)
+    branches = db.ListField(db.BooleanField(), default=4*[False])
+
 class User(db.Document, UserMixin):
     email = db.StringField(max_length=255)
     password = db.StringField(max_length=255)
@@ -231,6 +235,8 @@ class User(db.Document, UserMixin):
     active = db.BooleanField(default=True)
     confirmed_at = db.DateTimeField()
     roles = db.ListField(db.ReferenceField(Role))
+    my_story = db.EmbeddedDocumentListField(StoryLine)
+    story_branches = db.ListField(field=db.StringField(), default=4*[''])
 
 class Mjs(db.Document):
     mjs = db.DictField()
@@ -247,12 +253,17 @@ def setup_users():
             user_datastore.create_role(name=role_name)
 
     user_role = user_datastore.find_role('user')
-    if not user_datastore.get_user('tester@example.com'):
+    test_user = user_datastore.get_user('tester@example.com')
+    if not test_user:
         logger.debug('Creating test user.')
         user_datastore.create_user(email='tester@example.com',
                                    name='Test User',
                                    password=encrypt_password('password'),
                                    roles=[user_role])
+    elif hasattr(test_user, 'my_story'):
+        test_user.my_story = None
+        user_datastore.put(test_user)
+
 
 # Setup Flask-Security
 user_datastore = MongoEngineUserDatastore(db, User, Role)
@@ -419,13 +430,14 @@ def update_user(user_id, user_dict):
 
 ######################################################################################
 
-def get_mjs(user_oid):
-    mjs = Mjs.objects(id=user_oid).first()
-    if mjs:
-        return dictify(mjs)
-    else:
-        logger.debug('Mjs not found for user {}'.format(str(user_oid)))
-        return {'mjs':{}}
+def get_mjs(user):
+    ret = []
+    if user.my_story:
+        items, errors = fetch_items([i.item_id for i in user.my_story])
+        for item, branches in zip(items, [i.branches for i in user.my_story]):
+            item['branches'] = branches
+            ret.append(item)
+    return ret
 
 def update_mjs(user_oid, data):
     new_mjs = Mjs(id=user_oid, mjs = data)
@@ -1391,47 +1403,90 @@ def manage_user(user_id=None):
             abort(400, 'POST method is not supported for logged in users.')
         return user_handler(user_id, request)
 
-@app.route('/mjs', methods=['GET', 'PUT'])
+
+@app.route('/mjs/<item_id>', methods=['DELETE'])
+@app.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
+@jwt_required()
+def remove_item_from_branch(item_id, branch_num=None):
+    line = None
+    for i in current_user.my_story:
+        if i.item_id == item_id:
+            line = i
+            break
+    if not line:
+        abort(400, 'item is not part of the story'.format(item_id))
+    if branch_num:
+        line.branches[int(branch_num)-1] = False
+        msg = 'item was removed from the import branch'
+    else:
+        current_user.my_story.remove(line)
+        msg = 'item was removed from the import story'
+    current_user.save()
+    return humanify(msg)
+
+
+@app.route('/mjs/<branch_num>', methods=['POST'])
+@jwt_required()
+def add_to_story_branch(branch_num):
+    item_id = request.data
+    line = None
+    for i in current_user.my_story:
+        if i.item_id == item_id:
+            line = i
+            break
+    if not line:
+        abort(400, 'item must be part of the story to be added to a branch'.format(item_id))
+    line.branches[int(branch_num)-1] = True
+    current_user.save()
+    return humanify('item was added to the branch')
+
+
+@app.route('/mjs/<branch_num>/name', methods=['GET', 'POST'])
+@jwt_required()
+def manage_story_branches(branch_num):
+    try:
+        branches = current_user.story_branches
+    except KeyError:
+        branches = 4*['']
+
+    if request.method == 'GET':
+        ret = current_user.story_branches[branch_num-1]
+    elif request.method == 'POST':
+        name = request.data
+        current_user.story_branches[int(branch_num)-1] = name
+        current_user.save()
+        ret = ''
+    return humanify(ret)
+
+
+@app.route('/mjs', methods=['GET', 'POST'])
 @jwt_required()
 def manage_jewish_story():
-    '''Logged in user may GET or PUT their mjs metadata - a dict
-    with the following structure:
-    {
-      'assigned': [
-        {'name': 'branch_name_1', 'items': []},
-        {'name': 'branch_name_2', 'items': []}, etc...
-      ],
-      'unassigned': []
-    }
-    Each metadata member is a string in form of "collection_name.id".
-    A PUT request must include ALL the metadata, not just the new object!
-    The data is saved as an object in the mjs collection while its _id
-    equals to this of the updating user.
+    '''Logged in user may GET or POST their jewish story links.
+    the links are stored as an array of items where each item has a special
+    field: `branch` with a boolean array indicating which branches this item is 
+    part of.
+    POST requests should be sent with a string in form of "collection_name.id".
     '''
-    user_oid = current_user.id
     if request.method == 'GET':
-        mjs = get_mjs(user_oid)
-        return humanify(mjs['mjs'])
+        return humanify({'items':  get_mjs(current_user),
+                         'branches': current_user.story_branches})
 
-    elif request.method == 'PUT':
+    elif request.method == 'POST':
         try:
-            data = json.loads(request.data)
+            data = request.data
             # Enforce mjs structure:
-            if not type(data) == dict:
-                abort(400, 'Expecting an object')
-            must_have_keys = set(['assigned', 'unassigned'])
-            keys = data.keys()
-            missing_keys = list(must_have_keys.difference(set(keys)))
-            if missing_keys != []:
-                e_message = gen_missing_keys_error(missing_keys)
-                abort(400, e_message)
+            if not isinstance(data, str):
+                abort(400, 'Expecting a string')
 
         except ValueError:
             e_message = 'Could not decode JSON from data'
             logger.debug(e_message)
             abort(400, e_message)
 
-        return humanify(update_mjs(user_oid, data)['mjs'])
+        current_user.my_story.append(StoryLine(item_id=data, branches=4*[False]))
+        current_user.save()
+        return humanify('')
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()

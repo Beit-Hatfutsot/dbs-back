@@ -3,25 +3,9 @@ import json
 import pytest
 
 from pytest_flask.plugin import client, config
+from fixtures import get_auth_header
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
-
-# The documentation for advanced pytest fixtures use is at
-# http://pytest.org/latest/fixture.html#fixture
-
-@pytest.fixture
-def get_auth_header(client):
-    '''Asks the api for a JWT token and returns auth header.
-    Uses the client fixture'''
-    # We must use confusing email=username alias until the flask-jwt
-    # author merges request #31
-    # https://github.com/mattupstate/flask-jwt/pull/31
-    res = client.post('/auth', data = '{"username": "tester@example.com", "password": "password"}')
-    token = res.json['token']
-    auth_header_tuple = ('Authorization', 'Bearer ' + token)
-    print 'Got jwt token ' + token
-    return auth_header_tuple
-
 
 def test_api_public_view(client):
     res = client.get('/')
@@ -69,31 +53,25 @@ def test_user(client, request):
     headers = [('Content-Type', 'application/json')]
     headers.append(auth_header)
 
-    def user_get_self(email, password):
-        headers = [('Content-Type', 'application/json')]
-        auth_header = get_generic_auth_header(email, password)
-        headers.append(auth_header)
-        res = client.get(route, headers=headers)
-        return res.json
-
-    def user_email_change(new_email):
-        data = json.dumps({'email': new_email})
-        res = client.put(route, headers=headers, data=data)
-        return res.json
-
-    def user_password_change(new_password):
-        data = json.dumps({'password': new_password})
-        res = client.put(route, headers=headers, data=data)
-        return res.json
-
     def delete_test_user():
         res = client.delete(route, headers=headers)
         assert res.json == {}
 
-    user_email_change(new_email)
-    assert user_get_self(new_email, password)['email'] == new_email
-    user_password_change(new_password)
-    assert user_get_self(new_email, new_password)['email'] == new_email
+    # change the email and password
+    res = client.put(route,
+                     headers=headers,
+                     data=json.dumps({'email': new_email}))
+    assert res.status == '200 OK'
+    res = client.put(route,
+                     headers=headers,
+                     data=json.dumps({'password': new_password}))
+    assert res.status == '200 OK'
+    headers = [('Content-Type', 'application/json')]
+    auth_header = get_generic_auth_header(new_email, new_password)
+    headers.append(auth_header)
+    res = client.get(route, headers=headers)
+    assert res.status == '200 OK'
+    assert res.json['email'] == new_email
 
     request.addfinalizer(delete_test_user)
   
