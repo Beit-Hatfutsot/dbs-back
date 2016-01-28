@@ -236,7 +236,7 @@ class User(db.Document, UserMixin):
     confirmed_at = db.DateTimeField()
     roles = db.ListField(db.ReferenceField(Role))
     my_story = db.EmbeddedDocumentListField(StoryLine)
-    story_branches = db.ListField(field=db.StringField(), default=4*[''])
+    story_branches = db.ListField(field=db.StringField(max_length=64), default=4*[''])
 
 class Mjs(db.Document):
     mjs = db.DictField()
