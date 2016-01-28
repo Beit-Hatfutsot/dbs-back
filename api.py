@@ -509,6 +509,7 @@ def _fetch_item(item_id, debug_mode=False):
     if collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
         if item:
+            item = enrich_item(item)
             item_id = item['_id']
             item = item['ugc'] # Getting the dict out from  mongoengine
             item['_id'] = item_id
@@ -527,6 +528,7 @@ def _fetch_item(item_id, debug_mode=False):
         # Return item by id without show filter - good for debugging
         filtered = filter_doc_id(_id, collection)
         item = data_db[collection].find_one(_id)
+        item = enrich_item(item)
 
         if not filtered:
             if item:
