@@ -1014,9 +1014,9 @@ def search_by_header(string, collection, starts_with=True):
         lang = 'En'
     string_re = re.escape(string)
     if starts_with:
-        header_regex = re.compile('^'+string_re, re.IGNORECASE)
+        header_regex = re.compile(u'^'+string_re, re.IGNORECASE)
     else:
-        header_regex = re.compile('^{}$'.format(string_re), re.IGNORECASE)
+        header_regex = re.compile(u'^{}$'.format(string_re), re.IGNORECASE)
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
