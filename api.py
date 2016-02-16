@@ -441,26 +441,23 @@ def fetch_items(item_list):
     # Fetch 2 items - 1 good and 1 bad
     >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
     >>> item_id = 'movies.{}'.format(movie_id)
-    >>> items, errors = fetch_items([item_id, 'places.00000'])
+    >>> items = fetch_items([item_id, 'places.00000'])
     >>> len(items)
-    1
+    2
     >>> int(items[0]['_id']) ==  int(movie_id)
     True
-    >>> errors[0]
-    'places.00000:404: Not Found'
+    >>> items[1]['error_code']
+    404
     '''
 
-    errors = []
     rv = []
     for item_id in item_list:
         try:
             item = _fetch_item(item_id)
             rv.append(item)
         except (Forbidden, NotFound) as e:
-            msg = ':'.join((item_id, str(e)))
-            errors.append(msg)
-
-    return rv, errors
+            rv.append({'item_id': item_id, 'error_code': e.code, 'msg': str(e)})
+    return rv
 
 
 def _fetch_item(item_id):
@@ -1745,8 +1742,11 @@ def get_items(item_id):
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
 
-    items, errors = fetch_items(items_list[:10])
-    if items:
+    items = fetch_items(items_list[:10])
+    if len(items) == 1 and items[0].has_key('error_code'):
+        error = items[0]
+        abort (error.error_code,  error.msg)
+    else:
         # Cast items to list
         if type(items) != list:
             items = [items]
@@ -1756,8 +1756,6 @@ def get_items(item_id):
                 if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != unicode(user_oid):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
-    else:
-        abort(404, ';'.join(errors))
 
 @app.route('/fsearch')
 @autodoc.doc()
