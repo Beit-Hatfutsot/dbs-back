@@ -24,6 +24,7 @@ from itsdangerous import URLSafeSerializer, BadSignature
 from flask.ext.autodoc import Autodoc
 
 from werkzeug import secure_filename, Response
+from werkzeug.exceptions import NotFound, Forbidden
 import elasticsearch
 
 import pymongo
@@ -435,7 +436,7 @@ def get_mjs(user):
                         'branches': i.branches })
     return ret
 
-def fetch_items(item_list, debug_mode=False):
+def fetch_items(item_list):
     '''
     # Fetch 2 items - 1 good and 1 bad
     >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
@@ -446,29 +447,26 @@ def fetch_items(item_list, debug_mode=False):
     >>> int(items[0]['_id']) ==  int(movie_id)
     True
     >>> errors[0]
-    'places.00000:item not found'
+    'places.00000:404: Not Found'
     '''
 
     errors = []
     rv = []
     for item_id in item_list:
         try:
-            item = _fetch_item(item_id, debug_mode)
+            item = _fetch_item(item_id)
             rv.append(item)
-        except (ValueError, LookupError) as e:
+        except (Forbidden, NotFound) as e:
             msg = ':'.join((item_id, str(e)))
             errors.append(msg)
 
     return rv, errors
 
 
-def _fetch_item(item_id, debug_mode=False):
+def _fetch_item(item_id):
     """
-    Gets item_id string and debug_mode flag.
+    Gets item_id string and return an item
     If item_id is bad or item is not found, raises an exception.
-    If item is found, but doesn't pass the show_filter, the behaviour
-    depends on the debug_mode: if the flag is set, the function will return
-    the item, if not, it will raise an exception.
 
     # A regular non-empty item - setup
     >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
@@ -481,7 +479,7 @@ def _fetch_item(item_id, debug_mode=False):
     >>> _fetch_item('places.00000')
     Traceback (most recent call last):
         ...
-    LookupError: item not found
+    NotFound: 404: Not Found
 
     # Item that doesn't pass filter
     >>> bad_filter_id = data_db.movies.find_one({"StatusDesc": "Edit"}, {'_id': 1})['_id']
@@ -489,11 +487,7 @@ def _fetch_item(item_id, debug_mode=False):
     >>> _fetch_item(bad_filter_item_id)
     Traceback (most recent call last):
         ...
-    LookupError: Item didn't pass the filter
-
-    # Item that doesn't pass filter could be fetched in debug mode
-    >>> _fetch_item(bad_filter_item_id, debug_mode=True) != {}
-    True
+    Forbidden: 403: Forbidden
 
     """
 
@@ -519,21 +513,11 @@ def _fetch_item(item_id, debug_mode=False):
             logger.debug('Bad id: {}'.format(_id))
             raise ValueError
 
-        # Return item by id without show filter - good for debugging
-        filtered = filter_doc_id(_id, collection)
+        filter_doc_id(_id, collection)
         item = data_db[collection].find_one(_id)
         item = enrich_item(item)
 
-        if not filtered:
-            if item:
-                if debug_mode:
-                    return _make_serializable(item)
-                else:
-                    raise LookupError, "Item didn't pass the filter"
-            else:
-                raise LookupError, "item not found"
-        else:
-            return _make_serializable(item)
+        return _make_serializable(item)
 
 def enrich_item(item):
     if (not item.has_key('related')) or (not item['related']):
@@ -626,9 +610,11 @@ def get_es_text_related(doc, items_per_collection=1):
     # Filter results
     for item_name in related:
         collection, _id = item_name.split('.')[:2]
-        filtered = filter_doc_id(_id, collection)
-        if filtered:
-            related.append(filtered)
+        try:
+            filter_doc_id(_id, collection)
+        except (Forbidden, NotFound) as e:
+            continue
+        related.append(filtered)
     return related
 
 def uuids_to_str(doc):
@@ -740,9 +726,12 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
                     continue
                 else:
                     i = int(i)
-                    filtered_id =  filter_doc_id(i, collection)
-                    if filtered_id:
-                        rv.append(collection + '.' + filtered_id)
+                    try:
+                        filter_doc_id(i, collection)
+                    except (Forbidden, NotFound) as e:
+                        continue
+                    rv.append(collection + '.' + i)
+
     if bhp_only:
         # Don't pad the results with es_mlt related
         return rv
@@ -814,7 +803,8 @@ def sort_related(related_items):
 def filter_doc_id(unit_id, collection):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
-    Fail if the _id is not found or doesn't pass the show filter.
+    Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
+    and therefore Forbidden.
     '''
     search_query = {'_id': unit_id}
     search_query.update(show_filter)
@@ -831,8 +821,22 @@ def filter_doc_id(unit_id, collection):
         else:
             return str(found['_id'])
     else:
-        logger.debug("Document {}.{} didn't pass filter".format(collection, unit_id))
-        return None
+        search_query = {'_id': unit_id}
+        item = data_db[collection].find_one(search_query)
+        if item:
+            msg = []
+            if item['StatusDesc'] != 'Completed':
+                msg.append("Status Description is not 'Completed'")
+            if item['RightsDesc'] != 'Full':
+                msg.append("The  Rights of the Item are not 'Full'")
+            if item['DisplayStatusDesc'] == 'Internal Use':
+                msg.append("Display Status is 'Internal Use'")
+            if item['UnitText1']['En'] not in [None,''] or \
+               item['UnitText1']['He'] not in [None, '']:
+                msg.append('Empty Text (description) in both Heabrew and English')
+            raise Forbidden('\n'.join(msg))
+        else:
+            raise NotFound
 
 def get_collection_name(doc):
     if doc.has_key('UnitType'):
@@ -1725,10 +1729,6 @@ def get_items(item_id):
     unless a `debug` argument was provided.
     '''
     args = request.args
-    if 'debug' in args.keys() and args['debug']:
-        debug_mode = True
-    else:
-        debug_mode = False
 
     items_list = item_id.split(',')
     # Check if there are items from ugc collection and test their access control
@@ -1745,7 +1745,7 @@ def get_items(item_id):
             logger.debug(e.description)
             abort(403, 'You have to be logged in to access this item(s)')
 
-    items, errors = fetch_items(items_list[:10], debug_mode)
+    items, errors = fetch_items(items_list[:10])
     if items:
         # Cast items to list
         if type(items) != list:

@@ -58,6 +58,7 @@ def test_user(client, request):
                       data = json.dumps({'email': email,
                                          'name': name,
                                          'password': password}))
+    assert res.status == '200 OK'
     parsed_res = res.json
     assert parsed_res['email'] == email
 
@@ -68,14 +69,12 @@ def test_user(client, request):
                      headers=[('Content-Type', 'application/json')]+auth_header,
                      data=json.dumps({'email': new_email}))
     assert res.status == '200 OK'
-    auth_header = get_generic_auth_header(new_email, password)
     res = client.put(route,
                      headers=[('Content-Type', 'application/json')]+auth_header,
                      data=json.dumps({'password': new_password}))
     assert res.status == '200 OK'
     headers = [('Content-Type', 'application/json')]
     headers = [('Content-Type', 'application/json')]
-    auth_header = get_generic_auth_header(new_email, new_password)
     res = client.get(route,
                      headers=[('Content-Type', 'application/json')]+auth_header)
     assert res.status == '200 OK'
