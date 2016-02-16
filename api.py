@@ -456,7 +456,7 @@ def fetch_items(item_list):
             item = _fetch_item(item_id)
             rv.append(item)
         except (Forbidden, NotFound) as e:
-            rv.append({'item_id': item_id, 'error_code': e.code, 'msg': str(e)})
+            rv.append({'item_id': item_id, 'error_code': e.code, 'msg': e.description})
     return rv
 
 
@@ -1745,7 +1745,7 @@ def get_items(item_id):
     items = fetch_items(items_list[:10])
     if len(items) == 1 and items[0].has_key('error_code'):
         error = items[0]
-        abort (error.error_code,  error.msg)
+        abort (error['error_code'],  error['msg'])
     else:
         # Cast items to list
         if type(items) != list:
