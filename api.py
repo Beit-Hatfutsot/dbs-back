@@ -225,7 +225,7 @@ class Role(db.Document, RoleMixin):
     description = db.StringField(max_length=255)
 
 class StoryLine(db.EmbeddedDocument):
-    item_id = db.StringField(max_length=64)
+    item_id = db.StringField(max_length=64, unique=True)
     branches = db.ListField(db.BooleanField(), default=4*[False])
 
 class User(db.Document, UserMixin):
@@ -237,9 +237,6 @@ class User(db.Document, UserMixin):
     roles = db.ListField(db.ReferenceField(Role))
     my_story = db.EmbeddedDocumentListField(StoryLine)
     story_branches = db.ListField(field=db.StringField(max_length=64), default=4*[''])
-
-class Mjs(db.Document):
-    mjs = db.DictField()
 
 class Ugc(db.Document):
     ugc = db.DictField()
@@ -437,20 +434,6 @@ def get_mjs(user):
             ret.append({'id': i.item_id,
                         'branches': i.branches })
     return ret
-
-def update_mjs(user_oid, data):
-    new_mjs = Mjs(id=user_oid, mjs = data)
-    try:
-        new_mjs.save()
-        return new_mjs
-    except ValidationError as e:
-        logger.debug('Error occured while saving mjs data for user {}'.format(str(user_oid)))
-        logger.debug(e.message)
-        abort(500, e.message)
-
-def _init_mjs():
-    return {'assigned': [],
-            'unassigned': []}
 
 def fetch_items(item_list, debug_mode=False):
     '''
@@ -1610,9 +1593,6 @@ def save_user_content():
         mjs = get_mjs(user_oid)['mjs']
         if mjs == {}:
             logger.debug('Creating mjs for user {}'.format(user_email))
-            mjs = _init_mjs()
-        mjs['unassigned'].append('ugc.{}'.format(str(file_oid)))
-        update_mjs(user_oid, mjs)
         # Add main_image_url for images (UnitType 1)
         if bhp6_md['UnitType'] == 1:
             ugc_image_uri = 'https://storage.googleapis.com/' + saved_uri.split('gs://')[1]

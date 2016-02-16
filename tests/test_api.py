@@ -1,9 +1,10 @@
 import json
-
+import logging
 import pytest
 
-from pytest_flask.plugin import client, config
+from pytest_flask.plugin import client
 from fixtures import get_auth_header
+from api import user_datastore
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
@@ -26,14 +27,32 @@ def test_api_jwt_auth(client):
 # User API
 
 def test_user(client, request):
+
     email = 'krakoziabr@example.com'
+    new_email = 'shmakoziabr@example.com'
+
+    def delete_test_user():
+        test_user = user_datastore.get_user(email)
+        if test_user: test_user.delete()
+        test_user = user_datastore.get_user(new_email)
+        if test_user: test_user.delete()
+
+
+    def get_generic_auth_header(email, password):
+        data =  json.dumps({'username': email, 'password': password})
+        res = client.post('/auth', data=data)
+        token = res.json['token']
+        auth_header_tuple = ('Authorization', 'Bearer ' + token)
+        return [auth_header_tuple]
+
     name = 'The evil one'
     password = 'kr0koftW!'
     route = '/user'
-    new_email = 'shmakoziabr@example.com'
     new_password = 'kr0koftL!'
+    # clean the db
+    delete_test_user()
 
-    print 'Creating test user %s' % name
+    logging.info('Creating a test user %s' % name)
     res = client.post('/user',
                       headers = {'Content-Type': 'application/json'},
                       data = json.dumps({'email': email,
@@ -42,34 +61,23 @@ def test_user(client, request):
     parsed_res = res.json
     assert parsed_res['email'] == email
 
-    def get_generic_auth_header(email, password):
-        data =  json.dumps({'username': email, 'password': password})
-        res = client.post('/auth', data=data)
-        token = res.json['token']
-        auth_header_tuple = ('Authorization', 'Bearer ' + token)
-        return auth_header_tuple
-    
-    auth_header = get_generic_auth_header(email, password)    
-    headers = [('Content-Type', 'application/json')]
-    headers.append(auth_header)
-
-    def delete_test_user():
-        res = client.delete(route, headers=headers)
-        assert res.json == {}
+    auth_header = get_generic_auth_header(email, password)
 
     # change the email and password
     res = client.put(route,
-                     headers=headers,
+                     headers=[('Content-Type', 'application/json')]+auth_header,
                      data=json.dumps({'email': new_email}))
     assert res.status == '200 OK'
+    auth_header = get_generic_auth_header(new_email, password)
     res = client.put(route,
-                     headers=headers,
+                     headers=[('Content-Type', 'application/json')]+auth_header,
                      data=json.dumps({'password': new_password}))
     assert res.status == '200 OK'
     headers = [('Content-Type', 'application/json')]
+    headers = [('Content-Type', 'application/json')]
     auth_header = get_generic_auth_header(new_email, new_password)
-    headers.append(auth_header)
-    res = client.get(route, headers=headers)
+    res = client.get(route,
+                     headers=[('Content-Type', 'application/json')]+auth_header)
     assert res.status == '200 OK'
     assert res.json['email'] == new_email
 
