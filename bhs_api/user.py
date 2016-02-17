@@ -1,4 +1,5 @@
 import json
+
 from flask_jwt import JWT
 from flask.ext.jwt import current_user
 from flask import request, abort
@@ -18,8 +19,8 @@ class Role(db.Document, RoleMixin):
 
 
 class StoryLine(db.EmbeddedDocument):
-    item_id = db.StringField(max_length=64, unique=True)
-    branches = db.ListField(db.BooleanField(), default=4*[False])
+    id = db.StringField(max_length=512, unique=True)
+    in_branch = db.ListField(db.BooleanField(), default=4*[False])
 
 
 class User(db.Document, UserMixin):
@@ -29,7 +30,7 @@ class User(db.Document, UserMixin):
     active = db.BooleanField(default=True)
     confirmed_at = db.DateTimeField()
     roles = db.ListField(db.ReferenceField(Role))
-    my_story = db.EmbeddedDocumentListField(StoryLine)
+    story_items = db.EmbeddedDocumentListField(StoryLine)
     story_branches = db.ListField(field=db.StringField(max_length=64),
                                   default=4*[''])
 
@@ -54,9 +55,6 @@ def setup_users():
                                    name='Test User',
                                    password=encrypt_password('password'),
                                    roles=[user_role])
-    elif hasattr(test_user, 'my_story'):
-        test_user.my_story = None
-        user_datastore.put(test_user)
 
 
 @jwt.authentication_handler
@@ -139,8 +137,9 @@ def get_user_or_error(user_id):
 def clean_user(user_obj):
     user_dict = dictify(user_obj)
     ret = {}
-    for key in ['email', 'name', 'confirmed_at', 'my_story', 'story_branches']:
+    for key in ['email', 'name', 'confirmed_at']:
         ret[key] = user_dict.get(key, None)
+    ret.update(get_mjs(user_obj))
     return ret
 
 
@@ -242,16 +241,24 @@ def _generate_confirmation_body(template_fn, name, activation_link):
     return body.format(name, activation_link)
 
 def add_to_my_story(item_id):
-    current_user.my_story.append(StoryLine(item_id=item_id,
-                                            branches=4*[False]))
+    current_user.story_items.append(StoryLine(id=item_id,
+                                              in_branch=4*[False]))
     current_user.save()
-    return get_mjs()
 
 def get_mjs(user=current_user):
-    items = []
-    if user.my_story:
-        for i in user.my_story:
-            items.append({'id': i.item_id,
-                        'branches': i.branches })
-    return {'items': items,
-            'branches': user.story_branches}
+    return {'story_items': [{'id': o.id, 'in_branch': o.in_branch} for o in user.story_items],
+            'story_branches': user.story_branches}
+
+def set_item_in_branch(item_id, branch_num, value):
+    line = None
+    for i in current_user.story_items:
+        if i.id == item_id:
+            line = i
+            break
+    if not line:
+        abort(400, 'item must be part of the story'.format(item_id))
+    line.in_branch[branch_num] = value
+    current_user.save()
+
+def remove_item_from_story(item_id):
+    current_user.story_items.filter(id=item_id).delete()

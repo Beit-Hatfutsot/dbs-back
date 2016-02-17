@@ -3,6 +3,8 @@ import json
 import datetime
 import os
 import getpass
+from bson.json_util import dumps
+
 
 import yaml
 import boto
@@ -222,10 +224,10 @@ def humanify(obj, status_code=200):
         rv = []
         for doc in obj:
             doc['_id'] = str(doc['_id'])
-            rv.append(json.dumps(doc, default=json_util.default, indent=2))
+            rv.append(dumps(doc, indent=2))
         data = '[' + ',\n'.join(rv) + ']' + '\n'
     else:
-        data = json.dumps(obj,
+        data = dumps(obj,
                           default=json_util.default,
                           indent=2,
                           cls=MongoJsonEncoder)

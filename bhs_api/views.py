@@ -15,7 +15,7 @@ from flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
 
 from werkzeug import secure_filename, Response
-from werkzeug.exceptions import NotFound, Forbidden
+from werkzeug.exceptions import NotFound, Forbidden, BadRequest
 import elasticsearch
 
 import pymongo
@@ -27,7 +27,8 @@ from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
 from utils import (get_logger, upload_file, send_gmail, humanify,
                    get_referrer_host_url, dictify)
 from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
-                  user_handler, is_admin, get_mjs, add_to_my_story)
+            user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
+            remove_item_from_story)
 import phonetic
 
 
@@ -1042,40 +1043,33 @@ def manage_user(user_id=None):
 
 
 @app.route('/mjs/<item_id>', methods=['DELETE'])
+@jwt_required()
+def delete_item_from_story(item_id):
+    remove_item_from_story(item_id)
+    return humanify(get_mjs())
+    
 @app.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
 @jwt_required()
 def remove_item_from_branch(item_id, branch_num=None):
-    line = None
-    for i in current_user.my_story:
-        if i.item_id == item_id:
-            line = i
-            break
-    if not line:
-        abort(400, 'item is not part of the story'.format(item_id))
-    if branch_num:
-        line.branches[int(branch_num)-1] = False
-        msg = 'item was removed from the import branch'
-    else:
-        current_user.my_story.remove(line)
-        msg = 'item was removed from the import story'
-    current_user.save()
-    return humanify(msg)
+    try:
+        branch_num = int(branch_num)
+    except ValueError:
+        raise BadRequest("branch number must be an integer")
+
+    set_item_in_branch(item_id, branch_num-1, False)
+    return humanify(get_mjs())
 
 
 @app.route('/mjs/<branch_num>', methods=['POST'])
 @jwt_required()
 def add_to_story_branch(branch_num):
     item_id = request.data
-    line = None
-    for i in current_user.my_story:
-        if i.item_id == item_id:
-            line = i
-            break
-    if not line:
-        abort(400, 'item must be part of the story to be added to a branch'.format(item_id))
-    line.branches[int(branch_num)-1] = True
-    current_user.save()
-    return humanify('item was added to the branch')
+    try:
+        branch_num = int(branch_num)
+    except ValueError:
+        raise BadRequest("branch number must be an integer")
+    set_item_in_branch(item_id, branch_num-1, True)
+    return humanify(get_mjs())
 
 
 @app.route('/mjs/<branch_num>/name', methods=['POST'])
@@ -1085,9 +1079,7 @@ def set_story_branch_name(branch_num):
     name = request.data
     current_user.story_branches[int(branch_num)-1] = name
     current_user.save()
-    #TODO: should return the story
-    ret = ''
-    return humanify(ret)
+    return humanify(get_mjs())
 
 
 @app.route('/mjs', methods=['GET', 'POST'])
@@ -1114,7 +1106,8 @@ def manage_jewish_story():
             logger.debug(e_message)
             abort(400, e_message)
 
-        return humanify(add_to_my_story(data))
+        add_to_my_story(data)
+        return humanify(get_mjs())
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()
