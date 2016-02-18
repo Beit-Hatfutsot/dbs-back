@@ -196,8 +196,7 @@ def _fetch_item(item_id):
             logger.debug('Bad id: {}'.format(_id))
             raise ValueError
 
-        filter_doc_id(_id, collection)
-        item = data_db[collection].find_one(_id)
+        item = filter_doc_id(_id, collection)
         item = enrich_item(item)
 
         return _make_serializable(item)
@@ -491,31 +490,31 @@ def filter_doc_id(unit_id, collection):
     '''
     search_query = {'_id': unit_id}
     search_query.update(show_filter)
-    found = data_db[collection].find_one(search_query)
-    if found:
+    item = data_db[collection].find_one(search_query)
+    if item:
         if collection == 'movies':
-            video_id = found['MovieFileId']
+            video_id = item['MovieFileId']
             video_url = get_video_url(video_id)
             if not video_url:
                 logger.debug('No video for {}.{}'.format(collection, unit_id))
                 return None
             else:
-                return str(found['_id'])
+                return item
         else:
-            return str(found['_id'])
+            return item
     else:
         search_query = {'_id': unit_id}
         item = data_db[collection].find_one(search_query)
         if item:
-            msg = []
+            msg = ['filter failed for {}.{}'.format(collection, unit_id)]
             if item['StatusDesc'] != 'Completed':
                 msg.append("Status Description is not 'Completed'")
             if item['RightsDesc'] != 'Full':
                 msg.append("The  Rights of the Item are not 'Full'")
             if item['DisplayStatusDesc'] == 'Internal Use':
                 msg.append("Display Status is 'Internal Use'")
-            if item['UnitText1']['En'] not in [None,''] or \
-               item['UnitText1']['He'] not in [None, '']:
+            if item['UnitText1']['En'] in [None, ''] and \
+               item['UnitText1']['He'] in [None, '']:
                 msg.append('Empty Text (description) in both Heabrew and English')
             raise Forbidden('\n'.join(msg))
         else:
