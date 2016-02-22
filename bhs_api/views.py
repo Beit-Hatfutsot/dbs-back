@@ -158,7 +158,10 @@ def _fetch_item(item_id):
     >>> item != {}
     True
 
-    # Bad id
+    >>> _fetch_item('unknown.')
+    Traceback (most recent call last):
+        ...
+    NotFound: 404: Not Found
     >>> _fetch_item('places.00000')
     Traceback (most recent call last):
         ...
@@ -175,7 +178,7 @@ def _fetch_item(item_id):
     """
 
     if not '.' in item_id: # Need colection.id to unpack
-        raise ValueError
+        raise NotFound, "missing a dot in item's id"
     collection, _id = item_id.split('.')[:2]
     if collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
@@ -188,13 +191,13 @@ def _fetch_item(item_id):
                 item['_id'] = item['_id']['$oid']
             return _make_serializable(item)
         else:
-            raise LookupError
+            raise NotFound
     else:
         try:
             _id = long(_id) # Check that we are dealing with a right id format
         except ValueError:
             logger.debug('Bad id: {}'.format(_id))
-            raise ValueError
+            raise NotFound, "id has to be numeric"
 
         item = filter_doc_id(_id, collection)
         item = enrich_item(item)
