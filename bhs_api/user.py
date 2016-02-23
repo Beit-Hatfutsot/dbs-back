@@ -49,13 +49,13 @@ def setup_users():
 
     user_role = user_datastore.find_role('user')
     test_user = user_datastore.get_user('tester@example.com')
-    if not test_user:
-        logger.debug('Creating test user.')
-        user_datastore.create_user(email='tester@example.com',
-                                   name='Test User',
-                                   password=encrypt_password('password'),
-                                   roles=[user_role])
-
+    if test_user:
+        test_user.delete()
+    logger.debug('Creating test user.')
+    user_datastore.create_user(email='tester@example.com',
+                                name='Test User',
+                                password=encrypt_password('password'),
+                                roles=[user_role])
 
 @jwt.authentication_handler
 def authenticate(username, password):
