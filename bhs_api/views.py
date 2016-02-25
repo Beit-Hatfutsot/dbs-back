@@ -2,148 +2,40 @@
 # -*- coding: utf-8 -*-
 
 import os
-import inspect
 from datetime import timedelta, datetime
-import json
-from bson import json_util, ObjectId
 import re
 import urllib
 import mimetypes
 import magic
 from uuid import UUID
 
-from flask import Flask, request, abort, url_for, render_template
-from flask.ext.mongoengine import MongoEngine, ValidationError
-from flask.ext.security import (Security, MongoEngineUserDatastore,
-                               UserMixin, RoleMixin, login_required)
-from flask.ext.security.utils import encrypt_password, verify_password
-from flask.ext.cors import CORS
-from flask_jwt import JWT, JWTError, jwt_required, verify_jwt
-from  flask.ext.jwt import current_user
+from flask import Flask, request, abort, url_for
+from flask_jwt import JWTError, jwt_required, verify_jwt
+from flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
-from flask.ext.autodoc import Autodoc
 
 from werkzeug import secure_filename, Response
-from werkzeug.exceptions import NotFound, Forbidden
+from werkzeug.exceptions import NotFound, Forbidden, BadRequest
 import elasticsearch
 
 import pymongo
 import jinja2
 
+from bhs_api import app, db, logger, data_db, autodoc, conf
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                             get_unit_type, SEARCHABLE_COLLECTIONS)
-from utils import get_logger, upload_file, get_oid, send_gmail, MongoJsonEncoder
+                              get_unit_type, SEARCHABLE_COLLECTIONS)
+from utils import (get_logger, upload_file, send_gmail, humanify,
+                   get_referrer_host_url, dictify)
+from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
+            user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
+            remove_item_from_story)
 import phonetic
 
 
-CONF_FILE = '/etc/bhs/config.yml'
-# Create app
-app = Flask(__name__)
-
-# Initialize autodoc - https://github.com/acoomans/flask-autodoc
-autodoc = Autodoc(app)
-
-# Specify the bucket name for user generated content
-ugc_bucket = 'bhs-ugc'
-
-# Specify the email address of the editor for UGC moderation
-#editor_address = 'pavel.suchman@gmail.com'
-editor_address = 'pavel.suchman@bh.org.il,dannyb@bh.org.il'
-
-# Get configuration from file
-must_have_keys = set(['secret_key',
-                    'security_password_hash',
-                    'security_password_salt',
-                    'user_db_host',
-                    'user_db_port',
-                    'elasticsearch_host',
-                    'user_db_name',
-                    'data_db_host',
-                    'data_db_port',
-                    'data_db_name',
-                    'image_bucket_url',
-                    'video_bucket_url'])
-
-# load the conf file. use local copy if nothing in the system
-if os.path.exists(CONF_FILE):
-    conf = get_conf(CONF_FILE, must_have_keys)
-else:
-    current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) # script directory
-    conf = get_conf(os.path.join(current_dir, 'conf', 'bhs_config.yaml'), must_have_keys)
-
-# Set app config
-app.config['DEBUG'] = True
-app.config['SECRET_KEY'] = conf.secret_key
-app.config['SECURITY_PASSWORD_HASH'] = conf.security_password_hash
-app.config['SECURITY_PASSWORD_SALT'] = conf.security_password_salt
-app.config['JWT_EXPIRATION_DELTA'] = timedelta(days=1)
-
-# DB Config
-app.config['MONGODB_DB'] = conf.user_db_name
-app.config['MONGODB_HOST'] = conf.user_db_host
-app.config['MONGODB_PORT'] = conf.user_db_port
-
-# Logging config
-logger = get_logger()
-
-#allow CORS
-cors = CORS(app, origins=['*'], headers=['content-type', 'accept', 'Authorization'])
-
-def get_serializer(secret_key=None):
-    if secret_key is None:
-        secret_key = app.secret_key
-    return URLSafeSerializer(secret_key)
-
-def get_referrer_host_url(referrer):
-    """Return referring host url for valid links or None"""
-    for protocol in ['http://', 'https://']:
-        if referrer.startswith(protocol):
-            return protocol + referrer.split(protocol)[1].split('/')[0]
-    return None
-
-def get_frontend_activation_link(user_id, referrer_host_url):
-    s = get_serializer()
-    payload = s.dumps(user_id)
-    return '{}/verify_email/{}'.format(referrer_host_url, payload)
-
 def get_activation_link(user_id):
-    s = get_serializer()
+    s = URLSafeSerializer(app.secret_key)
     payload = s.dumps(user_id)
     return url_for('activate_user', payload=payload, _external=True)
-
-# Set up the JWT Token authentication
-jwt = JWT(app)
-@jwt.authentication_handler
-def authenticate(username, password):
-    # We must use confusing email=username alias until the flask-jwt
-    # author merges request #31
-    # https://github.com/mattupstate/flask-jwt/pull/31
-    user_obj = user_datastore.find_user(email=username)
-    if not user_obj:
-        logger.debug('User {} not found'.format(username))
-        return None
-
-    if verify_password(password, user_obj.password):
-        # make user.id jsonifiable
-        user_obj.id = str(user_obj.id)
-        return user_obj
-    else:
-        logger.debug('Wrong password for {}'.format(username))
-        return None
-
-@jwt.user_handler
-def load_user(payload):
-    user_obj = user_datastore.find_user(id=payload['user_id'])
-    return user_obj
-
-# Create database connection object
-db = MongoEngine(app)
-client_data_db = pymongo.MongoClient(conf.data_db_host, conf.data_db_port,
-                read_preference=pymongo.ReadPreference.SECONDARY_PREFERRED)
-data_db = client_data_db[conf.data_db_name]
-
-# Create the elasticsearch connection
-es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
 # While searching for docs, we always need to filter results by their work
 # status and rights.
@@ -221,220 +113,14 @@ es_show_filter = {
   }
 }
 
-class Role(db.Document, RoleMixin):
-    name = db.StringField(max_length=80, unique=True)
-    description = db.StringField(max_length=255)
-
-class StoryLine(db.EmbeddedDocument):
-    item_id = db.StringField(max_length=64, unique=True)
-    branches = db.ListField(db.BooleanField(), default=4*[False])
-
-class User(db.Document, UserMixin):
-    email = db.StringField(max_length=255)
-    password = db.StringField(max_length=255)
-    name = db.StringField(max_length=255)
-    active = db.BooleanField(default=True)
-    confirmed_at = db.DateTimeField()
-    roles = db.ListField(db.ReferenceField(Role))
-    my_story = db.EmbeddedDocumentListField(StoryLine)
-    story_branches = db.ListField(field=db.StringField(max_length=64), default=4*[''])
-
 class Ugc(db.Document):
     ugc = db.DictField()
-
-# Ensure we have a user to test with
-@app.before_first_request
-def setup_users():
-    for role_name in ('user', 'admin'):
-        if not user_datastore.find_role(role_name):
-            logger.debug('Creating role {}'.format(role_name))
-            user_datastore.create_role(name=role_name)
-
-    user_role = user_datastore.find_role('user')
-    test_user = user_datastore.get_user('tester@example.com')
-    if not test_user:
-        logger.debug('Creating test user.')
-        user_datastore.create_user(email='tester@example.com',
-                                   name='Test User',
-                                   password=encrypt_password('password'),
-                                   roles=[user_role])
-    elif hasattr(test_user, 'my_story'):
-        test_user.my_story = None
-        user_datastore.put(test_user)
-
-
-# Setup Flask-Security
-user_datastore = MongoEngineUserDatastore(db, User, Role)
-security = Security(app, user_datastore)
-
 
 def custom_error(error):
     return humanify({'error': error.description}, error.code)
 for i in [400, 403, 404, 405, 409, 415, 500]:
     app.error_handler_spec[None][i] = custom_error
 
-
-# Utility functions
-def humanify(obj, status_code=200):
-    """ Gets an obj and possibly a status code and returns a flask Resonse
-        with a jsonified obj, with newlines.
-    >>> humanify({"a": 1})
-    <Response 13 bytes [200 OK]>
-    >>> humanify({"a": 1}, 404)
-    <Response 13 bytes [404 NOT FOUND]>
-    >>> humanify({"a": 1}).get_data()
-    '{\\n  "a": 1\\n}\\n'
-    >>> humanify([1,2,3]).get_data()
-    '[\\n  1, \\n  2, \\n  3\\n]\\n'
-    """
-    # jsonify function doesn't work with lists
-    if type(obj) == list:
-        data = json.dumps(obj, default=json_util.default, indent=2) + '\n'
-    elif type(obj) == pymongo.cursor.Cursor:
-        rv = []
-        for doc in obj:
-            doc['_id'] = str(doc['_id'])
-            rv.append(json.dumps(doc, default=json_util.default, indent=2))
-        data = '[' + ',\n'.join(rv) + ']' + '\n'
-    else:
-        data = json.dumps(obj,
-                          default=json_util.default,
-                          indent=2,
-                          cls=MongoJsonEncoder)
-        data += '\n'
-    resp = Response(data, mimetype='application/json')
-    resp.status_code = status_code
-    return resp
-
-def is_admin(flask_user_obj):
-    if flask_user_obj.has_role('admin'):
-        return True
-    else:
-        return False
-
-def mask_dict(from_dict, allowed_keys):
-    'Return only allowed keys'
-    rv = {}
-    for key in allowed_keys:
-        if from_dict.has_key(key):
-            rv[key] = from_dict[key]
-    return rv
-
-def dictify(m_engine_object):
-    # ToDo: take care of $oid conversion to string
-    return json.loads(m_engine_object.to_json())
-
-# User management
-def user_handler(user_id, request):
-    method = request.method
-    data = request.data
-    referrer = request.referrer
-    if referrer:
-        referrer_host_url = get_referrer_host_url(referrer)
-    else:
-        referrer_host_url = None
-    if data:
-        try:
-            data = json.loads(data)
-            if type(data) != dict:
-                abort(400, 'Only dict like objects are supported for user management')
-        except ValueError:
-            e_message = 'Could not decode JSON from data'
-            logger.debug(e_message)
-            abort(400, e_message)
-
-    if method == 'GET':
-        return humanify(get_user(user_id))
-
-    elif method == 'POST':
-        if not data:
-            abort(400, 'No data provided')
-        return humanify(create_user(data, referrer_host_url))
-
-    elif method == 'PUT':
-        if not data:
-            abort(400, 'No data provided')
-        return humanify(update_user(user_id, data))
-
-    elif method == 'DELETE':
-        return humanify(delete_user(user_id))
-
-def _get_user_or_error(user_id):
-    user = user_datastore.get_user(user_id)
-    if user:
-        return user
-    else:
-        raise abort(404, 'User not found')
-
-def _clean_user(user_obj):
-    user_dict = dictify(user_obj)
-    allowed_fields = ['email', 'name', 'confirmed_at']
-    masked_user_dict = mask_dict(user_dict, allowed_fields)
-    return masked_user_dict
-
-def get_user(user_id):
-    user_obj = _get_user_or_error(user_id)
-    return _clean_user(user_obj)
-
-def delete_user(user_id):
-    user = _get_user_or_error(user_id)
-    if is_admin(user):
-        return {'error': 'God Mode!'}
-    else:
-        user.delete()
-        return {}
-
-def create_user(user_dict, referrer_host_url=None):
-    try:
-        email = user_dict['email']
-        name = user_dict['name']
-        enc_password = encrypt_password(user_dict['password'])
-    except KeyError as e:
-        e_message = '{} key is missing from data'.format(e)
-        logger.debug(e_message)
-        abort(400, e_message)
-
-    user_exists = user_datastore.get_user(email)
-    if user_exists:
-        e_message = 'User {} with email {} already exists'.format(
-                                        str(user_exists.id), email)
-        logger.debug(e_message)
-        abort(409, e_message)
-
-    created = user_datastore.create_user(email=email,
-                                        name=name,
-                                        password=enc_password)
-    # Add default role to a newly created user
-    user_datastore.add_role_to_user(created, 'user')
-    # Send an email confirmation link only if referrer is specified
-    if referrer_host_url:
-        user_id = str(created.id)
-        _send_activation_email(user_id, referrer_host_url)
-
-    return _clean_user(created)
-
-def update_user(user_id, user_dict):
-    user_obj = _get_user_or_error(user_id)
-    if 'email' in user_dict.keys():
-        user_obj.email = user_dict['email']
-    if 'name' in user_dict.keys():
-        user_obj.email = user_dict['name']
-    if 'password' in user_dict.keys():
-        enc_password = encrypt_password(user_dict['password'])
-        user_obj.password = enc_password
-
-    user_obj.save()
-    return _clean_user(user_obj)
-
-######################################################################################
-
-def get_mjs(user):
-    ret = []
-    if user.my_story:
-        for i in user.my_story:
-            ret.append({'id': i.item_id,
-                        'branches': i.branches })
-    return ret
 
 def fetch_items(item_list):
     '''
@@ -472,7 +158,10 @@ def _fetch_item(item_id):
     >>> item != {}
     True
 
-    # Bad id
+    >>> _fetch_item('unknown.')
+    Traceback (most recent call last):
+        ...
+    NotFound: 404: Not Found
     >>> _fetch_item('places.00000')
     Traceback (most recent call last):
         ...
@@ -489,7 +178,7 @@ def _fetch_item(item_id):
     """
 
     if not '.' in item_id: # Need colection.id to unpack
-        raise ValueError
+        raise NotFound, "missing a dot in item's id"
     collection, _id = item_id.split('.')[:2]
     if collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
@@ -498,26 +187,25 @@ def _fetch_item(item_id):
             item_id = item['_id']
             item = item['ugc'] # Getting the dict out from  mongoengine
             item['_id'] = item_id
-            if (type(item['_id']) == dict and item['_id'].has_key('$oid')):
+            if type(item['_id']) == dict and '$oid' in item['_id']:
                 item['_id'] = item['_id']['$oid']
             return _make_serializable(item)
         else:
-            raise LookupError
+            raise NotFound
     else:
         try:
             _id = long(_id) # Check that we are dealing with a right id format
         except ValueError:
             logger.debug('Bad id: {}'.format(_id))
-            raise ValueError
+            raise NotFound, "id has to be numeric"
 
-        filter_doc_id(_id, collection)
-        item = data_db[collection].find_one(_id)
+        item = filter_doc_id(_id, collection)
         item = enrich_item(item)
 
         return _make_serializable(item)
 
 def enrich_item(item):
-    if (not item.has_key('related')) or (not item['related']):
+    if 'related' not in item or not item['related']:
         m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
         logger.debug(m)
     if not 'thumbnail' in item.keys():
@@ -529,7 +217,7 @@ def enrich_item(item):
         except (KeyError, IndexError):
             item['main_image_url'] = None
     video_id_key = 'MovieFileId'
-    if item.has_key(video_id_key):
+    if video_id_key in item:
         # Try to fetch the video URL
         video_id = item[video_id_key]
         video_url = get_video_url(video_id)
@@ -566,7 +254,7 @@ def get_text_related(doc, max_items=3):
         header_text_search.update(show_filter)
         projection = {'score': {'$meta': 'textScore'}}
         sort_expression = [('score', {'$meta': 'textScore'})]
-        # http://api.mongodb.org/python/current/api/pymongo/cursor.html 
+        # http://api.mongodb.org/python/current/api/pymongo/cursor.html
         cursor = col.find(header_text_search, projection).sort(sort_expression).limit(max_items)
         if cursor:
             try:
@@ -609,7 +297,7 @@ def get_es_text_related(doc, items_per_collection=1):
         collection, _id = item_name.split('.')[:2]
         try:
             filter_doc_id(_id, collection)
-        except (Forbidden, NotFound) as e:
+        except (Forbidden, NotFound):
             continue
         related.append(filtered)
     return related
@@ -709,7 +397,7 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
     fields = related_fields[self_collection_name]
     for field in fields:
         collection = collection_names[field]
-        if doc.has_key(field) and doc[field]:
+        if field in doc and doc[field]:
             related_value = doc[field]
             if type(related_value) == list:
                 # Some related ids are encoded in comma separated strings
@@ -725,7 +413,7 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
                     i = int(i)
                     try:
                         filter_doc_id(i, collection)
-                    except (Forbidden, NotFound) as e:
+                    except (Forbidden, NotFound):
                         continue
                     rv.append(collection + '.' + i)
 
@@ -785,7 +473,7 @@ def sort_related(related_items):
     rv = []
     for item_name in related_items:
         collection, _id = item_name.split('.')
-        if by_collection.has_key(collection):
+        if collection in by_collection:
             by_collection[collection].append(item_name)
         else:
             by_collection[collection] = [item_name]
@@ -805,38 +493,38 @@ def filter_doc_id(unit_id, collection):
     '''
     search_query = {'_id': unit_id}
     search_query.update(show_filter)
-    found = data_db[collection].find_one(search_query)
-    if found:
+    item = data_db[collection].find_one(search_query)
+    if item:
         if collection == 'movies':
-            video_id = found['MovieFileId']
+            video_id = item['MovieFileId']
             video_url = get_video_url(video_id)
             if not video_url:
                 logger.debug('No video for {}.{}'.format(collection, unit_id))
                 return None
             else:
-                return str(found['_id'])
+                return item
         else:
-            return str(found['_id'])
+            return item
     else:
         search_query = {'_id': unit_id}
         item = data_db[collection].find_one(search_query)
         if item:
-            msg = []
+            msg = ['filter failed for {}.{}'.format(collection, unit_id)]
             if item['StatusDesc'] != 'Completed':
                 msg.append("Status Description is not 'Completed'")
             if item['RightsDesc'] != 'Full':
                 msg.append("The  Rights of the Item are not 'Full'")
             if item['DisplayStatusDesc'] == 'Internal Use':
                 msg.append("Display Status is 'Internal Use'")
-            if item['UnitText1']['En'] not in [None,''] or \
-               item['UnitText1']['He'] not in [None, '']:
+            if item['UnitText1']['En'] in [None, ''] and \
+               item['UnitText1']['He'] in [None, '']:
                 msg.append('Empty Text (description) in both Heabrew and English')
             raise Forbidden('\n'.join(msg))
         else:
             raise NotFound
 
 def get_collection_name(doc):
-    if doc.has_key('UnitType'):
+    if 'UnitType' in doc:
         unit_type = doc['UnitType']
     else:
         return None
@@ -898,38 +586,6 @@ def _generate_credits(fn='credits.html'):
         logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
 
-def _send_activation_email(user_id, referrer_host_url):
-    user =_get_user_or_error(user_id)
-    email = user.email
-    name = user.name
-    activation_link = get_frontend_activation_link(user_id, referrer_host_url)
-    body = _generate_confirmation_body('email_verfication_template.html',
-                                      name, activation_link)
-    subject = 'My Jewish Story: please confirm your email address'
-    sent = send_gmail(subject, body, email, message_mode='html')
-    if not sent:
-        e_message = 'There was an error sending an email to {}'.format(email)
-        logger.error(e_message)
-        abort(500, e_message)
-    return humanify({'sent': email})
-
-def _generate_confirmation_body(template_fn, name, activation_link):
-    try:
-        fh = open(template_fn)
-        template = fh.read()
-        fh.close()
-        return template.format(name, activation_link)
-    except:
-        logger.debug("Couldn't open template file {}".format(template_fn))
-        abort(500, "Couldn't open template file")
-
-    body = '''Hello {}!
-    Please click on <a href="{}">activation link</a> to activate your user at My Jewish Story web site.
-    If you received this email by mistake, simply delete it.
-
-    Thanks, Beit HaTfutsot Online team.'''
-    return body.format(name, activation_link)
-
 def _convert_meta_to_bhp6(upload_md, file_info):
     '''Convert language specific metadata fields to bhp6 format.
     Use file_info to set the unit type.
@@ -982,7 +638,7 @@ def _convert_meta_to_bhp6(upload_md, file_info):
 
     for key in rv:
         for lang in [he, en]:
-            if lang['values'].has_key(bhp6_to_ugc[key]):
+            if bhp6_to_ugc[key] in lang['values']:
                 rv[key][lang['code']] = lang['values'][bhp6_to_ugc[key]]
             else:
                 rv[key][lang['code']] = ''
@@ -1087,7 +743,7 @@ def fsearch(max_results=None,**kwargs):
     the query "first_name=yeh;phonetic" will match "yayeh" and "ben jau".
     Years could be specified with a fudge factor - 1907~2 will match
     1905, 1906, 1907, 1908 and 1909.
-    If `tree_number` kwarg is present, return only the results from this tree. 
+    If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `max_results`
     '''
     args_to_index = {'first_name': 'FN_lc',
@@ -1294,9 +950,6 @@ def get_video_url(video_id):
                                  'DisplayStatusDesc': {'$nin': ['Internal Use']},
                                  'MoviePath': {'$nin': [None, 'None']}})
     if video:
-        video_path = video['MoviePath']
-        #extension = video_path.split('.')[-1].lower()
-        # We transcode everything to H264 in mp4 container
         extension = 'mp4'
         url = '{}/{}.{}'.format(video_bucket_url, video_id, extension)
         return url
@@ -1327,28 +980,30 @@ def private_space():
 
 @app.route('/users/activate/<payload>')
 def activate_user(payload):
-    s = get_serializer()
+    s = URLSafeSerializer(app.secret_key)
     try:
         user_id = s.loads(payload)
     except BadSignature:
         abort(404)
 
-    user = _get_user_or_error(user_id)
+    user = get_user_or_error(user_id)
     user.confirmed_at = datetime.now()
     user.save()
     logger.debug('User {} activated'.format(user.email))
-    return humanify(_clean_user(user))
+    return humanify(clean_user(user))
+
 
 @app.route('/users/send_activation_email',  methods=['POST'])
 @jwt_required()
-def send_activation_email():
+def handle_activation_email_request():
     referrer = request.referrer
     if referrer:
         referrer_host_url = get_referrer_host_url(referrer)
     else:
         referrer_host_url = None
     user_id = str(current_user.id)
-    return _send_activation_email(user_id, referrer_host_url)
+    return send_activation_email(user_id, referrer_host_url)
+
 
 @app.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @app.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
@@ -1390,58 +1045,43 @@ def manage_user(user_id=None):
 
 
 @app.route('/mjs/<item_id>', methods=['DELETE'])
+@jwt_required()
+def delete_item_from_story(item_id):
+    remove_item_from_story(item_id)
+    return humanify(get_mjs())
+    
 @app.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
 @jwt_required()
 def remove_item_from_branch(item_id, branch_num=None):
-    line = None
-    for i in current_user.my_story:
-        if i.item_id == item_id:
-            line = i
-            break
-    if not line:
-        abort(400, 'item is not part of the story'.format(item_id))
-    if branch_num:
-        line.branches[int(branch_num)-1] = False
-        msg = 'item was removed from the import branch'
-    else:
-        current_user.my_story.remove(line)
-        msg = 'item was removed from the import story'
-    current_user.save()
-    return humanify(msg)
+    try:
+        branch_num = int(branch_num)
+    except ValueError:
+        raise BadRequest("branch number must be an integer")
+
+    set_item_in_branch(item_id, branch_num-1, False)
+    return humanify(get_mjs())
 
 
 @app.route('/mjs/<branch_num>', methods=['POST'])
 @jwt_required()
 def add_to_story_branch(branch_num):
     item_id = request.data
-    line = None
-    for i in current_user.my_story:
-        if i.item_id == item_id:
-            line = i
-            break
-    if not line:
-        abort(400, 'item must be part of the story to be added to a branch'.format(item_id))
-    line.branches[int(branch_num)-1] = True
-    current_user.save()
-    return humanify('item was added to the branch')
-
-
-@app.route('/mjs/<branch_num>/name', methods=['GET', 'POST'])
-@jwt_required()
-def manage_story_branches(branch_num):
     try:
-        branches = current_user.story_branches
-    except KeyError:
-        branches = 4*['']
+        branch_num = int(branch_num)
+    except ValueError:
+        raise BadRequest("branch number must be an integer")
+    set_item_in_branch(item_id, branch_num-1, True)
+    return humanify(get_mjs())
 
-    if request.method == 'GET':
-        ret = current_user.story_branches[branch_num-1]
-    elif request.method == 'POST':
-        name = request.data
-        current_user.story_branches[int(branch_num)-1] = name
-        current_user.save()
-        ret = ''
-    return humanify(ret)
+
+@app.route('/mjs/<branch_num>/name', methods=['POST'])
+@jwt_required()
+def set_story_branch_name(branch_num):
+
+    name = request.data
+    current_user.story_branches[int(branch_num)-1] = name
+    current_user.save()
+    return humanify(get_mjs())
 
 
 @app.route('/mjs', methods=['GET', 'POST'])
@@ -1449,13 +1089,12 @@ def manage_story_branches(branch_num):
 def manage_jewish_story():
     '''Logged in user may GET or POST their jewish story links.
     the links are stored as an array of items where each item has a special
-    field: `branch` with a boolean array indicating which branches this item is 
+    field: `branch` with a boolean array indicating which branches this item is
     part of.
     POST requests should be sent with a string in form of "collection_name.id".
     '''
     if request.method == 'GET':
-        return humanify({'items':  get_mjs(current_user),
-                         'branches': current_user.story_branches})
+        return humanify(get_mjs(current_user))
 
     elif request.method == 'POST':
         try:
@@ -1469,9 +1108,8 @@ def manage_jewish_story():
             logger.debug(e_message)
             abort(400, e_message)
 
-        current_user.my_story.append(StoryLine(item_id=data, branches=4*[False]))
-        current_user.save()
-        return humanify('')
+        add_to_my_story(data)
+        return humanify(get_mjs())
 
 @app.route('/upload', methods=['POST'])
 @jwt_required()
@@ -1512,7 +1150,7 @@ def save_user_content():
         em_base = 'You must provide a full list of keys in English or Hebrew. '
         em = em_base + must_have_keys['_en']['error'] + ' ' +  must_have_keys['_he']['error']
         abort(400, em)
-    
+
     # Set metadata language(s) to the one(s) without missing fields
     md_languages = []
     for lang in must_have_keys:
@@ -1636,7 +1274,7 @@ def general_search():
     args = request.args
     parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
     for param in parameters.keys():
-        if args.has_key(param):
+        if param in args:
             parameters[param] = args[param]
     if not parameters['q']:
         abort(400, 'You must specify a search query')
@@ -1751,7 +1389,7 @@ def get_items(item_id):
         if type(items) != list:
             items = [items]
         # Check that each of the ugc_items is accessible by the logged in user
-        for ugc_item_id in [item_id[4:] for item_id in ugc_items]:
+        for ugc_item_id in [i[4:] for i in ugc_items]:
             for item in items:
                 if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != unicode(user_oid):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
@@ -1766,7 +1404,6 @@ def ftree_search():
     For example, to get all individuals whose last name sounds like Abulafia
     and first name is Hanna:
     curl 'api.myjewishidentity.org/fsearch?last_name=Abulafia;phonetic&first_name=Hanna'
- 
     The full list of fields and their possible options follows:
     _______________________________________________________________________
     first_name
@@ -1884,7 +1521,7 @@ def get_changes(from_date, to_date):
     for date in dates:
         try:
             dates[date] = datetime.fromtimestamp(float(dates[date]))
-        except ValueError as e:
+        except ValueError:
             abort(400, 'Bad timestamp - {}'.format(dates[date]))
 
     log_collection = data_db['migration_log']

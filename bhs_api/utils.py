@@ -3,6 +3,8 @@ import json
 import datetime
 import os
 import getpass
+from bson.json_util import dumps
+
 
 import yaml
 import boto
@@ -10,6 +12,7 @@ import gcs_oauth2_boto_plugin
 import bson
 import soundcloud
 import gmail
+import pymongo
 from bson.objectid import ObjectId
 from bson import json_util
 from werkzeug import Response
@@ -34,6 +37,10 @@ def jsonify(*args, **kwargs):
                     indent=2,
                     cls=MongoJsonEncoder),
                     mimetype='application/json')
+
+def dictify(m_engine_object):
+    # ToDo: take care of $oid conversion to string
+    return json.loads(m_engine_object.to_json())
 
 class Struct:
     def __init__(self, **entries): 
@@ -186,3 +193,46 @@ def send_gmail(subject, body, address, message_mode='text'):
         return False
 
     return True
+
+
+
+def get_referrer_host_url(referrer):
+    """Return referring host url for valid links or None"""
+    for protocol in ['http://', 'https://']:
+        if referrer.startswith(protocol):
+            return protocol + referrer.split(protocol)[1].split('/')[0]
+    return None
+
+
+# Utility functions
+def humanify(obj, status_code=200):
+    """ Gets an obj and possibly a status code and returns a flask Resonse
+        with a jsonified obj, with newlines.
+    >>> humanify({"a": 1})
+    <Response 13 bytes [200 OK]>
+    >>> humanify({"a": 1}, 404)
+    <Response 13 bytes [404 NOT FOUND]>
+    >>> humanify({"a": 1}).get_data()
+    '{\\n  "a": 1\\n}\\n'
+    >>> humanify([1,2,3]).get_data()
+    '[\\n  1, \\n  2, \\n  3\\n]\\n'
+    """
+    # jsonify function doesn't work with lists
+    if type(obj) == list:
+        data = json.dumps(obj, default=json_util.default, indent=2) + '\n'
+    elif type(obj) == pymongo.cursor.Cursor:
+        rv = []
+        for doc in obj:
+            doc['_id'] = str(doc['_id'])
+            rv.append(dumps(doc, indent=2))
+        data = '[' + ',\n'.join(rv) + ']' + '\n'
+    else:
+        data = dumps(obj,
+                          default=json_util.default,
+                          indent=2,
+                          cls=MongoJsonEncoder)
+        data += '\n'
+    resp = Response(data, mimetype='application/json')
+    resp.status_code = status_code
+    return resp
+

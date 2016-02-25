@@ -4,7 +4,7 @@ import pytest
 
 from pytest_flask.plugin import client
 from fixtures import get_auth_header
-from api import user_datastore
+from bhs_api.user import user_datastore
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
@@ -23,8 +23,9 @@ def test_api_jwt_auth(client):
     res = client.post('/auth', data = '{"username": "tester@example.com", "password": "password"}')
     assert res.json.has_key('token')
 
-#==================================================================================================================================#
+#=============================================================================#
 # User API
+#=============================================================================#
 
 def test_user(client, request):
 
