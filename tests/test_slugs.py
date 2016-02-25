@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ''' Testing items Slugs
     ===================
     The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
@@ -6,21 +7,25 @@
     http://pytest.org/latest/fixture.html#fixture
 '''
 import json
+import urllib2
 
 import pytest
+import mongomock
 
 from pytest_flask.plugin import client, config
 
+def hebrew_url(val):
+    return urllib2.quote(val.encode('utf8'))
 
 def test_single_collection(client):
 
     items = [{'Slug': {'En': 'person.tester',
-                       'He': 'אישיות.בודק'
+                       'He': hebrew_url(u'אישיות.בודק')
                       },
               'data': 'whatever',
              },
              {'Slug': {'En': 'person.another-tester',
-                       'He': 'אישיות.עוד-בודק'
+                       'He': hebrew_url(u'אישיות.עוד-בודק')
                       },
               'data': 'whatever',
              }]
@@ -47,5 +52,5 @@ def test_single_collection(client):
     res = client.get('/item/hello')
     assert res.status == 404
 
-def test_multi_collections(client, items_with_slugs):
+def test_multi_collections(client):
     pass
