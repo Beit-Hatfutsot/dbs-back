@@ -1,8 +1,10 @@
+import urllib
+
 from werkzeug.exceptions import NotFound, Forbidden
 
 import phonetic
 from bhs_common.utils import get_unit_type, SEARCHABLE_COLLECTIONS
-from bhs_api import db, logger, data_db, conf
+from bhs_api import logger, data_db, conf
 
 show_filter = {
                 'StatusDesc': 'Completed',
@@ -13,6 +15,47 @@ show_filter = {
                 }
 
 
+class Slug:
+    slugs_to_collection = {
+        'personality': 'personality',
+        '%D7%90%D7%99%D7%A9%D7%99%D7%95%D7%AA': 'personality'
+    }
+    def __init__(self, slug):
+        self.full = slug
+        collection, self.local_slug = slug.split('.')
+        self.collection = self.slugs_to_collection[collection]
+
+    def __unicode__(self):
+        return self.full
+
+def _get_thumbnail(doc):
+    thumbnail = ''
+    path = ''
+
+    try:
+        if 'Pictures' in doc.keys():
+            for pic in doc['Pictures']:
+                if pic['IsPreview'] == '1':
+                    picture = _get_picture(pic['PictureId'])
+                    thumbnail = picture['bin']
+                    if 'PictureFileName' in picture.keys():
+                        path = picture['PicturePath']
+        elif 'RelatedPictures' in doc.keys():
+            for pic in doc['RelatedPictures']:
+                if pic['IsPreview'] == '1':
+                    picture = _get_picture(pic['PictureId'])
+                    thumbnail = picture['bin']
+                    if 'PictureFileName' in picture.keys():
+                        path = picture['PicturePath']
+
+        return {
+            'data': urllib.quote(thumbnail.encode('base-64')),
+            'path': urllib.quote(path.replace('\\', '/'))
+        }
+
+    except (KeyError, TypeError):
+        return {}
+
 def _make_serializable(obj):
     # ToDo: Replace with json.dumps with default setting and check
     # Make problematic fields json serializable
@@ -22,7 +65,7 @@ def _make_serializable(obj):
         obj['UpdateDate'] = str(obj['UpdateDate'])
     return obj
 
-def fetch_items(item_list):
+def fetch_items(slug_list, db=data_db):
     '''
     # Fetch 2 items - 1 good and 1 bad
     >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
@@ -37,16 +80,16 @@ def fetch_items(item_list):
     '''
 
     rv = []
-    for item_id in item_list:
+    for slug in slug_list:
         try:
-            item = _fetch_item(item_id)
+            item = _fetch_item(slug, db)
             rv.append(item)
         except (Forbidden, NotFound) as e:
-            rv.append({'item_id': item_id, 'error_code': e.code, 'msg': e.description})
+            rv.append({'slug': slug, 'error_code': e.code, 'msg': e.description})
     return rv
 
 
-def _fetch_item(item_id):
+def _fetch_item(slug, db):
     """
     Gets item_id string and return an item
     If item_id is bad or item is not found, raises an exception.
@@ -54,15 +97,15 @@ def _fetch_item(item_id):
     # A regular non-empty item - setup
     >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
     >>> item_id = 'movies.{}'.format(movie_id)
-    >>> item = _fetch_item(item_id)
+    >>> item = _fetch_item(item_id, data_db)
     >>> item != {}
     True
 
-    >>> _fetch_item('unknown.')
+    >>> _fetch_item('unknown.', data_db)
     Traceback (most recent call last):
         ...
     NotFound: 404: Not Found
-    >>> _fetch_item('places.00000')
+    >>> _fetch_item('places.00000', data_db)
     Traceback (most recent call last):
         ...
     NotFound: 404: Not Found
@@ -70,20 +113,25 @@ def _fetch_item(item_id):
     # Item that doesn't pass filter
     >>> bad_filter_id = data_db.movies.find_one({"StatusDesc": "Edit"}, {'_id': 1})['_id']
     >>> bad_filter_item_id = 'movies.{}'.format(bad_filter_id)
-    >>> _fetch_item(bad_filter_item_id)
+    >>> _fetch_item(bad_filter_item_id, data_db)
     Traceback (most recent call last):
         ...
     Forbidden: 403: Forbidden
 
     """
 
-    if not '.' in item_id: # Need colection.id to unpack
-        raise NotFound, "missing a dot in item's id"
-    collection, _id = item_id.split('.')[:2]
-    if collection == 'ugc':
+    try:
+        slug = Slug(slug)
+    except ValueError:
+        raise NotFound, "missing a dot in item's slug"
+    except KeyError:
+        raise NotFound, "bad collection name in slug"
+
+    #TODO: handle ugc
+    if slug.collection == 'ugc':
         item = dictify(Ugc.objects(id=_id).first())
         if item:
-            item = enrich_item(item)
+            item = enrich_item(item, db)
             item_id = item['_id']
             item = item['ugc'] # Getting the dict out from  mongoengine
             item['_id'] = item_id
@@ -93,18 +141,12 @@ def _fetch_item(item_id):
         else:
             raise NotFound
     else:
-        try:
-            _id = long(_id) # Check that we are dealing with a right id format
-        except ValueError:
-            logger.debug('Bad id: {}'.format(_id))
-            raise NotFound, "id has to be numeric"
-
-        item = filter_doc_id(_id, collection)
-        item = enrich_item(item)
+        item = filter_doc_id(slug, db)
+        item = enrich_item(item, db)
 
         return _make_serializable(item)
 
-def enrich_item(item):
+def enrich_item(item, db):
     if 'related' not in item or not item['related']:
         m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
         logger.debug(m)
@@ -120,7 +162,7 @@ def enrich_item(item):
     if video_id_key in item:
         # Try to fetch the video URL
         video_id = item[video_id_key]
-        video_url = get_video_url(video_id)
+        video_url = get_video_url(video_id, db)
         if video_url:
             item['video_url'] = video_url
         else:
@@ -336,31 +378,34 @@ def sort_related(related_items):
                 rv.append(by_collection[c].pop())
     return rv
 
-def filter_doc_id(unit_id, collection):
+def filter_doc_id(slug, db):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
     and therefore Forbidden.
     '''
-    search_query = {'_id': unit_id}
+    if slug.full[0].isalpha():
+        slug_query = {'Slug.En': slug.full}
+    else:
+        slug_query = {'Slug.He': slug.full}
+    search_query = slug_query.copy()
     search_query.update(show_filter)
-    item = data_db[collection].find_one(search_query)
+    item = db[slug.collection].find_one(search_query)
     if item:
-        if collection == 'movies':
+        if slug.collection == 'movies':
             video_id = item['MovieFileId']
-            video_url = get_video_url(video_id)
+            video_url = get_video_url(video_id, db)
             if not video_url:
-                logger.debug('No video for {}.{}'.format(collection, unit_id))
+                logger.debug('No video for {}'.format(slug))
                 return None
             else:
                 return item
         else:
             return item
     else:
-        search_query = {'_id': unit_id}
-        item = data_db[collection].find_one(search_query)
+        item = db[slug.collection].find_one(slug_query)
         if item:
-            msg = ['filter failed for {}.{}'.format(collection, unit_id)]
+            msg = ['filter failed for {}'.format(slug)]
             if item['StatusDesc'] != 'Completed':
                 msg.append("Status Description is not 'Completed'")
             if item['RightsDesc'] != 'Full':
@@ -386,9 +431,9 @@ def get_item_name(doc):
     item_name = '{}.{}'.format(collection_name, doc['_id'])
     return item_name
 
-def get_video_url(video_id):
+def get_video_url(video_id, db):
     video_bucket_url = conf.video_bucket_url
-    collection = data_db['movies']
+    collection = db['movies']
     # Search only within the movies filtered by rights, display status and work status
     video = collection.find_one({'MovieFileId': video_id,
                                  'RightsDesc': 'Full',
@@ -404,7 +449,7 @@ def get_video_url(video_id):
         return None
 
 
-def search_by_header(string, collection, starts_with=True):
+def search_by_header(string, collection, starts_with=True, db=data_db):
     if not string: # Support empty strings
         return {}
     if phonetic.is_hebrew(string):
@@ -422,10 +467,10 @@ def search_by_header(string, collection, starts_with=True):
     show_filter[unit_text] = {"$nin": [None, '']}
     header_search_ex = {lang_header: header_regex}
     header_search_ex.update(show_filter)
-    item = data_db[collection].find_one(header_search_ex)
+    item = db[collection].find_one(header_search_ex)
 
     if item:
-        item = enrich_item(item)
+        item = enrich_item(item, db)
         return _make_serializable(item)
     else:
         return {}

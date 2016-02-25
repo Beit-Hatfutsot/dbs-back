@@ -14,43 +14,54 @@ import mongomock
 
 from pytest_flask.plugin import client, config
 
-def hebrew_url(val):
+from bhs_api.item import fetch_items
+
+def hebrew_slug(val):
     return urllib2.quote(val.encode('utf8'))
 
 def test_single_collection(client):
 
-    items = [{'Slug': {'En': 'person.tester',
-                       'He': hebrew_url(u'אישיות.בודק')
+    items = [{'Slug': {'En': 'personality.tester',
+                       'He': hebrew_slug(u'אישיות.בודק'),
                       },
-              'data': 'whatever',
+              'StatusDesc': 'Completed',
+              'RightsDesc': 'Full',
+              'DisplayStatusDesc':  'free',
+              'UnitText1': {'En': 'tester',
+                            'He': 'בודק',
+                            }
              },
-             {'Slug': {'En': 'person.another-tester',
-                       'He': hebrew_url(u'אישיות.עוד-בודק')
+             {'Slug': {'En': 'personality.another-tester',
+                       'He': hebrew_slug(u'אישיות.עוד-בודק'),
                       },
-              'data': 'whatever',
+              'StatusDesc': 'Completed',
+              'RightsDesc': 'Full',
+              'DisplayStatusDesc':  'free',
+              'UnitText1': {'En': 'another tester',
+                            'He': 'עוד בודק',
+                            }
              }]
-    persons = mongomock.MongoClient().db.collection
+    db = mongomock.MongoClient().db
+    persons = db.create_collection('personality')
     for item in items:
         item['_id'] = persons.insert(item)
 
-    res = client.get('/item/person.tester')
-    assert res.status == 200
-    res2 = client.get('/item/אישיות.בודק')
-    assert res2.status == 200
-    assert res == res2
+    res = fetch_items(['personality.tester'], db)
+    assert res[0]['Slug']['En'] == 'personality.tester'
+    res = fetch_items([hebrew_slug(u'אישיות.בודק')], db)
+    assert res[0]['Slug']['En'] == 'personality.tester'
 
-    res = client.get('/item/person.tester,person.another-tester')
-    assert res.status == 200
-    assert len(res.json) == 2
+    res = fetch_items(['personality.tester','personality.another-tester'], db)
+    assert len(res) == 2
 
-    res = client.get('/item/person.no-one2')
-    assert res.status == 404
+    res = fetch_items(['personality.no-one'], db)
+    assert res[0]['error_code'] == 404
 
-    res = client.get('/item/unknown.unknown')
-    assert res.status == 404
+    res = fetch_items(['unknown.unknown'], db)
+    assert res[0]['error_code'] == 404
 
-    res = client.get('/item/hello')
-    assert res.status == 404
+    res = fetch_items(['hello'], db)
+    assert res[0]['error_code'] == 404
 
 def test_multi_collections(client):
     pass
