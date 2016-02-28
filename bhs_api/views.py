@@ -13,15 +13,13 @@ from flask import Flask, request, abort, url_for
 from flask_jwt import JWTError, jwt_required, verify_jwt
 from flask.ext.jwt import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
-
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
 import elasticsearch
-
 import pymongo
 import jinja2
 
-from bhs_api import app, db, logger, data_db, autodoc, conf
+from bhs_api import app, db, logger, data_db, autodoc, conf, es
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                               get_unit_type, SEARCHABLE_COLLECTIONS)
 from utils import (get_logger, upload_file, send_gmail, humanify,
