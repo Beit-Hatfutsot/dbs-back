@@ -261,4 +261,5 @@ def set_item_in_branch(item_id, branch_num, value):
     current_user.save()
 
 def remove_item_from_story(item_id):
-    current_user.story_items.filter(id=item_id).delete()
+    current_user.story_items = [i for i in current_user.story_items if i.id != item_id]
+    current_user.save()
