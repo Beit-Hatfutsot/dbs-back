@@ -22,7 +22,7 @@ class Slug:
     }
     def __init__(self, slug):
         self.full = slug
-        collection, self.local_slug = slug.split('.')
+        collection, self.local_slug = slug.split('_')
         self.collection = self.slugs_to_collection[collection]
 
     def __unicode__(self):
@@ -66,18 +66,6 @@ def _make_serializable(obj):
     return obj
 
 def fetch_items(slug_list, db=data_db):
-    '''
-    # Fetch 2 items - 1 good and 1 bad
-    >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
-    >>> item_id = 'movies.{}'.format(movie_id)
-    >>> items = fetch_items([item_id, 'places.00000'])
-    >>> len(items)
-    2
-    >>> int(items[0]['_id']) ==  int(movie_id)
-    True
-    >>> items[1]['error_code']
-    404
-    '''
 
     rv = []
     for slug in slug_list:
@@ -94,36 +82,12 @@ def _fetch_item(slug, db):
     Gets item_id string and return an item
     If item_id is bad or item is not found, raises an exception.
 
-    # A regular non-empty item - setup
-    >>> movie_id = data_db.movies.find_one(show_filter, {'_id': 1})['_id']
-    >>> item_id = 'movies.{}'.format(movie_id)
-    >>> item = _fetch_item(item_id, data_db)
-    >>> item != {}
-    True
-
-    >>> _fetch_item('unknown.', data_db)
-    Traceback (most recent call last):
-        ...
-    NotFound: 404: Not Found
-    >>> _fetch_item('places.00000', data_db)
-    Traceback (most recent call last):
-        ...
-    NotFound: 404: Not Found
-
-    # Item that doesn't pass filter
-    >>> bad_filter_id = data_db.movies.find_one({"StatusDesc": "Edit"}, {'_id': 1})['_id']
-    >>> bad_filter_item_id = 'movies.{}'.format(bad_filter_id)
-    >>> _fetch_item(bad_filter_item_id, data_db)
-    Traceback (most recent call last):
-        ...
-    Forbidden: 403: Forbidden
-
     """
 
     try:
         slug = Slug(slug)
     except ValueError:
-        raise NotFound, "missing a dot in item's slug"
+        raise NotFound, "missing an underscore in item's slug"
     except KeyError:
         raise NotFound, "bad collection name in slug"
 
@@ -405,7 +369,7 @@ def filter_doc_id(slug, db):
     else:
         item = db[slug.collection].find_one(slug_query)
         if item:
-            msg = ['filter failed for {}'.format(slug)]
+            msg = ['filter failed for {}'.format(unicode(slug))]
             if item['StatusDesc'] != 'Completed':
                 msg.append("Status Description is not 'Completed'")
             if item['RightsDesc'] != 'Full':
