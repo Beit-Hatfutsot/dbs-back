@@ -134,51 +134,6 @@ def enrich_item(item, db):
             #abort(404, 'No video URL was found for this movie item.')
     return item
 
-def get_text_related(doc, max_items=3):
-    """Look for documents in `collections` where one or more of the words
-    from the headers (English and Hebrew) of the given `doc` appear inside
-    UnitText1 field.
-    """
-    related = []
-    collections = SEARCHABLE_COLLECTIONS
-    en_header = doc['Header']['En']
-    if en_header == None:
-        en_header = ''
-    he_header = doc['Header']['He']
-    if he_header == None:
-        he_header = ''
-
-    for collection_name in collections:
-        col = data_db[collection_name]
-        headers = en_header + ' ' + he_header
-        if headers == ' ':
-            # No headers at all - empty doc - no relateds
-            return []
-        # Create text indices for text search to work:
-        # db.YOUR_COLLECTION.createIndex({"UnitText1.En": "text", "UnitText1.He": "text"})
-        header_text_search = {'$text': {'$search': headers}}
-        header_text_search.update(show_filter)
-        projection = {'score': {'$meta': 'textScore'}}
-        sort_expression = [('score', {'$meta': 'textScore'})]
-        # http://api.mongodb.org/python/current/api/pymongo/cursor.html
-        cursor = col.find(header_text_search, projection).sort(sort_expression).limit(max_items)
-        if cursor:
-            try:
-                for related_item in cursor:
-                    related_item = _make_serializable(related_item)
-                    if not _make_serializable(doc)['_id'] == related_item['_id']:
-                        # Exclude the doc iteself from its relateds
-                        related_string = collection_name + '.' + related_item['_id']
-                        related.append(related_string)
-            except pymongo.errors.OperationFailure as e:
-                # Create a text index
-                logger.debug('Creating a text index for collection {}'.format(collection_name))
-                col.ensure_index([('UnitText1.En', pymongo.TEXT), ('UnitText1.He', pymongo.TEXT)])
-                continue
-        else:
-            continue
-
-    return related
 
 def get_es_text_related(doc, items_per_collection=1):
     related = []
