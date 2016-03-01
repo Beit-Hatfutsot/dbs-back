@@ -27,7 +27,8 @@ from utils import (get_logger, upload_file, send_gmail, humanify,
 from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
             remove_item_from_story)
-from bhs_api.item import fetch_items, search_by_header
+from bhs_api.item import (fetch_items, search_by_header, get_image_url,
+                          show_filter)
 import phonetic
 
 
@@ -161,10 +162,6 @@ def es_search(q, collection=None, size=14, from_=0):
         logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
         return None
     return results
-
-def _get_picture(picture_id):
-    found = data_db['photos'].find_one({'PictureId': picture_id})
-    return found
 
 def _generate_credits(fn='credits.html'):
     try:
@@ -483,25 +480,6 @@ def _generate_year_range(year, fudge_factor=0):
     maximum = int(str(year + fudge_factor) + '9999')
     minimum = int(str(year - fudge_factor) + '0000')
     return {'min': minimum, 'max': maximum}
-
-
-def get_image_url(image_id):
-    image_bucket_url = conf.image_bucket_url
-    collection = data_db['photos']
-
-    photo = collection.find_one({'PictureId': image_id})
-    if photo:
-        photo_path = photo['PicturePath']
-        photo_fn = photo['PictureFileName']
-        if not (photo_path and photo_fn):
-            logger.debug('Bad picture path or filename - {}'.format(image_id))
-            return None
-        extension = photo_path.split('.')[-1].lower()
-        url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
-        return url
-    else:
-        logger.debug('UUID {} was not found'.format(image_id))
-        return None
 
 
 # Views
@@ -868,13 +846,17 @@ def wizard_search():
         ftree_args['birth_place'] = [place]
 
     # We turn the cursor to list in order to serialize it
+    ''' TODO: restore family trees
     tree_found = list(fsearch(max_results=1, **ftree_args))
     if not tree_found and name and 'birth_place' in ftree_args:
         del ftree_args['birth_place']
         tree_found = list(fsearch(max_results=1, **ftree_args))
+    '''
     rv = {'place': place_doc, 'name': name_doc}
+    ''' TODO: restore family trees
     if tree_found:
         rv['ftree_args'] = ftree_args
+    '''
     return humanify(rv)
 
 @app.route('/suggest/<collection>/<string>')

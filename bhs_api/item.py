@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+import re
 import urllib
 
 from werkzeug.exceptions import NotFound, Forbidden
@@ -18,7 +20,11 @@ show_filter = {
 class Slug:
     slugs_to_collection = {
         'personality': 'personality',
-        '%D7%90%D7%99%D7%A9%D7%99%D7%95%D7%AA': 'personality'
+        '%D7%90%D7%99%D7%A9%D7%99%D7%95%D7%AA': 'personality',
+        'place': 'places',
+        u'מקום': 'places',
+        'familyname': 'familyNames',
+        u'שםמשפחה': 'familyNames',
     }
     def __init__(self, slug):
         self.full = slug
@@ -307,7 +313,8 @@ def filter_doc_id(slug, db):
     Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
     and therefore Forbidden.
     '''
-    if slug.full[0].isalpha():
+    first = slug.full[0]
+    if first >= 'a' and first <='z':
         slug_query = {'Slug.En': slug.full}
     else:
         slug_query = {'Slug.He': slug.full}
