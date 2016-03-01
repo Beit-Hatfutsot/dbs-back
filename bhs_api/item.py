@@ -28,6 +28,10 @@ class Slug:
     def __unicode__(self):
         return self.full
 
+def _get_picture(picture_id):
+    found = data_db['photos'].find_one({'PictureId': picture_id})
+    return found
+
 def _get_thumbnail(doc):
     thumbnail = ''
     path = ''
@@ -393,4 +397,23 @@ def search_by_header(string, collection, starts_with=True, db=data_db):
         return _make_serializable(item)
     else:
         return {}
+
+def get_image_url(image_id):
+    image_bucket_url = conf.image_bucket_url
+    collection = data_db['photos']
+
+    photo = collection.find_one({'PictureId': image_id})
+    if photo:
+        photo_path = photo['PicturePath']
+        photo_fn = photo['PictureFileName']
+        if not (photo_path and photo_fn):
+            logger.debug('Bad picture path or filename - {}'.format(image_id))
+            return None
+        extension = photo_path.split('.')[-1].lower()
+        url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
+        return url
+    else:
+        logger.debug('UUID {} was not found'.format(image_id))
+        return None
+
 
