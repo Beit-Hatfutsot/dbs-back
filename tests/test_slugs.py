@@ -14,13 +14,10 @@ from pytest_flask.plugin import client, config
 
 from bhs_api.item import fetch_items
 
-def hebrew_slug(val):
-    return urllib2.quote(val.encode('utf8'))
-
 def test_single_collection(client):
 
     items = [{'Slug': {'En': 'personality_tester',
-                       'He': hebrew_slug(u'אישיות_בודק'),
+                       'He': u'אישיות_בודק',
                       },
               'StatusDesc': 'Completed',
               'RightsDesc': 'Full',
@@ -30,7 +27,7 @@ def test_single_collection(client):
                             }
              },
              {'Slug': {'En': 'personality_another-tester',
-                       'He': hebrew_slug(u'אישיות_עוד-בודק'),
+                       'He': u'אישיות_עוד-בודק',
                       },
               'StatusDesc': 'Edit',
               'RightsDesc': 'Full',
@@ -40,13 +37,13 @@ def test_single_collection(client):
                             }
              }]
     db = mongomock.MongoClient().db
-    persons = db.create_collection('personality')
+    persons = db.create_collection('personalities')
     for item in items:
         item['_id'] = persons.insert(item)
 
     res = fetch_items(['personality_tester'], db)
     assert res[0]['Slug']['En'] == 'personality_tester'
-    res = fetch_items([hebrew_slug(u'אישיות_בודק')], db)
+    res = fetch_items([u'אישיות_בודק'], db)
     assert res[0]['Slug']['En'] == 'personality_tester'
 
     res = fetch_items(['personality_tester','personality_another-tester'], db)

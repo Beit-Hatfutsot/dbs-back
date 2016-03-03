@@ -20,22 +20,21 @@ show_filter = {
 class Slug:
     slugs_collection_map = {
         "image": "photoUnits",
-        "תמונה": "photoUnits",
+        u"תמונה": "photoUnits",
         "synonym": "synonyms",
-        "שם נרדף": "synonyms",
+        u"שם נרדף": "synonyms",
         "lexicon": "lexicon",
-        "מלון": "lexicon",
+        u"מלון": "lexicon",
         "personality": "personalities",
-        "אישיות": "personalities",
+        u"אישיות": "personalities",
         "place": "places",
-        "מקום": "places",
+        u"מקום": "places",
         "person": "genTreeIndividuals",
-        "אדם": "genTreeIndividuals",
+        u"אדם": "genTreeIndividuals",
         "familyname": "familyNames",
-        "שםמשפחה": "familyNames",
+        u"שםמשפחה": "familyNames",
         "video": "movies",
-        "וידאו": "movies"};
-        'personality': 'personality',
+        u"וידאו": "movies",
     }
     def __init__(self, slug):
         self.full = slug
