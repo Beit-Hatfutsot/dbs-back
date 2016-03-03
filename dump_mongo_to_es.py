@@ -5,7 +5,7 @@ from uuid import UUID
 
 import elasticsearch
 
-from api import SEARCHABLE_COLLECTIONS, data_db, show_filter, es, uuids_to_str
+from bhs_api import SEARCHABLE_COLLECTIONS, data_db, show_filter, es, uuids_to_str
 
 index_name = data_db.name
 
