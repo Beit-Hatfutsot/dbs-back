@@ -5,16 +5,14 @@ import logging
 import sys
 import argparse
 
-from api import (invert_related_vector,
+from bhs_common.utils import SEARCHABLE_COLLECTIONS
+from bhs_api import (logger, data_db)
+from bhs_api.item import (invert_related_vector, show_filter,
+                get_bhp_related,
                 reverse_related,
                 reduce_related,
                 unify_related_lists,
                 sort_related,
-                SEARCHABLE_COLLECTIONS,
-                logger,
-                data_db,
-                show_filter,
-                get_bhp_related,
                 get_item_name,
                 enrich_item,
                 get_es_text_related)
