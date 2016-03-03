@@ -18,18 +18,29 @@ show_filter = {
 
 
 class Slug:
-    slugs_to_collection = {
+    slugs_collection_map = {
+        "image": "photoUnits",
+        "תמונה": "photoUnits",
+        "synonym": "synonyms",
+        "שם נרדף": "synonyms",
+        "lexicon": "lexicon",
+        "מלון": "lexicon",
+        "personality": "personalities",
+        "אישיות": "personalities",
+        "place": "places",
+        "מקום": "places",
+        "person": "genTreeIndividuals",
+        "אדם": "genTreeIndividuals",
+        "familyname": "familyNames",
+        "שםמשפחה": "familyNames",
+        "video": "movies",
+        "וידאו": "movies"};
         'personality': 'personality',
-        '%D7%90%D7%99%D7%A9%D7%99%D7%95%D7%AA': 'personality',
-        'place': 'places',
-        u'מקום': 'places',
-        'familyname': 'familyNames',
-        u'שםמשפחה': 'familyNames',
     }
     def __init__(self, slug):
         self.full = slug
         collection, self.local_slug = slug.split('_')
-        self.collection = self.slugs_to_collection[collection]
+        self.collection = self.slugs_collection_map[collection]
 
     def __unicode__(self):
         return self.full
