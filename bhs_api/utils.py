@@ -5,6 +5,7 @@ import os
 import getpass
 from bson.json_util import dumps
 
+from uuid import UUID
 
 import yaml
 import boto
