@@ -5,17 +5,216 @@ import logging
 import sys
 import argparse
 
+import elasticsearch
+from werkzeug.exceptions import NotFound, Forbidden
+
 from bhs_common.utils import SEARCHABLE_COLLECTIONS
-from bhs_api import (logger, data_db)
-from bhs_api.item import (invert_related_vector, show_filter,
-                get_bhp_related,
-                reverse_related,
-                reduce_related,
-                unify_related_lists,
-                sort_related,
-                get_item_name,
-                enrich_item,
-                get_es_text_related)
+from bhs_api import logger, data_db, es
+from bhs_api.item import (show_filter, enrich_item, Slug, get_item_slug,
+                          get_item_by_id, get_item, get_collection_name)
+
+def reduce_related(related_list):
+    reduced = {}
+    for r in related_list:
+        key = r.keys()[0]
+        value = r.values()[0]
+        if key in reduced:
+            reduced[key].extend(value)
+        else:
+            reduced[key] = value
+
+    rv = []
+    for key in reduced:
+        rv.append({key: reduced[key]})
+    return rv
+
+def unify_related_lists(l1, l2):
+    rv = l1[:]
+    rv.extend(l2)
+    return reduce_related(rv)
+
+def invert_related_vector(vector_dict):
+    rv = []
+    key = vector_dict.keys()[0]
+    for value in vector_dict.values()[0]:
+        rv.append({value: [key]})
+    return rv
+
+def reverse_related(direct_related):
+    rv = []
+    for vector in direct_related:
+        for r in invert_related_vector(vector):
+            rv.append(r)
+
+    return rv
+
+def sort_related(related_items):
+    '''Put the more diverse items in the beginning'''
+    # Sort the related ids by collection names...
+    by_collection = {}
+    rv = []
+    for item_name in related_items:
+        collection, _id = item_name.split('_')
+        if collection in by_collection:
+            by_collection[collection].append(item_name)
+        else:
+            by_collection[collection] = [item_name]
+
+    # And pop 1 item form each collection as long as there are items
+    while [v for v in by_collection.values() if v]:
+        for c in by_collection:
+            if by_collection[c]:
+                rv.append(by_collection[c].pop())
+    return rv
+
+def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
+    """
+    Bring the documents that were manually marked as related to the current doc
+    by an editor.
+    Unfortunately there are not a lot of connections, so we only check the more
+    promising vectors:
+    places -> photoUnits
+    personalities -> photoUnits, familyNames, places
+    photoUnits -> places, personalities
+    If no manual marks are found for the document, return the result of es mlt
+    related search.
+    """
+    # A map of fields that we check for each kind of document (by collection)
+    related_fields = {
+            'places': ['PictureUnitsIds'],
+            'personalities': ['PictureUnitsIds', 'FamilyNameIds', 'UnitPlaces'],
+            'photoUnits': ['UnitPlaces', 'PersonalityIds']}
+
+    # A map of document fields to related collections
+    collection_names = {
+            'PersonalityIds': 'personalities',
+            'PictureUnitsIds': 'photoUnits',
+            'FamilyNameIds': 'familyNames',
+            'UnitPlaces': 'places'}
+
+    # Check what is the collection name for the current doc and what are the
+    # related fields that we have to check for it
+    rv = []
+    self_collection_name = get_collection_name(doc)
+
+    if not self_collection_name:
+        logger.debug('Unknown collection for {}'.format(get_item_slug(doc)))
+        return get_es_text_related(doc)[:max_items]
+    elif self_collection_name not in related_fields:
+        if not bhp_only:
+            logger.debug(
+                'BHP related not supported for collection {}'.format(
+                self_collection_name))
+            return get_es_text_related(doc)[:max_items]
+        else:
+            return []
+
+    # Turn each related field into a list of BHP ids if it has content
+    fields = related_fields[self_collection_name]
+    for field in fields:
+        collection = collection_names[field]
+        if field in doc and doc[field]:
+            related_value = doc[field]
+            if type(related_value) == list:
+                # Some related ids are encoded in comma separated strings
+                # and others are inside lists
+                related_value_list = [i.values()[0] for i in related_value]
+            else:
+                related_value_list = related_value.split(delimeter)
+
+            for i in related_value_list:
+                if not i:
+                    continue
+                i = int(i)
+                try:
+                    item = get_item_by_id(i, collection)
+                except (Forbidden, NotFound):
+                    continue
+                rv.append(get_item_slug(item))
+
+    if bhp_only:
+        # Don't pad the results with es_mlt related
+        return rv
+    else:
+        # If we didn't find enough related items inside the document fields,
+        # get more items using elasticsearch mlt search.
+        if len(rv) < max_items:
+            es_text_related = get_es_text_related(doc)
+            rv.extend(es_text_related)
+            rv = list(set(rv))
+            # Using list -> set -> list conversion to avoid adding the same item
+            # multiple times.
+        return rv[:max_items]
+
+def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
+    '''Build an mlt query and execute it'''
+
+
+    query = {'query':
+              {'mlt':
+                {'fields': doc_fields,
+                'docs':
+                  [
+                    {'doc': doc}
+                  ],
+                }
+              }
+            }
+    try:
+        results = es.search(index=data_db.name, doc_type=target_collection, body=query, size=limit)
+    except elasticsearch.exceptions.SerializationError:
+        # UUID fields are causing es to crash, turn them to strings
+        uuids_to_str(doc)
+        results = es.search(index=data_db.name, doc_type=target_collection,
+                            body=query, size=limit)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        raise e
+
+    if len(results['hits']['hits']) > 0:
+        ret = []
+        for h in results['hits']['hits']:
+            try:
+                slug = get_item_slug(h['_source'])
+            except KeyError:
+                logger.error("couldn't find slug for {},{}".format(h['_source']['_id'],
+                                                                h['_source']['UnitType']))
+                continue
+            ret.append(slug)
+        return ret
+    else:
+        return None
+
+def get_es_text_related(doc, items_per_collection=1):
+    related = []
+    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He',
+                      'Slug.En', 'Slug.He']
+    collections = SEARCHABLE_COLLECTIONS
+    self_collection = get_collection_name(doc)
+    if not self_collection:
+        logger.info('Unknown collection for document {}'.format(doc['_id']))
+        return []
+    for collection_name in collections:
+        found_related = es_mlt_search(
+                                    data_db.name,
+                                    doc,
+                                    related_fields,
+                                    collection_name,
+                                    items_per_collection)
+        if found_related:
+            related.extend(found_related)
+    # Filter results
+    ret = []
+    for item_name in related:
+        slug = Slug(item_name)
+        filtered = None
+        try:
+            filtered = get_item(slug)
+        except (Forbidden, NotFound):
+            continue
+        if filtered:
+            ret.append(item_name)
+    return ret
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -45,8 +244,8 @@ if __name__ == '__main__':
             if not related:
                 continue
             else:
-                item_name = get_item_name(doc)
-                direct_related_list.append({item_name: related})
+                item_slug = get_item_slug(doc)
+                direct_related_list.append({item_slug: related})
 
     logger.info('Pass 1 finished')
 
@@ -66,9 +265,8 @@ if __name__ == '__main__':
     for item in unified_related_list:
         key = item.keys()[0]
         value = item.values()[0]
-        collection, str_id = key.split('.')
-        _id = int(str_id)
-        doc = db[collection].find_one({'_id': _id})
+        slug = Slug(key)
+        doc = get_item(slug)
         if doc:
             doc['bhp_related'] = value
             db[collection].save(doc)
@@ -85,7 +283,6 @@ if __name__ == '__main__':
         logger.info('Starting to work on {}'.format(collection))
         logger.info('Collection {} has {} valid documents.'.format(collection, count))
         for doc in db[collection].find(show_filter, modifiers={"$snapshot": "true"}):
-            item_name = get_item_name(doc)
             if not doc.has_key('bhp_related') or not doc['bhp_related']:
                 # No bhp_related, get everything from es
                 related = sort_related(get_es_text_related(doc, items_per_collection=2))[:6]
@@ -100,7 +297,7 @@ if __name__ == '__main__':
                 related = sort_related(list(set(doc['bhp_related'])))[:6]
 
             if not related:
-                logger.debug('No related items found for {}'.format(item_name))
+                logger.debug('No related items found for {}'.format(get_item_slug(doc)))
             doc['related'] = related
             enriched_doc = enrich_item(doc)
             db[collection].save(enriched_doc)

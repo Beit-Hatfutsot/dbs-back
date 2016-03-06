@@ -46,6 +46,13 @@ class Slug:
     def __unicode__(self):
         return self.full
 
+def get_item_slug(item):
+    slug = item['Slug']
+    if 'En' in slug:
+        return slug['En']
+    else:
+        return slug['He']
+
 def _get_picture(picture_id):
     found = data_db['photos'].find_one({'PictureId': picture_id})
     return found
@@ -127,14 +134,14 @@ def _fetch_item(slug, db):
         else:
             raise NotFound
     else:
-        item = filter_doc_slug(slug, db)
+        item = get_item(slug, db)
         item = enrich_item(item, db)
 
         return _make_serializable(item)
 
 def enrich_item(item, db=data_db):
     if 'related' not in item or not item['related']:
-        m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
+        m = 'Hit bhp related in enrich_item - {}'.format(item['Slug']['En'])
         logger.debug(m)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
@@ -157,206 +164,11 @@ def enrich_item(item, db=data_db):
     return item
 
 
-def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
-    '''Build an mlt query and execute it'''
+def get_item_by_id(id, collection, db=data_db):
+    query = {"_id": id}
+    return _filter_doc(query, collection, db)
 
-
-    query = {'query':
-              {'mlt':
-                {'fields': doc_fields,
-                'docs':
-                  [
-                    {'doc': doc}
-                  ],
-                }
-              }
-            }
-    try:
-        results = es.search(doc_type=target_collection, body=query, size=limit)
-    except elasticsearch.exceptions.SerializationError:
-        # UUID fields are causing es to crash, turn them to strings
-        uuids_to_str(doc)
-        results = es.search(doc_type=target_collection, body=query, size=limit)
-    except elasticsearch.exceptions.ConnectionError as e:
-        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
-        raise e
-
-    if len(results['hits']['hits']) > 0:
-        ret = []
-        for h in results['hits']['hits']:
-            slugs = {}
-            for lang in ['En', 'He']:
-                slugs[lang] = h['_source']['Slug'][lang]
-            ret.append(slugs)
-        return ret
-    else:
-        return None
-
-def get_es_text_related(doc, items_per_collection=1):
-    related = []
-    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
-    collections = SEARCHABLE_COLLECTIONS
-    self_collection = get_collection_name(doc)
-    if not self_collection:
-        logger.info('Unknown collection for document {}'.format(doc['_id']))
-        return []
-    for collection_name in collections:
-        found_related = es_mlt_search(
-                                    data_db.name,
-                                    doc,
-                                    related_fields,
-                                    collection_name,
-                                    items_per_collection)
-        if found_related:
-            related.extend(found_related)
-    # Filter results
-    for item_name in related:
-        collection, slug = item_name.split('_')[:2]
-        try:
-            filter_doc_id(slug, collection)
-        except (Forbidden, NotFound):
-            continue
-        related.append(filtered)
-    return related
-
-def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
-    """
-    Bring the documents that were manually marked as related to the current doc
-    by an editor.
-    Unfortunately there are not a lot of connections, so we only check the more
-    promising vectors:
-    places -> photoUnits
-    personalities -> photoUnits, familyNames, places
-    photoUnits -> places, personalities
-    If no manual marks are found for the document, return the result of es mlt
-    related search.
-    """
-    # A map of fields that we check for each kind of document (by collection)
-    related_fields = {
-            'places': ['PictureUnitsIds'],
-            'personalities': ['PictureUnitsIds', 'FamilyNameIds', 'UnitPlaces'],
-            'photoUnits': ['UnitPlaces', 'PersonalityIds']}
-
-    # A map of document fields to related collections
-    collection_names = {
-            'PersonalityIds': 'personalities',
-            'PictureUnitsIds': 'photoUnits',
-            'FamilyNameIds': 'familyNames',
-            'UnitPlaces': 'places'}
-
-    # Check what is the collection name for the current doc and what are the
-    # related fields that we have to check for it
-    rv = []
-    self_collection_name = get_collection_name(doc)
-
-    if not self_collection_name:
-        logger.debug('Unknown collection')
-        return get_es_text_related(doc)[:max_items]
-    elif self_collection_name not in related_fields:
-        if not bhp_only:
-            logger.debug(
-                'BHP related not supported for collection {}'.format(
-                self_collection_name))
-            return get_es_text_related(doc)[:max_items]
-        else:
-            return []
-
-    # Turn each related field into a list of BHP ids if it has content
-    fields = related_fields[self_collection_name]
-    for field in fields:
-        collection = collection_names[field]
-        if field in doc and doc[field]:
-            related_value = doc[field]
-            if type(related_value) == list:
-                # Some related ids are encoded in comma separated strings
-                # and others are inside lists
-                related_value_list = [i['PlaceIds'] for i in related_value]
-            else:
-                related_value_list = related_value.split(delimeter)
-
-            for i in related_value_list:
-                if not i:
-                    continue
-                else:
-                    i = int(i)
-                    try:
-                        filter_doc_id(i, collection)
-                    except (Forbidden, NotFound):
-                        continue
-                    rv.append(collection + '.' + str(i))
-
-    if bhp_only:
-        # Don't pad the results with es_mlt related
-        return rv
-    else:
-        # If we didn't find enough related items inside the document fields,
-        # get more items using elasticsearch mlt search.
-        if len(rv) < max_items:
-            es_text_related = get_es_text_related(doc)
-            rv.extend(es_text_related)
-            rv = list(set(rv))
-            # Using list -> set -> list conversion to avoid adding the same item
-            # multiple times.
-        return rv[:max_items]
-
-def invert_related_vector(vector_dict):
-    rv = []
-    key = vector_dict.keys()[0]
-    for value in vector_dict.values()[0]:
-        rv.append({value: [key]})
-    return rv
-
-def reverse_related(direct_related):
-    rv = []
-    for vector in direct_related:
-        for r in invert_related_vector(vector):
-            rv.append(r)
-
-    return rv
-
-def reduce_related(related_list):
-    reduced = {}
-    for r in related_list:
-        key = r.keys()[0]
-        value = r.values()[0]
-        if key in reduced:
-            reduced[key].extend(value)
-        else:
-            reduced[key] = value
-
-    rv = []
-    for key in reduced:
-        rv.append({key: reduced[key]})
-    return rv
-
-def unify_related_lists(l1, l2):
-    rv = l1[:]
-    rv.extend(l2)
-    return reduce_related(rv)
-
-def sort_related(related_items):
-    '''Put the more diverse items in the beginning'''
-    # Sort the related ids by collection names...
-    by_collection = {}
-    rv = []
-    for item_name in related_items:
-        collection, _id = item_name.split('_')
-        if collection in by_collection:
-            by_collection[collection].append(item_name)
-        else:
-            by_collection[collection] = [item_name]
-
-    # And pop 1 item form each collection as long as there are items
-    while [v for v in by_collection.values() if v]:
-        for c in by_collection:
-            if by_collection[c]:
-                rv.append(by_collection[c].pop())
-    return rv
-
-def filter_doc_id(id, collection, db=data_db):
-    return _filter_doc({'_id': id}, collection, db)
-
-def filter_doc_slug(slug, db):
+def get_item(slug, db=data_db):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
@@ -402,16 +214,8 @@ def _filter_doc(query, collection, db):
             raise NotFound
 
 def get_collection_name(doc):
-    if 'UnitType' in doc:
-        unit_type = doc['UnitType']
-    else:
-        return None
-    return get_unit_type(unit_type)
-
-def get_item_name(doc):
-    collection_name = get_collection_name(doc)
-    item_name = '{}.{}'.format(collection_name, doc['_id'])
-    return item_name
+    slug = Slug(get_item_slug(doc))
+    return slug.collection
 
 def get_video_url(video_id, db):
     video_bucket_url = conf.video_bucket_url
