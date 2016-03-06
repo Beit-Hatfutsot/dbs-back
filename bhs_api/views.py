@@ -1049,13 +1049,15 @@ def newsletter_register():
                 }
         )
         if res.status_code == 200:
-            return True
+            return ''
 
         abort(500, """Got status code {} from https://webapi.mymarketing.co.il
                       when trying to register {} for {}""".format(
                           res.status_code, data['email'], date['langs'])
              )
-
+        log = open("var/log/bhs/newsletters.log", "a")
+        log.write("  ".join([res.status_code, data['email'], date['langs']]))
+        log.close()
 
 if __name__ == '__main__':
     app.run('0.0.0.0')
