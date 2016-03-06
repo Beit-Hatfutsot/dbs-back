@@ -236,3 +236,8 @@ def humanify(obj, status_code=200):
     resp.status_code = status_code
     return resp
 
+def uuids_to_str(doc):
+    for k,v in doc.items():
+        if type(v) == UUID:
+            doc[k] = str(v)
+

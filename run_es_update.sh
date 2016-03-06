@@ -5,7 +5,7 @@
 # - virtualenv ~/venv
 # - sudo apt-get install -y libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev python-dev
 
-branch=dev
+branch=alpha2
 base=`dirname $0`
 
 echo "Running mongo --> ES dump"

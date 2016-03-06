@@ -114,11 +114,6 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
     app.error_handler_spec[None][i] = custom_error
 
 
-def uuids_to_str(doc):
-    for k,v in doc.items():
-        if type(v) == UUID:
-            doc[k] = str(v)
-
 def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
     query_body = body['query']['filtered']['query']['query_string']
