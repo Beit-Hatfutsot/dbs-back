@@ -18,6 +18,7 @@ from werkzeug.exceptions import NotFound, Forbidden, BadRequest
 import elasticsearch
 import pymongo
 import jinja2
+import requests
 
 from bhs_api import app, db, logger, data_db, autodoc, conf, es
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
@@ -1034,6 +1035,27 @@ def get_changes(from_date, to_date):
                 if filter_doc_id(_id, col):
                     rv.add(doc['item_id'])
     return humanify(list(rv))
+
+@app.route('/newsletter', methods=['POST'])
+def newsletter_register():
+    data = request.json
+    for lang in data['langs']:
+        res = requests.post(
+            "https://webapi.mymarketing.co.il/Signup/PerformOptIn.aspx",
+            data={'mm_userid': 59325,
+                'mm_key': lang,
+                'mm_culture': 'he',
+                'mm_newemail': data['email'],
+                }
+        )
+        if res.status_code == 200:
+            return True
+
+        abort(500, """Got status code {} from https://webapi.mymarketing.co.il
+                      when trying to register {} for {}""".format(
+                          res.status_code, data['email'], date['langs'])
+             )
+
 
 if __name__ == '__main__':
     app.run('0.0.0.0')
