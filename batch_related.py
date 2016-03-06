@@ -187,8 +187,7 @@ def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
 
 def get_es_text_related(doc, items_per_collection=1):
     related = []
-    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He',
-                      'Slug.En', 'Slug.He']
+    related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
     collections = SEARCHABLE_COLLECTIONS
     self_collection = get_collection_name(doc)
     if not self_collection:
