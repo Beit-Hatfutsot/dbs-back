@@ -2,11 +2,12 @@
 import re
 import urllib
 
+import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 
 import phonetic
 from bhs_common.utils import get_unit_type, SEARCHABLE_COLLECTIONS
-from bhs_api import logger, data_db, conf
+from bhs_api import logger, data_db, conf, es
 
 show_filter = {
                 'StatusDesc': 'Completed',
@@ -125,12 +126,12 @@ def _fetch_item(slug, db):
         else:
             raise NotFound
     else:
-        item = filter_doc_id(slug, db)
+        item = filter_doc_slug(slug, db)
         item = enrich_item(item, db)
 
         return _make_serializable(item)
 
-def enrich_item(item, db):
+def enrich_item(item, db=data_db):
     if 'related' not in item or not item['related']:
         m = 'Hit bhp related in enrich_item - {}'.format(get_item_name(item))
         logger.debug(m)
@@ -155,6 +156,41 @@ def enrich_item(item, db):
     return item
 
 
+def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
+    '''Build an mlt query and execute it'''
+
+
+    query = {'query':
+              {'mlt':
+                {'fields': doc_fields,
+                'docs':
+                  [
+                    {'doc': doc}
+                  ],
+                }
+              }
+            }
+    try:
+        results = es.search(doc_type=target_collection, body=query, size=limit)
+    except elasticsearch.exceptions.SerializationError:
+        # UUID fields are causing es to crash, turn them to strings
+        uuids_to_str(doc)
+        results = es.search(doc_type=target_collection, body=query, size=limit)
+    except elasticsearch.exceptions.ConnectionError as e:
+        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        raise e
+
+    if len(results['hits']['hits']) > 0:
+        ret = []
+        for h in results['hits']['hits']:
+            slugs = {}
+            for lang in ['En', 'He']:
+                slugs[lang] = h['_source']['Slug'][lang]
+            ret.append(slugs)
+        return ret
+    else:
+        return None
+
 def get_es_text_related(doc, items_per_collection=1):
     related = []
     related_fields = ['Header.En', 'UnitText1.En', 'Header.He', 'UnitText1.He']
@@ -172,12 +208,11 @@ def get_es_text_related(doc, items_per_collection=1):
                                     items_per_collection)
         if found_related:
             related.extend(found_related)
-
     # Filter results
     for item_name in related:
-        collection, _id = item_name.split('.')[:2]
+        collection, slug = item_name.split('_')[:2]
         try:
-            filter_doc_id(_id, collection)
+            filter_doc_id(slug, collection)
         except (Forbidden, NotFound):
             continue
         related.append(filtered)
@@ -247,7 +282,7 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
                         filter_doc_id(i, collection)
                     except (Forbidden, NotFound):
                         continue
-                    rv.append(collection + '.' + i)
+                    rv.append(collection + '.' + str(i))
 
     if bhp_only:
         # Don't pad the results with es_mlt related
@@ -304,7 +339,7 @@ def sort_related(related_items):
     by_collection = {}
     rv = []
     for item_name in related_items:
-        collection, _id = item_name.split('.')
+        collection, _id = item_name.split('_')
         if collection in by_collection:
             by_collection[collection].append(item_name)
         else:
@@ -317,7 +352,10 @@ def sort_related(related_items):
                 rv.append(by_collection[c].pop())
     return rv
 
-def filter_doc_id(slug, db):
+def filter_doc_id(id, collection, db=data_db):
+    return _filter_doc({'_id': id}, collection, db)
+
+def filter_doc_slug(slug, db):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
@@ -328,11 +366,14 @@ def filter_doc_id(slug, db):
         slug_query = {'Slug.En': slug.full}
     else:
         slug_query = {'Slug.He': slug.full}
-    search_query = slug_query.copy()
+    return _filter_doc(slug_query, slug.collection, db)
+
+def _filter_doc(query, collection, db):
+    search_query = query.copy()
     search_query.update(show_filter)
-    item = db[slug.collection].find_one(search_query)
+    item = db[collection].find_one(search_query)
     if item:
-        if slug.collection == 'movies':
+        if collection == 'movies':
             video_id = item['MovieFileId']
             video_url = get_video_url(video_id, db)
             if not video_url:
@@ -343,9 +384,9 @@ def filter_doc_id(slug, db):
         else:
             return item
     else:
-        item = db[slug.collection].find_one(slug_query)
+        item = db[collection].find_one(query)
         if item:
-            msg = ['filter failed for {}'.format(unicode(slug))]
+            msg = ['filter failed for {}'.format(unicode(query))]
             if item['StatusDesc'] != 'Completed':
                 msg.append("Status Description is not 'Completed'")
             if item['RightsDesc'] != 'Full':

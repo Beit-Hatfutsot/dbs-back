@@ -119,36 +119,6 @@ def uuids_to_str(doc):
         if type(v) == UUID:
             doc[k] = str(v)
 
-def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
-    '''Build an mlt query and execute it'''
-
-
-    query = {'query':
-              {'mlt':
-                {'fields': doc_fields,
-                'docs':
-                  [
-                    {'doc': doc}
-                  ],
-                }
-              }
-            }
-    try:
-        results = es.search(doc_type=target_collection, body=query, size=limit)
-    except elasticsearch.exceptions.SerializationError:
-        # UUID fields are causing es to crash, turn them to strings
-        uuids_to_str(doc)
-        results = es.search(doc_type=target_collection, body=query, size=limit)
-    except elasticsearch.exceptions.ConnectionError as e:
-        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
-        raise e
-
-    if len(results['hits']['hits']) > 0:
-        result_doc_ids = ['{}.{}'.format(h['_type'], h['_source']['_id']) for h in results['hits']['hits']]
-        return result_doc_ids
-    else:
-        return None
-
 def es_search(q, collection=None, size=14, from_=0):
     body = es_show_filter
     query_body = body['query']['filtered']['query']['query_string']
