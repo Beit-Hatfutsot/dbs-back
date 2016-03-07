@@ -225,6 +225,9 @@ def parse_args():
                         '--filename',
                         help='The name of debug output file',
                         default='unified_related_list.json')
+    parser.add_argument('-s',
+                        '--slug',
+                        help='limit the run to a specifc slug')
     return parser.parse_args()
 
 
@@ -235,10 +238,16 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     db = data_db
 
+    query = show_filter.copy()
+    if 'slug' in args:
+        if args.slug[0] >= 'a' and args.slug[0] <= 'z':
+            query.update({"Slug.En": args.slug})
+        else:
+            query.update({"Slug.He": args.slug})
     logger.info('Pass 1 - Collecting bhp related')
     direct_related_list = []
     for collection in collections:
-        for doc in db[collection].find(show_filter, modifiers={"$snapshot": "true"}):
+        for doc in db[collection].find(query, modifiers={"$snapshot": "true"}):
             related = get_bhp_related(doc, max_items=6, bhp_only=True)
             if not related:
                 continue
@@ -281,7 +290,7 @@ if __name__ == '__main__':
         count = db[collection].count(show_filter)
         logger.info('Starting to work on {}'.format(collection))
         logger.info('Collection {} has {} valid documents.'.format(collection, count))
-        for doc in db[collection].find(show_filter, modifiers={"$snapshot": "true"}):
+        for doc in db[collection].find(query, modifiers={"$snapshot": "true"}):
             if not doc.has_key('bhp_related') or not doc['bhp_related']:
                 # No bhp_related, get everything from es
                 related = sort_related(get_es_text_related(doc, items_per_collection=2))[:6]
