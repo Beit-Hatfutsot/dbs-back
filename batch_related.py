@@ -240,7 +240,7 @@ if __name__ == '__main__':
     db = data_db
 
     query = show_filter.copy()
-    if 'slug' in args:
+    if args.slug:
         if args.slug[0] >= 'a' and args.slug[0] <= 'z':
             query.update({"Slug.En": args.slug})
         else:
