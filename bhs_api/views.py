@@ -771,6 +771,7 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
+        import pdb; pdb.set_trace()
         if not rv:
             abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)
