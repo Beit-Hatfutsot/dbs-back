@@ -54,7 +54,8 @@ def sort_related(related_items):
     by_collection = {}
     rv = []
     for item_name in related_items:
-        collection, _id = item_name.split('_')
+        slug = Slug(item_name)
+        collection = slug.collection
         if collection in by_collection:
             by_collection[collection].append(item_name)
         else:
