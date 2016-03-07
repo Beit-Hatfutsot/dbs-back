@@ -8,10 +8,11 @@ import argparse
 import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 
-from bhs_common.utils import SEARCHABLE_COLLECTIONS, uuids_to_str
+from bhs_common.utils import SEARCHABLE_COLLECTIONS
 from bhs_api import logger, data_db, es
 from bhs_api.item import (show_filter, enrich_item, Slug, get_item_slug,
                           get_item_by_id, get_item, get_collection_name)
+from bhs_api.utils import uuids_to_str
 
 def reduce_related(related_list):
     reduced = {}
