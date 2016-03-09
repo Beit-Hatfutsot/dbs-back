@@ -9,7 +9,7 @@ import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 
 from bhs_common.utils import SEARCHABLE_COLLECTIONS
-from bhs_api import logger, data_db, es
+from bhs_api import logger, client_data_db, data_db, es
 from bhs_api.item import (show_filter, enrich_item, Slug, get_item_slug,
                           get_item_by_id, get_item, get_collection_name)
 from bhs_api.utils import uuids_to_str
@@ -230,6 +230,12 @@ def parse_args():
     parser.add_argument('-s',
                         '--slug',
                         help='limit the run to a specifc slug')
+    parser.add_argument('-s',
+                        '--slug',
+                        help='limit the run to a specifc slug')
+    parser.add_argument('--db',
+                        help='the db to run on defaults to the value in /etc/bhs/config.yml')
+
     return parser.parse_args()
 
 
@@ -238,7 +244,10 @@ if __name__ == '__main__':
     args = parse_args()
     collections = SEARCHABLE_COLLECTIONS
     logger.setLevel(logging.INFO)
-    db = data_db
+    if args.db:
+        db = client_data_db[args.db]
+    else:
+        db = data_db
 
     query = show_filter.copy()
     if args.slug:
