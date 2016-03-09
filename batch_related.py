@@ -230,9 +230,6 @@ def parse_args():
     parser.add_argument('-s',
                         '--slug',
                         help='limit the run to a specifc slug')
-    parser.add_argument('-s',
-                        '--slug',
-                        help='limit the run to a specifc slug')
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')
 
