@@ -276,7 +276,5 @@ def get_image_url(image_id):
         url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
         return url
     else:
-        logger.debug('UUID {} was not found'.format(image_id))
+        logger.debug('photo with UUID {} was not found'.format(image_id))
         return None
-
-
