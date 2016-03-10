@@ -29,7 +29,7 @@ from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
             remove_item_from_story)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          show_filter)
+                          SHOW_FILTER)
 import phonetic
 
 
@@ -244,6 +244,7 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
+    show_filter = SHOW_FILTER.copy()
     show_filter[unit_text] = {"$nin": [None, '']}
     header_search_ex = {header: regex}
     header_search_ex.update(show_filter)

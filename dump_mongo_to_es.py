@@ -8,7 +8,7 @@ import elasticsearch
 
 from bhs_api import client_data_db, data_db, es
 from bhs_api.utils import uuids_to_str
-from bhs_api.item import SEARCHABLE_COLLECTIONS, show_filter
+from bhs_api.item import SEARCHABLE_COLLECTIONS, SHOW_FILTER
 
 
 def parse_args():
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     for collection in SEARCHABLE_COLLECTIONS:
         started = datetime.datetime.now()
-        for doc in db[collection].find(show_filter):
+        for doc in db[collection].find(SHOW_FILTER):
             try:
                 res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
             except elasticsearch.exceptions.SerializationError:

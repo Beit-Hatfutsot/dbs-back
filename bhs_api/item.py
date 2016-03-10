@@ -10,7 +10,7 @@ from bhs_common.utils import get_unit_type, SEARCHABLE_COLLECTIONS
 from bhs_api import logger, data_db, conf, es
 from bhs_api.utils import uuids_to_str
 
-show_filter = {
+SHOW_FILTER = {
                 'StatusDesc': 'Completed',
                 'RightsDesc': 'Full',
                 'DisplayStatusDesc':  {'$nin': ['Internal Use']},
@@ -183,7 +183,7 @@ def get_item(slug, db=data_db):
 
 def _filter_doc(query, collection, db):
     search_query = query.copy()
-    search_query.update(show_filter)
+    search_query.update(SHOW_FILTER)
     item = db[collection].find_one(search_query)
     if item:
         if collection == 'movies':
@@ -250,6 +250,7 @@ def search_by_header(string, collection, starts_with=True, db=data_db):
     lang_header = 'Header.{}'.format(lang)
     unit_text = 'UnitText1.{}'.format(lang)
     # Search only for non empty docs with right status
+    show_filter = SHOW_FILTER.copy()
     show_filter[unit_text] = {"$nin": [None, '']}
     header_search_ex = {lang_header: header_regex}
     header_search_ex.update(show_filter)
