@@ -73,5 +73,5 @@ data_db = client_data_db[conf.data_db_name]
 # Create the elasticsearch connection
 es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
 
-import bhs_api.views
+from bhs_api.views import *
 
