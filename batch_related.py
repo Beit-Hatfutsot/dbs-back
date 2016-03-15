@@ -9,10 +9,13 @@ import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 
 from bhs_common.utils import SEARCHABLE_COLLECTIONS
-from bhs_api import logger, client_data_db, data_db, es
-from bhs_api.item import (show_filter, enrich_item, Slug, get_item_slug,
+from bhs_api import logger, client_data_db, es
+from bhs_api import data_db as default_db
+from bhs_api.item import (SHOW_FILTER, enrich_item, Slug, get_item_slug,
                           get_item_by_id, get_item, get_collection_name)
 from bhs_api.utils import uuids_to_str
+
+data_db = None
 
 def reduce_related(related_list):
     reduced = {}
@@ -242,11 +245,11 @@ if __name__ == '__main__':
     collections = SEARCHABLE_COLLECTIONS
     logger.setLevel(logging.INFO)
     if args.db:
-        db = client_data_db[args.db]
+        data_db = client_data_db[args.db]
     else:
-        db = data_db
+        data_db = default_db
 
-    query = show_filter.copy()
+    query = SHOW_FILTER.copy()
     if args.slug:
         if args.slug[0] >= 'a' and args.slug[0] <= 'z':
             query.update({"Slug.En": args.slug})
@@ -255,7 +258,7 @@ if __name__ == '__main__':
     logger.info('Pass 1 - Collecting bhp related')
     direct_related_list = []
     for collection in collections:
-        for doc in db[collection].find(query, modifiers={"$snapshot": "true"}):
+        for doc in data_db[collection].find(query, modifiers={"$snapshot": "true"}):
             related = get_bhp_related(doc, max_items=6, bhp_only=True)
             if not related:
                 continue
@@ -285,7 +288,7 @@ if __name__ == '__main__':
         doc = get_item(slug)
         if doc:
             doc['bhp_related'] = value
-            db[collection].save(doc)
+            data_db[collection].save(doc)
         else:
             logger.info('Problem with {}'.format(key))
             sys.exit(1)
@@ -295,10 +298,10 @@ if __name__ == '__main__':
     logger.info('Pass 3 - Completing related and enriching documents')
     for collection in collections:
         started = datetime.datetime.now()
-        count = db[collection].count(show_filter)
+        count = data_db[collection].count(SHOW_FILTER)
         logger.info('Starting to work on {}'.format(collection))
         logger.info('Collection {} has {} valid documents.'.format(collection, count))
-        for doc in db[collection].find(query, modifiers={"$snapshot": "true"}):
+        for doc in data_db[collection].find(query, modifiers={"$snapshot": "true"}):
             if not doc.has_key('bhp_related') or not doc['bhp_related']:
                 # No bhp_related, get everything from es
                 related = sort_related(get_es_text_related(doc, items_per_collection=2))[:6]
@@ -316,12 +319,15 @@ if __name__ == '__main__':
                 logger.debug('No related items found for {}'.format(get_item_slug(doc)))
             doc['related'] = related
             enriched_doc = enrich_item(doc)
-            db[collection].save(enriched_doc)
+            data_db[collection].save(enriched_doc)
 
         finished = datetime.datetime.now()
-        per_doc_time = (finished - started).total_seconds()/count
-        logger.info("""Finished working on {}.
+        try:
+            per_doc_time = (finished - started).total_seconds()/count
+            logger.info("""Finished working on {}.
 Related took {:.2f} seconds per document.""".format(
         collection, per_doc_time))
+        except ZeroDivisionError:
+            logger.warn("count is zero")
 
     logger.info('Pass 3 finished')
