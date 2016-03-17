@@ -109,10 +109,12 @@ es_show_filter = {
 class Ugc(db.Document):
     ugc = db.DictField()
 
+'''
 def custom_error(error):
     return humanify({'error': error.description}, error.code)
 for i in [400, 403, 404, 405, 409, 415, 500]:
     app.error_handler_spec[None][i] = custom_error
+'''
 
 
 def es_search(q, collection=None, size=14, from_=0):

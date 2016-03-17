@@ -6,6 +6,7 @@ import subprocess
 import re
 from itertools import groupby
 import requests
+import urllib2
 
 import pymongo
 
@@ -32,9 +33,10 @@ def is_hebrew(string):
     else:
         return False
 
-def get_hebrew_dms(string):
+def get_hebrew_dms(name):
     ''' use the dms server to tturn a hebrew name into phonetic code '''
-    r = requests.get('http://localhost:8765', headers={'payload': string.encode('utf8')})
+    escaped_name = urllib2.quote(name.encode('utf8'))
+    r = requests.get('http://localhost:8765?n=' + escaped_name)
     return r.text
 
 def get_english_dms(string):

@@ -474,14 +474,10 @@ function IsVowel(value) {
 //console.log(SoundexWithoutDuplicateConsonantRule(FixVav(text), " "));
 
 var http = require('http');
-const PORT=8765;
-
-function decode_utf8(s) {
-  return decodeURIComponent(escape(s));
-}
+const PORT = process.argv[2] ? process.argv[2] : 8765;
 
 function handleRequest(request, response){
-  var name = decode_utf8(require('url').parse(request.url, true).query.n),
+  var name = require('url').parse(request.url, true).query.n,
       dmCode = SoundexWithoutDuplicateConsonantRule(FixVav(name), " ");
   console.log(name, '=>', dmCode);
   response.end(dmCode + '\n');
@@ -490,6 +486,6 @@ function handleRequest(request, response){
 var server = http.createServer(handleRequest);
 
 server.listen(PORT, function(){
-  console.log("DMS server listening on: http://localhost:%s. Send requests in 'payload' header.", PORT);
+  console.log("DMS server listening on: http://localhost:%s. Send requests in 'n' query parameter.", PORT);
 });
 
