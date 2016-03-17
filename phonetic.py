@@ -5,6 +5,7 @@ import argparse
 import subprocess
 import re
 from itertools import groupby
+import requests
 
 import pymongo
 
@@ -32,14 +33,9 @@ def is_hebrew(string):
         return False
 
 def get_hebrew_dms(string):
-    'Run Javascript code extracted from http://www.stevemorse.org/hebrew/dmheb.html'
-    script = './gen_hebrew_dm_soundex.js'
-    try:
-        output = subprocess.check_output([script, string])
-    except(subprocess.CalledProcessError) as e:
-        print e
-        return None
-    return output.strip()
+    ''' use the dms server to tturn a hebrew name into phonetic code '''
+    r = requests.get('http://localhost:8765', headers={'payload': string.encode('utf8')})
+    return r.text
 
 def get_english_dms(string):
     'Using code from https://github.com/chrislit/abydos/blob/master/abydos/phonetic.py'

@@ -481,8 +481,10 @@ function decode_utf8(s) {
 }
 
 function handleRequest(request, response){
-  var payload=decode_utf8(request.headers['payload']);
-  response.end(SoundexWithoutDuplicateConsonantRule(FixVav(payload), " ") + '\n');
+  var name = decode_utf8(require('url').parse(request.url, true).query.n),
+      dmCode = SoundexWithoutDuplicateConsonantRule(FixVav(name), " ");
+  console.log(name, '=>', dmCode);
+  response.end(dmCode + '\n');
 }
 
 var server = http.createServer(handleRequest);
@@ -490,3 +492,4 @@ var server = http.createServer(handleRequest);
 server.listen(PORT, function(){
   console.log("DMS server listening on: http://localhost:%s. Send requests in 'payload' header.", PORT);
 });
+
