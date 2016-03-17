@@ -470,6 +470,23 @@ function IsVowel(value) {
   return (value==ALEF || value == AYIN || value == YUD);
 }
 
-var text = process.argv[2];
-console.log(SoundexWithoutDuplicateConsonantRule(FixVav(text), " "));    
+//var text = process.argv[2];
+//console.log(SoundexWithoutDuplicateConsonantRule(FixVav(text), " "));
 
+var http = require('http');
+const PORT=8765;
+
+function decode_utf8(s) {
+  return decodeURIComponent(escape(s));
+}
+
+function handleRequest(request, response){
+  var payload=decode_utf8(request.headers['payload']);
+  response.end(SoundexWithoutDuplicateConsonantRule(FixVav(payload), " ") + '\n');
+}
+
+var server = http.createServer(handleRequest);
+
+server.listen(PORT, function(){
+  console.log("DMS server listening on: http://localhost:%s. Send requests in 'payload' header.", PORT);
+});
