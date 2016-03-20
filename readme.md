@@ -5,11 +5,11 @@ Installation
 
 On Debian/Ubuntu run::
 
-    $ git clone git@bitbucket.org:bhonline/bhs_api.git
-    $ cd bhs_api
+    $ git clone git@bitbucket.org:bhonline/api.git
+    $ cd api
     $ make external_dependencies
-    $ virtualenv venv
-    $ . venv/bin/activate
+    $ virtualenv env
+    $ . env/bin/activate
     $ pip install -r requirments.txt
 
 
@@ -21,4 +21,7 @@ Don't forget to activate the virtual environment (and update if needed)
 Deployment
 ----------
 
-ssh into the server and run `make`
+Deployment is done by::
+
+    $ fab -H <host> deploy_server:<branch || 'dev' >
+

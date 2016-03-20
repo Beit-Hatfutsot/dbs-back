@@ -1,4 +1,5 @@
-venv
+build
+env
 *.pyc
 __pycache__
 bhs_api.log

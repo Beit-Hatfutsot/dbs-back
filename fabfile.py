@@ -36,27 +36,18 @@ def deploy_api(branch='dev'):
 
 
 def push_api_source(branch='dev'):
-    with lcd('build'):
-        try:
-            with lcd('api'):
-                local('git pull')
-        except:
-            local('git clone git@bitbucket.org:bhonline/api.git')
-        with lcd('api'):
-            local('git checkout {}'.format(branch))
-            if not os.path.isdir('env'):
-                local('virtualenv env')
-            with prefix('. env/bin/activate'):
-                local('pip install -r requirements.txt')
-                local('py.test tests bhs_api/*.py')
-            local('find . -name "*.pyc" -exec rm -rf {} \;')
-        local('tar czf api.tgz --exclude=env api')
+    with prefix('. env/bin/activate'):
+        local('pip install -r requirements.txt')
+        local('py.test tests bhs_api/*.py')
+        local('find . -name "*.pyc" -exec rm -rf {} \;')
+    with lcd(".."):
+        local('tar czf api.tgz --exclude=env --exclude-vcs api')
         put('api.tgz', '~')
-        run('tar xzf api.tgz')
-        with cd("api"):
-            run('virtualenv env')
-            with prefix('. env/bin/activate'):
-                run('pip install -r requirements.txt')
+    run('tar xzf api.tgz')
+    with cd("api"):
+        run('virtualenv env')
+        with prefix('. env/bin/activate'):
+            run('pip install -r requirements.txt')
 
 
 @hosts('bhs-infra')
