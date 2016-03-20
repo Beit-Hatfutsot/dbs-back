@@ -21,7 +21,6 @@ def deploy_api(branch='dev'):
     with cd("api"):
         with prefix('. env/bin/activate'):
             run('py.test tests bhs_api/*.py')
-        sudo("service hebrew_dm_server stop")
         run("cp conf/supervisord.conf ~")
         run("kill -HUP `cat /run/bhs/supervisord.pid`")
         run("supervisorctl restart all")
