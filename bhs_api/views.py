@@ -435,7 +435,9 @@ def fsearch(max_results=None,**kwargs):
                   'MD': 1,   # Marriage dates as comma separated string
                   'MP': 1,   # Marriage places as comma separated string
                   'GTF': 1,  # Tree file UUID
-                  'EditorRemarks': 1}
+                  'EditorRemarks': 1,
+                  'tree': 1,  # get the tree
+                  }
 
     if 'debug' in search_dict.keys():
         projection = None
@@ -966,24 +968,19 @@ def fetch_tree(tree_number):
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
 
-@app.route('/fwalk/<tree_number>/<node_id>')
+@app.route('/person/<tree_number>/<node_id>')
 @autodoc.doc()
-def ftree_walk(tree_number, node_id):
+def person_view(tree_number, node_id):
     '''
     This view returns a part of family tree starting with a given tree number
     and node id.
     '''
-    dest_bucket_name = os.path.join('/data', 'bhs-familytrees-json',
-                                    str(tree_number),node_id+'.json')
-    try:
-        fd = open(dest_bucket_name)
-    except IOError, e:
-        abort(404, str(e))
-    data = fd.read()
-    fd.close()
-    resp = Response(data, mimetype='application/json')
-    resp.status_code = 200
-    return resp
+    person = data_db['genTreeIndividuals'].find_one({'GTN': int(tree_number),
+                                                'II': node_id})
+    # TODO: who cleans the living? should be here if not part of the migration
+    if not person:
+        abort(404, 'person not found')
+    return humanify(person)
 
 @app.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):

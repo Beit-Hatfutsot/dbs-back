@@ -108,8 +108,8 @@ def fetch_items(slug_list, db=data_db):
 
 def _fetch_item(slug, db):
     """
-    Gets item_id string and return an item
-    If item_id is bad or item is not found, raises an exception.
+    Gets an item based on slug and returns it
+    If slug is bad or item is not found, raises an exception.
 
     """
 
