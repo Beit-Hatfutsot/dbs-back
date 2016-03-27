@@ -103,7 +103,8 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
     self_collection_name = get_collection_name(doc)
 
     if not self_collection_name:
-        logger.debug('Unknown collection for {}'.format(get_item_slug(doc)))
+        logger.debug('Unknown collection for {}'.format(
+            get_item_slug(doc).encode('utf8')))
         return get_es_text_related(doc)[:max_items]
     elif self_collection_name not in related_fields:
         if not bhp_only:
@@ -316,7 +317,8 @@ if __name__ == '__main__':
                 related = sort_related(list(set(doc['bhp_related'])))[:6]
 
             if not related:
-                logger.debug('No related items found for {}'.format(get_item_slug(doc)))
+                logger.debug('No related items found for {}'.format(
+                    get_item_slug(doc).encode('utf8')))
             doc['related'] = related
             enriched_doc = enrich_item(doc)
             data_db[collection].save(enriched_doc)
