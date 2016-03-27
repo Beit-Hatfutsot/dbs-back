@@ -7,6 +7,7 @@ ARGS_TO_INDEX = {'first_name': 'FN_lc',
                     'sex': 'G',
                     'birth_place': 'BP_lc',
                     'marriage_place': 'MP_lc',
+                    'tree_number': 'GTN',
                     'death_place': 'DP_lc'}
 
 PROJECTION = {'II': 1,   # Individual ID
@@ -29,8 +30,7 @@ PROJECTION = {'II': 1,   # Individual ID
 def ensure_indexes(collection):
     ''' Ensure there are indices for all the needed fields '''
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
-    needed_indices = ['LN_lc', 'BP_lc', 'GTN', 'LNS', 'II']
-    for index_key in needed_indices:
+    for index_key in ARGS_TO_INDEX.values():
         if index_key not in index_keys:
              logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
              collection.ensure_index(index_key)
@@ -152,7 +152,6 @@ def fsearch(**kwargs):
     If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `MAX_RESULTS` starting with the `start` argument
     '''
-
     search_dict = {}
     for key, value in kwargs.items():
         search_dict[key] = value[0]
@@ -169,6 +168,7 @@ def fsearch(**kwargs):
         projection = None
 
     results = collection.find(search_query, PROJECTION)
+
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
     results = results.limit(MAX_RESULTS)
