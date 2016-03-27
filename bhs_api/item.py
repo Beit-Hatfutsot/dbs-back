@@ -140,9 +140,6 @@ def _fetch_item(slug, db):
         return _make_serializable(item)
 
 def enrich_item(item, db=data_db):
-    if 'related' not in item or not item['related']:
-        m = 'Hit bhp related in enrich_item - {}'.format(item['Slug']['En'])
-        logger.debug(m)
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
