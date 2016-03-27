@@ -767,8 +767,8 @@ def ftree_search():
     if len(keys) == 1 and keys[0]=='sex':
         em = "Sex only is not enough"
         abort (400, em)
-    results = fsearch(**args)
-    return humanify(results)
+    items = fsearch(**args)
+    return humanify({"items": items, "total": items.count()})
 
 @app.route('/get_ftree_url/<tree_number>')
 def fetch_tree(tree_number):
