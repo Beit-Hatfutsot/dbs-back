@@ -16,7 +16,7 @@ env.now = datetime.now().strftime('%Y%m%d-%H%M')
 def dev():
     env.hosts = ['bhs-dev']
 
-def deploy_api(branch='dev'):
+def restart_api(branch='dev'):
     push_api_source(branch)
     with cd("api"):
         with prefix('. env/bin/activate'):
@@ -34,7 +34,7 @@ def deploy_api(branch='dev'):
         sudo("service uwsgi status")
 
 
-def push_api_source(branch='dev'):
+def deploy_api(branch='dev'):
     with prefix('. env/bin/activate'):
         local('pip install -r requirements.txt')
         local('py.test tests bhs_api/*.py')
