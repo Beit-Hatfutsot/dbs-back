@@ -881,6 +881,3 @@ def newsletter_register():
         log = open("var/log/bhs/newsletters.log", "a")
         log.write("  ".join([res.status_code, data['email'], date['langs']]))
         log.close()
-
-if __name__ == '__main__':
-    app.run('0.0.0.0')
