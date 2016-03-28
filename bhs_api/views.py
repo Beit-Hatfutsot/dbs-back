@@ -270,12 +270,6 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-def _generate_year_range(year, fudge_factor=0):
-    maximum = int(str(year + fudge_factor) + '9999')
-    minimum = int(str(year - fudge_factor) + '0000')
-    return {'min': minimum, 'max': maximum}
-
-
 # Views
 @app.route('/documentation')
 def documentation():

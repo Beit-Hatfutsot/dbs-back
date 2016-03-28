@@ -27,6 +27,12 @@ PROJECTION = {'II': 1,   # Individual ID
                 'tree': 1,  # get the tree
                 }
 
+def _generate_year_range(year, fudge_factor=0):
+    maximum = int(str(year + fudge_factor) + '9999')
+    minimum = int(str(year - fudge_factor) + '0000')
+    return {'min': minimum, 'max': maximum}
+
+
 def ensure_indexes(collection):
     ''' Ensure there are indices for all the needed fields '''
     index_keys = [v['key'][0][0] for v in collection.index_information().values()]
