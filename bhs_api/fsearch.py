@@ -33,15 +33,6 @@ def _generate_year_range(year, fudge_factor=0):
     return {'min': minimum, 'max': maximum}
 
 
-def ensure_indexes(collection):
-    ''' Ensure there are indices for all the needed fields '''
-    index_keys = [v['key'][0][0] for v in collection.index_information().values()]
-    for index_key in ARGS_TO_INDEX.values():
-        if index_key not in index_keys:
-             logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
-             collection.ensure_index(index_key)
-
-
 def build_query(search_dict):
     ''' build a mongo search query based on the search_dict '''
     names_and_places = {}
@@ -166,7 +157,6 @@ def fsearch(**kwargs):
 
 
     collection = data_db['genTreeIndividuals']
-    ensure_indexes(collection)
     search_query = build_query(search_dict)
     logger.debug('FSearch query:\n{}'.format(search_query))
 
