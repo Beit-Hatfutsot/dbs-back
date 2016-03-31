@@ -116,7 +116,7 @@ def build_query(search_dict):
                    'death_year': ['DSD', 'DED']}
 
     # Build gentree search query from all the subqueries
-    search_query = {}
+    search_query = {'tree': {'$exists': True}}
 
     for item in years:
         if item == 'marriage_year':
