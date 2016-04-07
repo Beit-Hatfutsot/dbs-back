@@ -30,11 +30,16 @@ if __name__ == '__main__':
     for collection in SEARCHABLE_COLLECTIONS:
         started = datetime.datetime.now()
         for doc in db[collection].find(SHOW_FILTER):
+            _id = doc['_id']
+            del doc['_id']
             try:
-                res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
+                res = es.index(index=index_name, doc_type=collection, id=_id, body=doc)
             except elasticsearch.exceptions.SerializationError:
                 # UUID fields are causing es to crash, turn them to strings
                 uuids_to_str(doc)
-                res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
+                try:
+                    res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
+                except elasticsearch.exceptions.SerializationError as e:
+                    import pdb; pdb.set_trace()
         finished = datetime.datetime.now()
         print 'Collection {} took {}'.format(collection, finished-started)

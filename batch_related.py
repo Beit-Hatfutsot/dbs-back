@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import re
 import datetime
 import logging
 import sys
@@ -72,7 +72,7 @@ def sort_related(related_items):
                 rv.append(by_collection[c].pop())
     return rv
 
-def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
+def get_bhp_related(doc, max_items=6, bhp_only=False):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -126,7 +126,7 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
                 # and others are inside lists
                 related_value_list = [i.values()[0] for i in related_value]
             else:
-                related_value_list = related_value.split(delimeter)
+                related_value_list = re.split('\||,', related_value)
 
             for i in related_value_list:
                 if not i:
@@ -155,13 +155,14 @@ def get_bhp_related(doc, max_items=6, bhp_only=False, delimeter='|'):
 def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
     '''Build an mlt query and execute it'''
 
-
+    clean_doc = doc.copy()
+    del clean_doc['_id']
     query = {'query':
               {'mlt':
                 {'fields': doc_fields,
                 'docs':
                   [
-                    {'doc': doc}
+                    {'doc': clean_doc}
                   ],
                 }
               }
@@ -170,7 +171,7 @@ def es_mlt_search(index_name, doc, doc_fields, target_collection, limit):
         results = es.search(index=data_db.name, doc_type=target_collection, body=query, size=limit)
     except elasticsearch.exceptions.SerializationError:
         # UUID fields are causing es to crash, turn them to strings
-        uuids_to_str(doc)
+        uuids_to_str(clean_doc)
         results = es.search(index=data_db.name, doc_type=target_collection,
                             body=query, size=limit)
     except elasticsearch.exceptions.ConnectionError as e:
