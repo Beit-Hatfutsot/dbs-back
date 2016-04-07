@@ -16,14 +16,19 @@ env.now = datetime.now().strftime('%Y%m%d-%H%M')
 def dev():
     env.hosts = ['bhs-dev']
 
-def restart_api(branch='dev'):
-    push_api_source(branch)
+def deploy(branch='dev'):
+    push_code(branch)
+    restart_api()
+
+def restart_api():
     with cd("api"):
         with prefix('. env/bin/activate'):
             run('py.test tests bhs_api/*.py')
+        '''
         run("cp conf/supervisord.conf ~")
         run("kill -HUP `cat /run/bhs/supervisord.pid`")
         run("supervisorctl restart all")
+        '''
         sudo("cp conf/api-uwsgi.ini /etc/bhs/")
         # change the ini file to use the corrent uid for bhs
         sudo('sed -i "s/1000/`id -u bhs`/" /etc/bhs/api-uwsgi.ini')
@@ -34,7 +39,7 @@ def restart_api(branch='dev'):
         sudo("service uwsgi status")
 
 
-def deploy_api(branch='dev'):
+def push_code(branch='dev'):
     with prefix('. env/bin/activate'):
         local('pip install -r requirements.txt')
         local('py.test tests bhs_api/*.py')
@@ -64,3 +69,9 @@ def pull_mongo(dbname):
             )
         # delete the old db
         local('mongorestore --drop -d {0} {0}'.format(dbname))
+
+@hosts('bhs-infra')
+def update_related(db):
+    with cd('api'), prefix('. env/bin/activate'):
+        run('python batch_related.py --db {}'.format(db))
+
