@@ -1,5 +1,6 @@
 from flask import abort
 from bhs_api import  logger, data_db
+import phonetic
 
 MAX_RESULTS=14
 ARGS_TO_INDEX = {'first_name': 'FN_lc',
