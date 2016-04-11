@@ -1,3 +1,4 @@
+from flask import abort
 from bhs_api import  logger, data_db
 
 MAX_RESULTS=14
@@ -87,8 +88,8 @@ def build_query(search_dict):
 
     # Build a dict of all the year queries
     for search_arg in years:
-        if '~' in years[search_arg]:
-            split_arg = years[search_arg].split('~')
+        if ':' in years[search_arg]:
+            split_arg = years[search_arg].split(':')
             try:
                 year = int(split_arg[0])
                 fudge_factor = int(split_arg[1])
