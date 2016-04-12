@@ -1,16 +1,20 @@
+import re
+
 from flask import abort
 from bhs_api import  logger, data_db
 import phonetic
 
 MAX_RESULTS=14
-ARGS_TO_INDEX = {'first_name': 'FN_lc',
-                    'last_name': 'LN_lc',
-                    'maiden_name': 'IBLN_lc',
-                    'sex': 'G',
-                    'birth_place': 'BP_lc',
-                    'marriage_place': 'MP_lc',
-                    'tree_number': 'GTN',
-                    'death_place': 'DP_lc'}
+ARGS_TO_INDEX = {'first_name':       'FN_lc',
+                 'last_name':        'LN_lc',
+                 'maiden_name':      'IBLN_lc',
+                 'sex':              'G',
+                 'birth_place':      'BP_lc',
+                 'marriage_place':   'MP_lc',
+                 'tree_number':      'GTN',
+                 'death_place':      'DP_lc',
+                 'place':            'filler_lc', # a dummy field name
+                 }
 
 PROJECTION = {'II': 1,   # Individual ID
                 'GTN': 1,  # GenTree Number
@@ -45,7 +49,7 @@ def build_query(search_dict):
 
     # Sort all the arguments to those with name or place and those with year
     for k, v in search_dict.items():
-        if '_name' in k or '_place' in k:
+        if k.endswith('name') or k.endswith('place'):
             # The search is case insensitive
             names_and_places[k] = v.lower()
         elif '_year' in k:
@@ -123,9 +127,20 @@ def build_query(search_dict):
     if sex:
         search_query['G'] = sex
     
-    for item in names_and_places.values():
-        for k in item:
-            search_query[k] = item[k]
+    for param, item in names_and_places.items():
+        for k, v in item.items():
+            # place is an or of all place fields
+            if param == 'place':
+                if k.endswith('S'):
+                    s = 'S'
+                else:
+                    s = '_lc'
+                search_query['$or'] = [{'BP' + s: v},
+                                       {'MP' + s: v},
+                                       {'DP' + s: v}]
+
+            else:
+                search_query[k] = v
 
     if 'tree_number' in search_dict:
         try:
