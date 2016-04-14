@@ -741,9 +741,9 @@ def ftree_search():
     marriage_year
     death_year
     The *_year fields could be specified as an integer with an optional fudge
-    factor signified by a tilda, like 1907~2
+    factor signified by a collon, like 1907:2
     The query for birth_year 1907 will match the records from this year only,
-    while the query for 1907~2 will match the records from 1905, 1906, 1907
+    while the query for 1907:2 will match the records from 1905, 1906, 1907
     1908 and 1909, making the match wider.
     _______________________________________________________________________
     sex
