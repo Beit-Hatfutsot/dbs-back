@@ -40,10 +40,7 @@ def restart_api():
 
 
 def push_code(branch='dev'):
-    with prefix('. env/bin/activate'):
-        local('pip install -r requirements.txt')
-        local('py.test tests bhs_api/*.py')
-        local('find . -name "*.pyc" -exec rm -rf {} \;')
+    local('find . -name "*.pyc" -exec rm -rf {} \;')
     with lcd(".."):
         local('tar czf api.tgz --exclude=env --exclude-vcs api')
         put('api.tgz', '~')
