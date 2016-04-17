@@ -20,7 +20,8 @@ import pymongo
 import jinja2
 import requests
 
-from bhs_api import app, db, logger, data_db, autodoc, conf, es
+from bhs_api import (app, db, logger, data_db, autodoc, conf, es,
+                     SEARCH_CHUNK_SIZE)
 from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                               get_unit_type, SEARCHABLE_COLLECTIONS)
 from utils import (get_logger, upload_file, send_gmail, humanify,
@@ -119,7 +120,7 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 '''
 
 
-def es_search(q, collection=None, size=14, from_=0):
+def es_search(q, size, collection=None, from_=0):
     body = es_show_filter
     query_body = body['query']['filtered']['query']['query_string']
     query_body['query'] = q
@@ -585,7 +586,7 @@ def general_search():
     The view returns a json with an elasticsearch response.
     """
     args = request.args
-    parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
+    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None}
     for param in parameters.keys():
         if param in args:
             parameters[param] = args[param]

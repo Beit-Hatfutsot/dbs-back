@@ -10,6 +10,7 @@ from flask.ext.autodoc import Autodoc
 from bhs_common.utils import get_conf
 from bhs_api.utils import get_logger
 
+SEARCH_CHUNK_SIZE = 15
 CONF_FILE = '/etc/bhs/config.yml'
 # Create app
 app = Flask(__name__)
