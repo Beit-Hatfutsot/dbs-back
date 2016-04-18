@@ -38,7 +38,7 @@ if __name__ == '__main__':
                 # UUID fields are causing es to crash, turn them to strings
                 uuids_to_str(doc)
                 try:
-                    res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
+                    res = es.index(index=index_name, doc_type=collection, id=_id, body=doc)
                 except elasticsearch.exceptions.SerializationError as e:
                     import pdb; pdb.set_trace()
         finished = datetime.datetime.now()
