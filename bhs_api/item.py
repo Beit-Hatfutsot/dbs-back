@@ -165,17 +165,22 @@ def get_item_by_id(id, collection, db=data_db):
     query = {"_id": id}
     return _filter_doc(query, collection, db)
 
+def get_item_query(slug):
+    if isinstance(slug, basestring):
+        slug = Slug(slug)
+    first = slug.full[0]
+    if first >= 'a' and first <='z':
+        return {'Slug.En': slug.full}
+    else:
+        return {'Slug.He': slug.full}
+
 def get_item(slug, db=data_db):
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
     and therefore Forbidden.
     '''
-    first = slug.full[0]
-    if first >= 'a' and first <='z':
-        slug_query = {'Slug.En': slug.full}
-    else:
-        slug_query = {'Slug.He': slug.full}
+    slug_query = get_item_query(slug)
     return _filter_doc(slug_query, slug.collection, db)
 
 def _filter_doc(query, collection, db):

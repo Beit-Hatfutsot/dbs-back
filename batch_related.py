@@ -11,8 +11,9 @@ from werkzeug.exceptions import NotFound, Forbidden
 from bhs_common.utils import SEARCHABLE_COLLECTIONS
 from bhs_api import logger, client_data_db, es
 from bhs_api import data_db as default_db
-from bhs_api.item import (SHOW_FILTER, enrich_item, Slug, get_item_slug,
-                          get_item_by_id, get_item, get_collection_name)
+from bhs_api.item import (SHOW_FILTER, Slug, get_item_slug,
+                          get_item_by_id, get_item, get_collection_name,
+                          get_item_query)
 from bhs_api.utils import uuids_to_str
 
 data_db = None
@@ -215,7 +216,7 @@ def get_es_text_related(doc, items_per_collection=1):
         slug = Slug(item_name)
         filtered = None
         try:
-            filtered = get_item(slug)
+            filtered = get_item(slug, data_db)
         except (Forbidden, NotFound):
             continue
         if filtered:
@@ -287,10 +288,13 @@ if __name__ == '__main__':
         key = item.keys()[0]
         value = item.values()[0]
         slug = Slug(key)
-        doc = get_item(slug)
+        try:
+            doc = get_item(slug)
+        except (Forbidden, NotFound):
+                continue
         if doc:
-            doc['bhp_related'] = value
-            data_db[collection].save(doc)
+            data_db[collection].update_one(get_item_query(slug),
+                                           {'$set': {'bhp_related': value}})
         else:
             logger.info('Problem with {}'.format(key))
             sys.exit(1)
@@ -304,6 +308,7 @@ if __name__ == '__main__':
         logger.info('Starting to work on {}'.format(collection))
         logger.info('Collection {} has {} valid documents.'.format(collection, count))
         for doc in data_db[collection].find(query, modifiers={"$snapshot": "true"}):
+            slug = get_item_slug(doc)
             if not doc.has_key('bhp_related') or not doc['bhp_related']:
                 # No bhp_related, get everything from es
                 related = sort_related(get_es_text_related(doc, items_per_collection=2))[:6]
@@ -319,10 +324,10 @@ if __name__ == '__main__':
 
             if not related:
                 logger.debug('No related items found for {}'.format(
-                    get_item_slug(doc).encode('utf8')))
+                    slug.encode('utf8')))
             doc['related'] = related
-            enriched_doc = enrich_item(doc)
-            data_db[collection].save(enriched_doc)
+            data_db[collection].update_one(get_item_query(slug),
+                                           {'$set': {'related': related}})
 
         finished = datetime.datetime.now()
         try:
