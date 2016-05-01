@@ -1,9 +1,9 @@
 import argparse
 
-from bhs_api import app, conf
+from bhs_api import create_app
 
 
-def flaskrun(app, db=None):
+def flaskrun(db=None):
     ''' run's flask or does flask run?
         based on http://flask.pocoo.org/snippets/133/
     '''
@@ -15,8 +15,9 @@ def flaskrun(app, db=None):
     if (args.db):
         #TODO: change the db
         pass
+    app, conf = create_app()
     app.run(debug=args.debug)
 
 
-flaskrun(app)
+flaskrun()
 
