@@ -445,9 +445,19 @@ def fsearch(max_results=None,**kwargs):
         results = results.limit(max_results)
     if results.count() > 0:
         logger.debug('Found {} results'.format(results.count()))
-        return results
+        return clean_private_data(results)
     else:
         return []
+def clean_private_data(ppl):
+    ret = []
+    for i in ppl:
+        if 'tree' in i and not i['tree']['deceased']:
+            i.tree = {}
+            for key in ('BD', 'BP', 'MD', 'MP'):
+                i[key] = ''
+        ret.append(i)
+    return ret
+
 
 def _generate_year_range(year, fudge_factor=0):
     maximum = int(str(year + fudge_factor) + '9999')
