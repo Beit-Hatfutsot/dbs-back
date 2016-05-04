@@ -6,9 +6,9 @@ import argparse
 
 import elasticsearch
 
-from bhs_api import client_data_db, data_db, es
+from bhs_api import SEARCHABLE_COLLECTIONS, client_data_db, data_db, es
 from bhs_api.utils import uuids_to_str
-from bhs_api.item import SEARCHABLE_COLLECTIONS, SHOW_FILTER
+from bhs_api.item import SHOW_FILTER
 
 
 def parse_args():

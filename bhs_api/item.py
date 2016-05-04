@@ -6,8 +6,8 @@ import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 
 import phonetic
-from bhs_common.utils import get_unit_type, SEARCHABLE_COLLECTIONS
-from bhs_api import logger, data_db, conf, es
+from bhs_common.utils import get_unit_type
+from bhs_api import SEARCHABLE_COLLECTIONS, logger, data_db, conf, es
 from bhs_api.utils import uuids_to_str
 
 SHOW_FILTER = {

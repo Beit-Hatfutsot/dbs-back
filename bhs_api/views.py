@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# standard library
 import os
-from datetime import timedelta, datetime
+from datetime import datetime
 import re
 import urllib
 import mimetypes
 import magic
 from uuid import UUID
-
+# open source community
 from flask import Flask, request, abort, url_for
 from flask_jwt import JWTError, jwt_required, verify_jwt
 from flask.ext.jwt import current_user
@@ -19,18 +19,20 @@ import elasticsearch
 import pymongo
 import jinja2
 import requests
-
-from bhs_api import app, db, logger, data_db, autodoc, conf, es
-from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                              get_unit_type, SEARCHABLE_COLLECTIONS)
-from utils import (get_logger, upload_file, send_gmail, humanify,
-                   get_referrer_host_url, dictify)
+# shared BHS code
+from bhs_common.utils import (gen_missing_keys_error, binarize_image,
+                              get_unit_type)
+# last, project code
+import phonetic
+from bhs_api import (SEARCHABLE_COLLECTIONS, app, db, logger, data_db, autodoc,
+                     conf, es)
+from bhs_api.utils import (get_logger, upload_file, send_gmail, humanify,
+                           get_referrer_host_url, dictify)
 from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
             remove_item_from_story)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
-import phonetic
 
 
 def get_activation_link(user_id):
