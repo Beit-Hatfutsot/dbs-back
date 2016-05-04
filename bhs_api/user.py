@@ -1,5 +1,6 @@
 import json
 
+from itsdangerous import URLSafeSerializer
 from flask_jwt import JWT
 from flask.ext.jwt import current_user
 from flask import request, abort
