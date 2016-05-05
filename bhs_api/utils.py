@@ -18,6 +18,10 @@ from bson.objectid import ObjectId
 from bson import json_util
 from werkzeug import Response
 
+CONF_FILE = '/etc/bhs/config.yml'
+DEFAULT_CONF_FILE = 'conf/dev.yaml'
+
+# TODO: delete the next 3 lines
 # Set default GCE project id
 project_id = 'bh-org-01'
 
@@ -53,27 +57,29 @@ def get_oid(id_str):
     except bson.errors.InvalidId:
         return None
 
-def get_conf(config_file='/etc/bhs/config.yml', must_have_keys=set()):
-    '''Read the configuration file and return config dict.
-    Check that all the necessary options are present.
-    Raise meaningful exceptions on errors'''
-    fh = open(config_file)
+def get_conf(config_file=CONF_FILE, must_have_keys=set()):
+    ''' Read the configuration file and return config dict.  Check that all
+        the necessary options are present. If the configuration file is
+        missing, use the one in `conf/dev.yaml`.
+    '''
     try:
-        conf = yaml.load(fh)
-        if not conf:
-            raise ValueError('Empty config file')
-        # Check that all the must_have_keys are present
-        config_keys = set(conf.keys())
-        missing_keys = list(must_have_keys.difference(config_keys))
-        if missing_keys != []:
-            keys_message = gen_missing_keys_error(missing_keys)
-            error_message = 'Invalid configuration file: ' + keys_message
-            raise ValueError(error_message)
+        fh = open(config_file)
+    except IOError:
+        fh = open(DEFAULT_CONF_FILE)
 
-        return Struct(**conf) # Enables dot access
+    conf = yaml.load(fh)
+    if not conf:
+        raise ValueError('Empty config file')
+    # Check that all the must_have_keys are present
+    config_keys = set(conf.keys())
+    missing_keys = list(must_have_keys.difference(config_keys))
+    if missing_keys != []:
+        keys_message = gen_missing_keys_error(missing_keys)
+        error_message = 'Invalid configuration file: ' + keys_message
+        raise ValueError(error_message)
 
-    except yaml.scanner.ScannerError, e:
-        raise yaml.scanner.ScannerError(e.problem+str(e.problem_mark))
+    return Struct(**conf) # Enables dot access
+
 
 def gen_missing_keys_error(missing_keys):
     if len(missing_keys) == 1:
@@ -180,7 +186,7 @@ def send_gmail(subject, body, address, message_mode='text'):
                     'email_password',
                     'email_from'])
 
-    conf = get_conf('/etc/bhs/config.yml', must_have_keys)
+    conf = get_conf()
 
     my_gmail = gmail.GMail(conf.email_username, conf.email_password)
     if message_mode == 'html':

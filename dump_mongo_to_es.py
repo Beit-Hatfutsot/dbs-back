@@ -6,9 +6,9 @@ import argparse
 
 import elasticsearch
 
-from bhs_api import client_data_db, data_db, es
+from bhs_api import SEARCHABLE_COLLECTIONS, client_data_db, data_db, es
 from bhs_api.utils import uuids_to_str
-from bhs_api.item import SEARCHABLE_COLLECTIONS, SHOW_FILTER
+from bhs_api.item import SHOW_FILTER
 
 
 def parse_args():
@@ -30,11 +30,16 @@ if __name__ == '__main__':
     for collection in SEARCHABLE_COLLECTIONS:
         started = datetime.datetime.now()
         for doc in db[collection].find(SHOW_FILTER):
+            _id = doc['_id']
+            del doc['_id']
             try:
-                res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
+                res = es.index(index=index_name, doc_type=collection, id=_id, body=doc)
             except elasticsearch.exceptions.SerializationError:
                 # UUID fields are causing es to crash, turn them to strings
                 uuids_to_str(doc)
-                res = es.index(index=index_name, doc_type=collection, id=doc['_id'], body=doc)
+                try:
+                    res = es.index(index=index_name, doc_type=collection, id=_id, body=doc)
+                except elasticsearch.exceptions.SerializationError as e:
+                    import pdb; pdb.set_trace()
         finished = datetime.datetime.now()
         print 'Collection {} took {}'.format(collection, finished-started)
