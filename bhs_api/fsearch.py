@@ -155,14 +155,14 @@ def build_query(search_dict):
     return search_query
 
 
-def fsearch(**kwargs):
+def fsearch(max_results=15, **kwargs):
     '''
     Search in the genTreeIindividuals table.
     Names and places could be matched exactly, by the prefix match
     or phonetically:
     The query "first_name=yeh;prefix" will match "yehuda" and "yehoshua", while
     the query "first_name=yeh;phonetic" will match "yayeh" and "ben jau".
-    Years could be specified with a fudge factor - 1907:2 will match
+    Years could be specified with a fudge factor - 1907~2 will match
     1905, 1906, 1907, 1908 and 1909.
     If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `MAX_RESULTS` starting with the `start` argument
@@ -188,6 +188,21 @@ def fsearch(**kwargs):
     results = results.limit(MAX_RESULTS)
     logger.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
-    return results
+    return ({"items": clean_private_data(results),
+             "total": results.count()})
+    return 
+
+def clean_private_data(ppl):
+    ''' Remove details of the living '''
+    ret = []
+    for i in ppl:
+        if 'tree' in i and not i['tree']['deceased']:
+            for key in ('BD', 'BP', 'MD', 'MP'):
+                i[key] = ''
+            for key in ('BIRT_PLAC', 'BIRT_DATE', 'MARR_PLAC', 'MARR_DATE',
+                        'OCCU', 'NOTE'):
+                i['tree'][key] = {}
+        ret.append(i)
+    return ret
 
 
