@@ -33,6 +33,7 @@ from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             remove_item_from_story)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
+from bhs_api.fsearch import fsearch
 
 
 def get_activation_link(user_id):
@@ -269,202 +270,6 @@ def get_phonetic(collection, string, limit=5):
     collection = data_db[collection]
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
-
-def fsearch(max_results=None,**kwargs):
-    '''
-    Search in the genTreeIindividuals table or try to fetch a gedcom file.
-    Names and places could be matched exactly, by the prefix match
-    or phonetically:
-    The query "first_name=yeh;prefix" will match "yehuda" and "yehoshua", while
-    the query "first_name=yeh;phonetic" will match "yayeh" and "ben jau".
-    Years could be specified with a fudge factor - 1907~2 will match
-    1905, 1906, 1907, 1908 and 1909.
-    If `tree_number` kwarg is present, return only the results from this tree.
-    Return up to `max_results`
-    '''
-    args_to_index = {'first_name': 'FN_lc',
-                     'last_name': 'LN_lc',
-                     'maiden_name': 'IBLN_lc',
-                     'sex': 'G',
-                     'birth_place': 'BP_lc',
-                     'marriage_place': 'MP_lc',
-                     'death_place': 'DP_lc'}
-
-    extra_args =    ['tree_number',
-                     'birth_year',
-                     'marriage_year',
-                     'death_year',
-                     'individual_id',
-                     'debug']
-
-    allowed_args = set(args_to_index.keys() + extra_args)
-    search_dict = {}
-    for key, value in kwargs.items():
-        search_dict[key] = value[0]
-        if not value[0]:
-            abort(400, "{} argument couldn't be empty".format(key))
-
-    keys = search_dict.keys()
-    bad_args = set(keys).difference(allowed_args)
-    if bad_args:
-        abort(400, 'Unsupported args in request: {}'.format(', '.join(list(bad_args))))
-    if 'tree_number' in keys:
-        try:
-            tree_number = int(search_dict['tree_number'])
-        except ValueError:
-            abort(400, 'Tree number must be an integer')
-    else:
-        tree_number = None
-
-    collection = data_db['genTreeIndividuals']
-
-    # Ensure there are indices for all the needed fields
-    index_keys = [v['key'][0][0] for v in collection.index_information().values()]
-    needed_indices = ['LN_lc', 'BP_lc', 'GTN', 'LNS', 'II']
-    for index_key in needed_indices:
-        if index_key not in index_keys:
-             logger.info('Ensuring indices for field {} - please wait...'.format(index_key))
-             collection.ensure_index(index_key)
-
-    # Sort all the arguments to those with name or place and those with year
-    names_and_places = {}
-    years = {}
-    # Set up optional queries
-    sex_query = None
-    individual_id = None
-
-    for k in keys:
-        if '_name' in k or '_place' in k:
-            # The search is case insensitive
-            names_and_places[k] = search_dict[k].lower()
-        elif '_year' in k:
-            years[k] = search_dict[k]
-        elif k == 'sex':
-            if search_dict[k].lower() in ['m', 'f']:
-                sex_query = search_dict[k].upper()
-            else:
-                abort(400, "Sex must be one of 'm', 'f'")
-        elif k == 'individual_id':
-            individual_id = search_dict['individual_id']
-
-    # Build a dict of all the names_and_places queries
-    for search_arg in names_and_places:
-        field_name = args_to_index[search_arg]
-        split_arg = names_and_places[search_arg].split(';')
-        search_str = split_arg[0]
-        # No modifications are supported for first names because
-        # firstname DMS (Soundex) values are not stored in the BHP database.
-        if search_arg == 'first_name':
-            qf = {field_name: search_str}
-            names_and_places[search_arg] = qf
-            continue
-        if len(split_arg) > 1:
-            if split_arg[1] == 'prefix':
-                q = re.compile('^{}'.format(search_str))
-                qf = {field_name: q}
-            elif split_arg[1] == 'phonetic':
-                q = phonetic.get_bhp_soundex(search_str)
-                case_sensitive_fn = field_name.split('_lc')[0]
-                field_name = case_sensitive_fn + 'S'
-                qf = {field_name: q}
-            # Drop wrong instructions - don't treat the part after semicolon
-            else:
-                qf = {field_name: search_str}
-        else:
-            # There is a simple string search
-            qf = {field_name: search_str}
-
-        names_and_places[search_arg] = qf
-
-    # Build a dict of all the year queries
-    for search_arg in years:
-        if '~' in years[search_arg]:
-            split_arg = years[search_arg].split('~')
-            try:
-                year = int(split_arg[0])
-                fudge_factor = int(split_arg[1])
-            except ValueError:
-                abort(400, 'Year and fudge factor must be integers')
-            years[search_arg] = _generate_year_range(year, fudge_factor)
-        else:
-            try:
-                year = int(years[search_arg])
-                years[search_arg] = year
-            except ValueError:
-                abort(400, 'Year must be an integer')
-            years[search_arg] = _generate_year_range(year)
-
-    year_ranges = {'birth_year': ['BSD', 'BED'],
-                   'death_year': ['DSD', 'DED']}
-
-    # Build gentree search query from all the subqueries
-    search_query = {}
-
-    for item in years:
-        if item == 'marriage_year':
-            # Look in the MSD array
-            search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}} 
-            continue
-        start, end = year_ranges[item]
-        search_query[start] = {'$gte': years[item]['min']}
-        search_query[end] = {'$lte': years[item]['max']}
-
-    if sex_query:
-        search_query['G'] = sex_query
-
-    for item in names_and_places.values():
-        for k in item:
-            search_query[k] = item[k]
-
-    if tree_number:
-        search_query['GTN'] = tree_number
-        # WARNING: Discarding all the other search qeuries if looking for GTN and II
-        if individual_id:
-            search_query = {'GTN': tree_number, 'II': individual_id}
-
-    logger.debug('Search query:\n{}'.format(search_query))
-
-    projection = {'II': 1,   # Individual ID
-                  'GTN': 1,  # GenTree Number
-                  'LN': 1,   # Last name
-                  'FN': 1,   # First Name
-                  'IBLN': 1, # Maiden name
-                  'BD': 1,   # Birth date
-                  'BP': 1,   # Birth place
-                  'DD': 1,   # Death date
-                  'DP': 1,   # Death place
-                  'G': 1,    # Gender
-                  'MD': 1,   # Marriage dates as comma separated string
-                  'MP': 1,   # Marriage places as comma separated string
-                  'GTF': 1,  # Tree file UUID
-                  'EditorRemarks': 1}
-
-    if 'debug' in search_dict.keys():
-        projection = None
-
-    results = collection.find(search_query, projection)
-    if max_results:
-        results = results.limit(max_results)
-    if results.count() > 0:
-        logger.debug('Found {} results'.format(results.count()))
-        return clean_private_data(results)
-    else:
-        return []
-def clean_private_data(ppl):
-    ret = []
-    for i in ppl:
-        if 'tree' in i and not i['tree']['deceased']:
-            i.tree = {}
-            for key in ('BD', 'BP', 'MD', 'MP'):
-                i[key] = ''
-        ret.append(i)
-    return ret
-
-
-def _generate_year_range(year, fudge_factor=0):
-    maximum = int(str(year + fudge_factor) + '9999')
-    minimum = int(str(year - fudge_factor) + '0000')
-    return {'min': minimum, 'max': maximum}
 
 
 # Views
@@ -782,7 +587,7 @@ def general_search():
     The view returns a json with an elasticsearch response.
     """
     args = request.args
-    parameters = {'collection': None, 'size': 14, 'from_': 0, 'q': None}
+    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None}
     for param in parameters.keys():
         if param in args:
             parameters[param] = args[param]
@@ -958,8 +763,7 @@ def ftree_search():
     if len(keys) == 1 and keys[0]=='sex':
         em = "Sex only is not enough"
         abort (400, em)
-    results = fsearch(**args)
-    return humanify(results)
+    return humanify(fsearch(**args))
 
 @app.route('/get_ftree_url/<tree_number>')
 def fetch_tree(tree_number):
@@ -978,24 +782,19 @@ def fetch_tree(tree_number):
     else:
         abort(404, 'Tree {} not found'.format(tree_number))
 
-@app.route('/fwalk/<tree_number>/<node_id>')
+@app.route('/person/<tree_number>/<node_id>')
 @autodoc.doc()
-def ftree_walk(tree_number, node_id):
+def person_view(tree_number, node_id):
     '''
     This view returns a part of family tree starting with a given tree number
     and node id.
     '''
-    dest_bucket_name = os.path.join('/data', 'bhs-familytrees-json',
-                                    str(tree_number),node_id+'.json')
-    try:
-        fd = open(dest_bucket_name)
-    except IOError, e:
-        abort(404, str(e))
-    data = fd.read()
-    fd.close()
-    resp = Response(data, mimetype='application/json')
-    resp.status_code = 200
-    return resp
+    person = data_db['genTreeIndividuals'].find_one({'GTN': int(tree_number),
+                                                'II': node_id})
+    # TODO: who cleans the living? should be here if not part of the migration
+    if not person:
+        abort(404, 'person not found')
+    return humanify(person)
 
 @app.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
@@ -1077,6 +876,3 @@ def newsletter_register():
         log = open("var/log/bhs/newsletters.log", "a")
         log.write("  ".join([res.status_code, data['email'], date['langs']]))
         log.close()
-
-if __name__ == '__main__':
-    app.run('0.0.0.0')
