@@ -35,6 +35,7 @@ from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
 from bhs_api.fsearch import fsearch
 
+SEARCH_CHUNK_SIZE = 15
 
 def get_activation_link(user_id):
     s = URLSafeSerializer(app.secret_key)

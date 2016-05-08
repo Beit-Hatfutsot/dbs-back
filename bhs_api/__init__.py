@@ -9,7 +9,6 @@ from flask.ext.cors import CORS
 from flask.ext.autodoc import Autodoc
 from bhs_api.utils import get_logger, get_conf
 
-SEARCH_CHUNK_SIZE = 15
 CONF_FILE = '/etc/bhs/config.yml'
 DEFAULT_CONF_FILE = 'conf/dev.yaml'
 
