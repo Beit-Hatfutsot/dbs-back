@@ -50,7 +50,6 @@ def create_app(testing=False):
     app.config['DEBUG'] = True
     app.config['SECURITY_PASSWORDLESS'] = True
     app.config['SECURITY_EMAIL_SENDER'] = 'support@bh.org.il'
-    app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'] = 'Authorization'
     app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = 'email'
     app.config['SECURITY_EMAIL_SUBJECT_PASSWORDLESS'] = 'BH Login Instructions'
     app.config['SECURITY_LOGIN_URL'] = '/get_token'

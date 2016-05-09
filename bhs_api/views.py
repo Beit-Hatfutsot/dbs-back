@@ -14,6 +14,7 @@ from flask.ext.security import login_required
 from flask_jwt import JWTError,  verify_jwt
 from flask.ext.security import current_user
 from flask.ext.autodoc import Autodoc
+from flask_security.decorators import _check_token
 from itsdangerous import URLSafeSerializer, BadSignature
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
@@ -283,7 +284,7 @@ def documentation():
 @blueprint.route('/')
 def home():
     # Check if the user is authenticated with JWT
-    if current_user.is_authenticated():
+    if _check_token():
         return humanify({'access': 'private'})
     else:
         return humanify({'access': 'public'})

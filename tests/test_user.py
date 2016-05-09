@@ -21,8 +21,13 @@ def test_send_ticket(client, app):
         assert outbox[0].subject == "BH Login Instructions"
         urls = re.findall('http\S+', outbox[0].body)
         assert len(urls) == 1
-    res = client.get(urls[0], headers={'content-type': 'application/json'})
-    assert res.status_code == 302
-    import pdb; pdb.set_trace()
+    res = client.get(urls[0], headers={'Accept': 'application/json'})
+    assert res.status_code == 200
+    token = res.json['response']['user']['authentication_token']
+    res = client.get('/', headers={'Authentication-Token': token})
+    assert "private" in res.data
 
+def test_dummy_token(client):
+    res = client.get('/', headers={'Authentication-Token': 'dfdfdfdf'})
+    assert "public" in res.data
 
