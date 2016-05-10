@@ -1,0 +1,5 @@
+Welcome!
+
+You can log into your account through the link below:
+
+http://dbs.bh.org.il/login/{{ token }}

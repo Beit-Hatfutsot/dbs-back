@@ -6,6 +6,7 @@ from flask.ext.security.utils import encrypt_password, verify_password
 from flask.ext.security.passwordless import send_login_instructions
 
 from utils import get_referrer_host_url, humanify, dictify, send_gmail
+from .models import StoryLine
 
 SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next')
 
@@ -130,7 +131,7 @@ def delete_user(user_id):
 
 
 def send_ticket(user_dict, referrer_host_url=None):
-    next = getattr(user_dict, 'name', '/welcome')
+    next = getattr(user_dict, 'next', '/welcome')
     try:
         email = user_dict['email']
         # enc_password = encrypt_password(user_dict['password'])

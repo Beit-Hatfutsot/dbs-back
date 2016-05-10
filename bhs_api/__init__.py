@@ -52,7 +52,6 @@ def create_app(testing=False):
     app.config['SECURITY_EMAIL_SENDER'] = 'support@bh.org.il'
     app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = 'email'
     app.config['SECURITY_EMAIL_SUBJECT_PASSWORDLESS'] = 'BH Login Instructions'
-    app.config['SECURITY_LOGIN_URL'] = '/get_token'
     app.config['SECRET_KEY'] = conf.secret_key
     # app.config['SECURITY_PASSWORD_HASH'] = conf.security_password_hash
     # app.config['SECURITY_PASSWORD_SALT'] = conf.security_password_salt

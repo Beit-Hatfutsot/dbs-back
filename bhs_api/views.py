@@ -10,7 +10,7 @@ import magic
 from uuid import UUID
 
 from flask import Flask, Blueprint, request, abort, url_for, current_app
-from flask.ext.security import login_required
+from flask.ext.security import auth_token_required
 from flask_jwt import JWTError,  verify_jwt
 from flask.ext.security import current_user
 from flask.ext.autodoc import Autodoc
@@ -290,7 +290,7 @@ def home():
         return humanify({'access': 'public'})
 
 @blueprint.route('/private')
-@login_required
+@auth_token_required
 def private_space():
     return humanify({'access': 'private', 'email': current_user.email})
 
@@ -309,20 +309,9 @@ def activate_user(payload):
     return humanify(clean_user(user))
 
 
-@blueprint.route('/users/send_activation_email',  methods=['POST'])
-@login_required
-def handle_activation_email_request():
-    referrer = request.referrer
-    if referrer:
-        referrer_host_url = get_referrer_host_url(referrer)
-    else:
-        referrer_host_url = None
-    user_id = str(current_user.id)
-    return send_activation_email(user_id, referrer_host_url)
-
-
 @blueprint.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @blueprint.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@auth_token_required
 def manage_user(user_id=None):
     '''
     Manage user accounts. If routed as /user, gives access only to logged in
@@ -336,8 +325,6 @@ def manage_user(user_id=None):
         if not 'application/json' in request.headers['Content-Type']:
             abort(400, "Please set 'Content-Type' header to 'application/json'")
         return user_handler(None, request)
-    else:
-        abort(403)
 
     if user_id:
         # admin access_mode
@@ -357,13 +344,13 @@ def manage_user(user_id=None):
 
 
 @blueprint.route('/mjs/<item_id>', methods=['DELETE'])
-@login_required
+@auth_token_required
 def delete_item_from_story(item_id):
     remove_item_from_story(item_id)
     return humanify(get_mjs())
     
 @blueprint.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
-@login_required
+@auth_token_required
 def remove_item_from_branch(item_id, branch_num=None):
     try:
         branch_num = int(branch_num)
@@ -375,7 +362,7 @@ def remove_item_from_branch(item_id, branch_num=None):
 
 
 @blueprint.route('/mjs/<branch_num>', methods=['POST'])
-@login_required
+@auth_token_required
 def add_to_story_branch(branch_num):
     item_id = request.data
     try:
@@ -387,7 +374,7 @@ def add_to_story_branch(branch_num):
 
 
 @blueprint.route('/mjs/<branch_num>/name', methods=['POST'])
-@login_required
+@auth_token_required
 def set_story_branch_name(branch_num):
 
     name = request.data
@@ -397,7 +384,7 @@ def set_story_branch_name(branch_num):
 
 
 @blueprint.route('/mjs', methods=['GET', 'POST'])
-@login_required
+@auth_token_required
 def manage_jewish_story():
     '''Logged in user may GET or POST their jewish story links.
     the links are stored as an array of items where each item has a special
@@ -424,7 +411,7 @@ def manage_jewish_story():
         return humanify(get_mjs())
 
 @blueprint.route('/upload', methods=['POST'])
-@login_required
+@auth_token_required
 @autodoc.doc()
 def save_user_content():
     '''Logged in user POSTs a multipart request that includes a binary
