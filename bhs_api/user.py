@@ -30,30 +30,6 @@ def setup_users():
                                 roles=[user_role])
 '''
 
-# @jwt.authentication_handler
-def authenticate(username, password):
-    # We must use confusing email=username alias until the flask-jwt
-    # author merges request #31
-    # https://github.com/mattupstate/flask-jwt/pull/31
-    user_obj = current_app.user_datastore.find_user(email=username)
-    if not user_obj:
-        current_app.logger.debug('User {} not found'.format(username))
-        return None
-
-    if verify_password(password, user_obj.password):
-        # make user.id jsonifiable
-        user_obj.id = str(user_obj.id)
-        return user_obj
-    else:
-        current_app.logger.debug('Wrong password for {}'.format(username))
-        return None
-
-
-# @jwt.user_handler
-def load_user(payload):
-    user_obj = current_app.user_datastore.find_user(id=payload['user_id'])
-    return user_obj
-
 
 def is_admin(flask_user_obj):
     if flask_user_obj.has_role('admin'):

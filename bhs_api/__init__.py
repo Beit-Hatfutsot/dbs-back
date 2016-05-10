@@ -55,7 +55,6 @@ def create_app(testing=False):
     app.config['SECRET_KEY'] = conf.secret_key
     # app.config['SECURITY_PASSWORD_HASH'] = conf.security_password_hash
     # app.config['SECURITY_PASSWORD_SALT'] = conf.security_password_salt
-    app.config['JWT_EXPIRATION_DELTA'] = timedelta(days=1)
     app.config['MAIL_SERVER'] = 'localhost'
     app.config['MAIL_PORT'] = 33333
     # app.config['MAIL_USE_SSL'] = False

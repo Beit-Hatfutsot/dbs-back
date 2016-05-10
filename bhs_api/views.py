@@ -11,7 +11,6 @@ from uuid import UUID
 
 from flask import Flask, Blueprint, request, abort, url_for, current_app
 from flask.ext.security import auth_token_required
-from flask_jwt import JWTError,  verify_jwt
 from flask.ext.security import current_user
 from flask.ext.autodoc import Autodoc
 from flask_security.decorators import _check_token
@@ -283,7 +282,6 @@ def documentation():
 
 @blueprint.route('/')
 def home():
-    # Check if the user is authenticated with JWT
     if _check_token():
         return humanify({'access': 'private'})
     else:
@@ -675,14 +673,7 @@ def get_items(item_id):
     for item in items_list:
         if item.startswith('ugc'):
             ugc_items.append(item)
-    if ugc_items:
-        # Check if the user is logged in
-        try:
-            verify_jwt()
-            user_oid = current_user.id
-        except JWTError as e:
-            current_app.logger.debug(e.description)
-            abort(403, 'You have to be logged in to access this item(s)')
+    user_oid = current_user.is_authenticated and current_user.id
 
     items = fetch_items(items_list[:10])
     if len(items) == 1 and 'error_code' in items[0]:
