@@ -22,8 +22,8 @@ def create_app(testing=False):
 
     # Get configuration from file
     must_have_keys = set(['secret_key',
-                        'security_password_hash',
-                        'security_password_salt',
+                        'mail_server',
+                        'mail_port',
                         'user_db_host',
                         'user_db_port',
                         'elasticsearch_host',
@@ -48,18 +48,23 @@ def create_app(testing=False):
 
     # Set app config
     app.config['DEBUG'] = True
+    # Security Config
+    app.config['SECRET_KEY'] = conf.secret_key
     app.config['SECURITY_PASSWORDLESS'] = True
     app.config['SECURITY_EMAIL_SENDER'] = 'support@bh.org.il'
     app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = 'email'
     app.config['SECURITY_EMAIL_SUBJECT_PASSWORDLESS'] = 'BH Login Instructions'
-    app.config['SECRET_KEY'] = conf.secret_key
-    # app.config['SECURITY_PASSWORD_HASH'] = conf.security_password_hash
-    # app.config['SECURITY_PASSWORD_SALT'] = conf.security_password_salt
-    app.config['MAIL_SERVER'] = 'localhost'
-    app.config['MAIL_PORT'] = 33333
-    # app.config['MAIL_USE_SSL'] = False
-    # app.config['MAIL_USERNAME'] = 'username'
-    # app.config['MAIL_PASSWORD'] = 'password'
+    app.config['WTF_CSRF_ENABLED'] = False
+    # Mail Config
+    app.config['MAIL_SERVER'] = conf.mail_server
+    app.config['MAIL_PORT'] = conf.mail_port
+    # Mail optional username and password
+    try:
+        app.config['MAIL_USERNAME'] = conf.mail_username
+        app.config['MAIL_PASSWORD'] = conf.mail_password
+    except AttributeError:
+        pass
+
     # DB Config
     app.config['MONGODB_DB'] = conf.user_db_name
     app.config['MONGODB_HOST'] = conf.user_db_host
