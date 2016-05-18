@@ -83,7 +83,7 @@ def create_app(testing=False):
     autodoc.init_app(app)
     #allow CORS
     cors = CORS(app, origins=['*'], headers=['content-type', 'accept',
-                                            'Authorization'])
+                                            'authentication-token', 'Authorization'])
     return app, conf
 
 app, conf = create_app()
