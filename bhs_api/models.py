@@ -1,6 +1,6 @@
 from mongoengine import (ListField, StringField, EmbeddedDocumentListField,
-                         EmbeddedDocument, BooleanField, DateTimeField,
-                         ReferenceField)
+                         EmbeddedDocument, GenericEmbeddedDocumentField,
+                         BooleanField, DateTimeField, ReferenceField)
 from flask.ext.mongoengine import Document
 from flask.ext.security import UserMixin, RoleMixin
 
@@ -25,5 +25,7 @@ class User(Document, UserMixin):
     story_items = EmbeddedDocumentListField(StoryLine)
     story_branches = ListField(field=StringField(max_length=64),
                                   default=4*[''])
+    next_state = StringField(max_length=31, default='mjs')
+    next_params = GenericEmbeddedDocumentField()
 
 
