@@ -187,9 +187,7 @@ def fsearch(max_results=15, **kwargs):
     results = results.limit(MAX_RESULTS)
     current_app.logger.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
-    return ({"items": clean_private_data(results),
-             "total": results.count()})
-    return 
+    return results
 
 def clean_private_data(ppl):
     ''' Remove details of the living '''
