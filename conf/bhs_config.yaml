@@ -1,5 +1,7 @@
 # App config - Development version
 secret_key: glpjht9dPBXQe8mBS9XxDMGLIoHukbpvSNU0FpnZ
+frontend_server: bhsclient
+
 # Mail server
 mail_server: 'localhost'
 mail_port: 25

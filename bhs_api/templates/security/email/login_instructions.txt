@@ -1,5 +1,5 @@
 Welcome!
 
-You can log into your account through the link below:
+You can log into your account using the link below:
 
-http://dbs.bh.org.il/login/{{ token }}
+http://{{config.FRONTEND_SERVER}}/login/{{ token }}

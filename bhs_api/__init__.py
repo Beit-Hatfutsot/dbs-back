@@ -49,6 +49,7 @@ def create_app(testing=False):
 
     # Set app config
     app.config['DEBUG'] = True
+    app.config['FRONTEND_SERVER'] = conf.frontend_server
     # Security Config
     app.config['SECRET_KEY'] = conf.secret_key
     app.config['SECURITY_PASSWORDLESS'] = True
