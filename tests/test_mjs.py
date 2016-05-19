@@ -6,8 +6,8 @@ from pytest_flask.plugin import client
 
 @pytest.fixture
 def tester_headers(client, get_auth_header):
-    headers = [('Content-Type', 'application/json')]
-    headers.append(get_auth_header)
+    headers = {'Content-Type': 'application/json'}
+    headers.update(get_auth_header)
     return headers
 
 def test_mjs_in_user_data(client, request, tester_headers):

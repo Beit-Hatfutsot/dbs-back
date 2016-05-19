@@ -4,10 +4,10 @@ import urllib
 
 import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
+from flask import current_app
 
 import phonetic
-from bhs_common.utils import get_unit_type
-from bhs_api import SEARCHABLE_COLLECTIONS, logger, data_db, conf, es
+from bhs_common.utils import get_unit_type, SEARCHABLE_COLLECTIONS
 from bhs_api.utils import uuids_to_str
 
 SHOW_FILTER = {
@@ -54,7 +54,7 @@ def get_item_slug(item):
         return slug['He']
 
 def _get_picture(picture_id):
-    found = data_db['photos'].find_one({'PictureId': picture_id})
+    found = current_app.data_db['photos'].find_one({'PictureId': picture_id})
     return found
 
 def _get_thumbnail(doc):
@@ -94,7 +94,10 @@ def _make_serializable(obj):
         obj['UpdateDate'] = str(obj['UpdateDate'])
     return obj
 
-def fetch_items(slug_list, db=data_db):
+def fetch_items(slug_list, db=None):
+                
+    if not db:
+        db = current_app.data_db
 
     rv = []
     for slug in slug_list:
@@ -139,7 +142,7 @@ def _fetch_item(slug, db):
 
         return _make_serializable(item)
 
-def enrich_item(item, db=data_db):
+def enrich_item(item, db):
     if not 'thumbnail' in item.keys():
         item['thumbnail'] = _get_thumbnail(item)
     if not 'main_image_url' in item.keys():
@@ -161,7 +164,9 @@ def enrich_item(item, db=data_db):
     return item
 
 
-def get_item_by_id(id, collection, db=data_db):
+def get_item_by_id(id, collection, db=None):
+    if not db:
+        db = current_app.data_db
     query = {"_id": id}
     return _filter_doc(query, collection, db)
 
@@ -174,7 +179,9 @@ def get_item_query(slug):
     else:
         return {'Slug.He': slug.full}
 
-def get_item(slug, db=data_db):
+def get_item(slug, db=None):
+    if not db:
+        db = current_app.data_db
     '''
     Try to return Mongo _id for the given unit_id and collection name.
     Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
@@ -192,7 +199,7 @@ def _filter_doc(query, collection, db):
             video_id = item['MovieFileId']
             video_url = get_video_url(video_id, db)
             if not video_url:
-                logger.debug('No video for {}'.format(slug))
+                current_app.logger.debug('No video for {}'.format(slug))
                 return None
             else:
                 return item
@@ -220,7 +227,7 @@ def get_collection_name(doc):
     return slug.collection
 
 def get_video_url(video_id, db):
-    video_bucket_url = conf.video_bucket_url
+    video_bucket_url = current_app.config['VIDEO_BUCKET_URL']
     collection = db['movies']
     # Search only within the movies filtered by rights, display status and work status
     video = collection.find_one({'MovieFileId': video_id,
@@ -233,11 +240,13 @@ def get_video_url(video_id, db):
         url = '{}/{}.{}'.format(video_bucket_url, video_id, extension)
         return url
     else:
-        logger.debug('Video URL was not found for {}'.format(video_id))
+        current_app.logger.debug('Video URL was not found for {}'.format(video_id))
         return None
 
 
-def search_by_header(string, collection, starts_with=True, db=data_db):
+def search_by_header(string, collection, starts_with=True, db=None):
+    if not db:
+        db = current_app.data_db
     if not string: # Support empty strings
         return {}
     if phonetic.is_hebrew(string):
@@ -265,19 +274,19 @@ def search_by_header(string, collection, starts_with=True, db=data_db):
         return {}
 
 def get_image_url(image_id):
-    image_bucket_url = conf.image_bucket_url
-    collection = data_db['photos']
+    image_bucket_url = current_app.config['IMAGE_BUCKET_URL']
+    collection = current_app.data_db['photos']
 
     photo = collection.find_one({'PictureId': image_id})
     if photo:
         photo_path = photo['PicturePath']
         photo_fn = photo['PictureFileName']
         if not (photo_path and photo_fn):
-            logger.debug('Bad picture path or filename - {}'.format(image_id))
+            current_app.logger.debug('Bad picture path or filename - {}'.format(image_id))
             return None
         extension = photo_path.split('.')[-1].lower()
         url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
         return url
     else:
-        logger.debug('photo with UUID {} was not found'.format(image_id))
+        current_app.logger.debug('photo with UUID {} was not found'.format(image_id))
         return None

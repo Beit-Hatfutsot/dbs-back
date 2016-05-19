@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# standard library
+
 import os
-from datetime import datetime
+from datetime import timedelta, datetime
 import re
 import urllib
 import mimetypes
 import magic
 from uuid import UUID
-# open source community
-from flask import Flask, request, abort, url_for
-from flask_jwt import JWTError, jwt_required, verify_jwt
-from flask.ext.jwt import current_user
+
+from flask import Flask, Blueprint, request, abort, url_for, current_app
+from flask.ext.security import auth_token_required
+from flask.ext.security import current_user
+from flask.ext.autodoc import Autodoc
+from flask_security.decorators import _check_token
 from itsdangerous import URLSafeSerializer, BadSignature
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
@@ -19,15 +21,12 @@ import elasticsearch
 import pymongo
 import jinja2
 import requests
-# shared BHS code
-from bhs_common.utils import (gen_missing_keys_error, binarize_image,
-                              get_unit_type)
-# last, project code
-import phonetic
-from bhs_api import (SEARCHABLE_COLLECTIONS, app, db, logger, data_db, autodoc,
-                     conf, es)
-from bhs_api.utils import (get_logger, upload_file, send_gmail, humanify,
-                           get_referrer_host_url, dictify)
+
+from bhs_api import SEARCH_CHUNK_SIZE
+from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
+                              get_unit_type, SEARCHABLE_COLLECTIONS)
+from utils import (upload_file, send_gmail, humanify,
+                   get_referrer_host_url, dictify)
 from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
             remove_item_from_story)
@@ -35,10 +34,13 @@ from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
 from bhs_api.fsearch import fsearch
 
-SEARCH_CHUNK_SIZE = 15
+import phonetic
+
+blueprint = Blueprint('', __name__)
+autodoc = Autodoc() 
 
 def get_activation_link(user_id):
-    s = URLSafeSerializer(app.secret_key)
+    s = URLSafeSerializer(current_app.secret_key)
     payload = s.dumps(user_id)
     return url_for('activate_user', payload=payload, _external=True)
 
@@ -110,10 +112,10 @@ es_show_filter = {
   }
 }
 
+'''
 class Ugc(db.Document):
     ugc = db.DictField()
 
-'''
 def custom_error(error):
     return humanify({'error': error.description}, error.code)
 for i in [400, 403, 404, 405, 409, 415, 500]:
@@ -121,7 +123,7 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 '''
 
 
-def es_search(q, collection=None, size=14, from_=0):
+def es_search(q, size, collection=None, from_=0):
     body = es_show_filter
     query_body = body['query']['filtered']['query']['query_string']
     query_body['query'] = q
@@ -133,9 +135,10 @@ def es_search(q, collection=None, size=14, from_=0):
             collection = collection.split(',')
         except:
             pass
-        results = es.search(index=data_db.name, body=body, doc_type=collection, size=size, from_=from_)
+        results = current_app.es.search(index=current_app.data_db.name, body=body,
+                            doc_type=collection, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
-        logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
+        current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
         return None
     return results
 
@@ -146,7 +149,7 @@ def _generate_credits(fn='credits.html'):
         fh.close()
         return credits
     except:
-        logger.debug("Couldn't open credits file {}".format(fn))
+        current_app.logger.debug("Couldn't open credits file {}".format(fn))
         return '<h1>No credits found</h1>'
 
 def _convert_meta_to_bhp6(upload_md, file_info):
@@ -214,7 +217,7 @@ def _convert_meta_to_bhp6(upload_md, file_info):
            ut_matched = True
     if not ut_matched:
         rv['UnitType'] = 0
-        logger.debug('Failed to match UnitType for "{}"'.format(file_info))
+        current_app.logger.debug('Failed to match UnitType for "{}"'.format(file_info))
     # Add the raw upload data to rv
     rv['raw'] = no_lang
     return rv
@@ -239,7 +242,7 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     otherwise search everywhere in the header.
     Return only `max_res` results.
     '''
-    collection = data_db[collection]
+    collection = current_app.data_db[collection]
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
@@ -268,35 +271,30 @@ def get_completion(collection, string, search_prefix=True, max_res=5):
     return found
 
 def get_phonetic(collection, string, limit=5):
-    collection = data_db[collection]
+    collection = current_app.data_db[collection]
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-
 # Views
-@app.route('/documentation')
+@blueprint.route('/documentation')
 def documentation():
     return autodoc.html(title='My Jewish Identity API documentation')
 
-@app.route('/')
+@blueprint.route('/')
 def home():
-    # Check if the user is authenticated with JWT
-    try:
-        verify_jwt()
+    if _check_token():
         return humanify({'access': 'private'})
-
-    except JWTError as e:
-        logger.debug(e.description)
+    else:
         return humanify({'access': 'public'})
 
-@app.route('/private')
-@jwt_required()
+@blueprint.route('/private')
+@auth_token_required
 def private_space():
     return humanify({'access': 'private', 'email': current_user.email})
 
-@app.route('/users/activate/<payload>')
+@blueprint.route('/users/activate/<payload>')
 def activate_user(payload):
-    s = URLSafeSerializer(app.secret_key)
+    s = URLSafeSerializer(current_app.secret_key)
     try:
         user_id = s.loads(payload)
     except BadSignature:
@@ -305,24 +303,13 @@ def activate_user(payload):
     user = get_user_or_error(user_id)
     user.confirmed_at = datetime.now()
     user.save()
-    logger.debug('User {} activated'.format(user.email))
+    current_app.logger.debug('User {} activated'.format(user.email))
     return humanify(clean_user(user))
 
 
-@app.route('/users/send_activation_email',  methods=['POST'])
-@jwt_required()
-def handle_activation_email_request():
-    referrer = request.referrer
-    if referrer:
-        referrer_host_url = get_referrer_host_url(referrer)
-    else:
-        referrer_host_url = None
-    user_id = str(current_user.id)
-    return send_activation_email(user_id, referrer_host_url)
-
-
-@app.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
-@app.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@blueprint.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@blueprint.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@auth_token_required
 def manage_user(user_id=None):
     '''
     Manage user accounts. If routed as /user, gives access only to logged in
@@ -330,25 +317,19 @@ def manage_user(user_id=None):
     if the looged in user is in the admin group.
     POST gets special treatment, as there must be a way to register new user.
     '''
-    try:
-        verify_jwt()
-    except JWTError as e:
-        # You can create a new user while not being logged in
-        # ToDo: defend this endpoint with rate limiting or similar means
-        if request.method == 'POST':
-            if not 'application/json' in request.headers['Content-Type']:
-                abort(400, "Please set 'Content-Type' header to 'application/json'")
-            return user_handler(None, request)
-        else:
-            logger.debug(e.description)
-            abort(403)
+    # You can create a new user while not being logged in
+    # ToDo: defend this endpoint with rate limiting or similar means
+    if request.method == 'POST':
+        if not 'application/json' in request.headers['Content-Type']:
+            abort(400, "Please set 'Content-Type' header to 'application/json'")
+        return user_handler(None, request)
 
     if user_id:
         # admin access_mode
         if is_admin(current_user):
             return user_handler(user_id, request)
         else:
-            logger.debug('Non-admin user {} tried to access user id {}'.format(
+            current_app.logger.debug('Non-admin user {} tried to access user id {}'.format(
                                                   current_user.email, user_id))
             abort(403)
     else:
@@ -360,14 +341,14 @@ def manage_user(user_id=None):
         return user_handler(user_id, request)
 
 
-@app.route('/mjs/<item_id>', methods=['DELETE'])
-@jwt_required()
+@blueprint.route('/mjs/<item_id>', methods=['DELETE'])
+@auth_token_required
 def delete_item_from_story(item_id):
     remove_item_from_story(item_id)
     return humanify(get_mjs())
     
-@app.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
-@jwt_required()
+@blueprint.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
+@auth_token_required
 def remove_item_from_branch(item_id, branch_num=None):
     try:
         branch_num = int(branch_num)
@@ -378,8 +359,8 @@ def remove_item_from_branch(item_id, branch_num=None):
     return humanify(get_mjs())
 
 
-@app.route('/mjs/<branch_num>', methods=['POST'])
-@jwt_required()
+@blueprint.route('/mjs/<branch_num>', methods=['POST'])
+@auth_token_required
 def add_to_story_branch(branch_num):
     item_id = request.data
     try:
@@ -390,8 +371,8 @@ def add_to_story_branch(branch_num):
     return humanify(get_mjs())
 
 
-@app.route('/mjs/<branch_num>/name', methods=['POST'])
-@jwt_required()
+@blueprint.route('/mjs/<branch_num>/name', methods=['POST'])
+@auth_token_required
 def set_story_branch_name(branch_num):
 
     name = request.data
@@ -400,8 +381,8 @@ def set_story_branch_name(branch_num):
     return humanify(get_mjs())
 
 
-@app.route('/mjs', methods=['GET', 'POST'])
-@jwt_required()
+@blueprint.route('/mjs', methods=['GET', 'POST'])
+@auth_token_required
 def manage_jewish_story():
     '''Logged in user may GET or POST their jewish story links.
     the links are stored as an array of items where each item has a special
@@ -421,14 +402,14 @@ def manage_jewish_story():
 
         except ValueError:
             e_message = 'Could not decode JSON from data'
-            logger.debug(e_message)
+            current_app.logger.debug(e_message)
             abort(400, e_message)
 
         add_to_my_story(data)
         return humanify(get_mjs())
 
-@app.route('/upload', methods=['POST'])
-@jwt_required()
+@blueprint.route('/upload', methods=['POST'])
+@auth_token_required
 @autodoc.doc()
 def save_user_content():
     '''Logged in user POSTs a multipart request that includes a binary
@@ -528,7 +509,7 @@ def save_user_content():
         bhp6_md['thumbnail'] = {}
         bhp6_md['thumbnail']['data'] = urllib.quote(binary_thumbnail.encode('base64'))
     except IOError as e:
-        logger.debug('Thumbnail creation failed for {} with error: {}'.format(
+        current_app.logger.debug('Thumbnail creation failed for {} with error: {}'.format(
             file_obj.filename, e.message))
 
     # Add ugc flag to the metadata
@@ -547,7 +528,7 @@ def save_user_content():
         http_uri = console_uri.format(bucket, file_oid)
         mjs = get_mjs(user_oid)['mjs']
         if mjs == {}:
-            logger.debug('Creating mjs for user {}'.format(user_email))
+            current_app.logger.debug('Creating mjs for user {}'.format(user_email))
         # Add main_image_url for images (UnitType 1)
         if bhp6_md['UnitType'] == 1:
             ugc_image_uri = 'https://storage.googleapis.com/' + saved_uri.split('gs://')[1]
@@ -563,14 +544,14 @@ def save_user_content():
                                 'user_name': user_name})
         sent = send_gmail(subject, body, editor_address, message_mode='html')
         if not sent:
-            logger.error('There was an error sending an email to {}'.format(editor_address))
+            current_app.logger.error('There was an error sending an email to {}'.format(editor_address))
         clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
 
         return humanify({'md': clean_md})
     else:
         abort(500, 'Failed to save {}'.format(filename))
 
-@app.route('/search')
+@blueprint.route('/search')
 @autodoc.doc()
 def general_search():
     """
@@ -600,7 +581,7 @@ def general_search():
             abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)
 
-@app.route('/wsearch')
+@blueprint.route('/wsearch')
 def wizard_search():
     '''
     We must have either `place` or `name` (or both) of the keywords.
@@ -650,7 +631,7 @@ def wizard_search():
     '''
     return humanify(rv)
 
-@app.route('/suggest/<collection>/<string>')
+@blueprint.route('/suggest/<collection>/<string>')
 def get_suggestions(collection,string):
     '''
     This view returns a json with 3 fields:
@@ -672,7 +653,7 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
-@app.route('/item/<item_id>')
+@blueprint.route('/item/<item_id>')
 @autodoc.doc()
 def get_items(item_id):
     '''
@@ -692,14 +673,7 @@ def get_items(item_id):
     for item in items_list:
         if item.startswith('ugc'):
             ugc_items.append(item)
-    if ugc_items:
-        # Check if the user is logged in
-        try:
-            verify_jwt()
-            user_oid = current_user.id
-        except JWTError as e:
-            logger.debug(e.description)
-            abort(403, 'You have to be logged in to access this item(s)')
+    user_oid = current_user.is_authenticated and current_user.id
 
     items = fetch_items(items_list[:10])
     if len(items) == 1 and 'error_code' in items[0]:
@@ -716,7 +690,7 @@ def get_items(item_id):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
 
-@app.route('/fsearch')
+@blueprint.route('/fsearch')
 @autodoc.doc()
 def ftree_search():
     '''
@@ -744,9 +718,9 @@ def ftree_search():
     marriage_year
     death_year
     The *_year fields could be specified as an integer with an optional fudge
-    factor signified by a tilda, like 1907~2
+    factor signified by a collon, like 1907:2
     The query for birth_year 1907 will match the records from this year only,
-    while the query for 1907~2 will match the records from 1905, 1906, 1907
+    while the query for 1907:2 will match the records from 1905, 1906, 1907
     1908 and 1909, making the match wider.
     _______________________________________________________________________
     sex
@@ -764,40 +738,24 @@ def ftree_search():
     if len(keys) == 1 and keys[0]=='sex':
         em = "Sex only is not enough"
         abort (400, em)
-    return humanify(fsearch(**args))
+    items = fsearch(**args)
+    return humanify({"items": items, "total": items.count()})
 
-@app.route('/get_ftree_url/<tree_number>')
-def fetch_tree(tree_number):
-    try:
-        tree_number = int(tree_number)
-    except ValueError:
-        abort(400, 'Tree number must be an integer')
-    ftree_bucket_url = conf.ftree_bucket_url
-    collection = data_db['genTreeIndividuals']
-    tree = collection.find_one({'GTN': tree_number})
-    if tree:
-        tree_path = tree['GenTreePath']
-        tree_fn = tree_path.split('/')[-1]
-        rv = {'tree_file': '{}/{}'.format(ftree_bucket_url, tree_fn)}
-        return humanify(rv)
-    else:
-        abort(404, 'Tree {} not found'.format(tree_number))
-
-@app.route('/person/<tree_number>/<node_id>')
+@blueprint.route('/person/<tree_number>/<node_id>')
 @autodoc.doc()
 def person_view(tree_number, node_id):
     '''
     This view returns a part of family tree starting with a given tree number
     and node id.
     '''
-    person = data_db['genTreeIndividuals'].find_one({'GTN': int(tree_number),
+    person = current_app.data_db['genTreeIndividuals'].find_one({'GTN': int(tree_number),
                                                 'II': node_id})
     # TODO: who cleans the living? should be here if not part of the migration
     if not person:
         abort(404, 'person not found')
     return humanify(person)
 
-@app.route('/get_image_urls/<image_ids>')
+@blueprint.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
     """Validate the comma separated list of image UUIDs and return a list
     of links to these images.
@@ -815,14 +773,14 @@ def fetch_images(image_ids):
             UUID(i)
             valid_ids.append(i)
         except ValueError:
-            logger.debug('Wrong UUID - {}'.format(i))
+            current_app.logger.debug('Wrong UUID - {}'.format(i))
             continue
 
     image_urls = [get_image_url(i) for i in valid_ids]
     return humanify(image_urls)
 
 
-@app.route('/get_changes/<from_date>/<to_date>')
+@blueprint.route('/get_changes/<from_date>/<to_date>')
 @autodoc.doc()
 def get_changes(from_date, to_date):
     '''
@@ -839,7 +797,7 @@ def get_changes(from_date, to_date):
         except ValueError:
             abort(400, 'Bad timestamp - {}'.format(dates[date]))
 
-    log_collection = data_db['migration_log']
+    log_collection = current_app.data_db['migration_log']
     query = {'date': {'$gte': dates['start'], '$lte': dates['end']}}
     projection = {'item_id': 1, '_id': 0}
     cursor = log_collection.find(query, projection)
@@ -855,7 +813,7 @@ def get_changes(from_date, to_date):
                     rv.add(doc['item_id'])
     return humanify(list(rv))
 
-@app.route('/newsletter', methods=['POST'])
+@blueprint.route('/newsletter', methods=['POST'])
 def newsletter_register():
     data = request.json
     for lang in data['langs']:

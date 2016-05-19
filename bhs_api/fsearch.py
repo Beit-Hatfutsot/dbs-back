@@ -1,7 +1,6 @@
 import re
 
-from flask import abort
-from bhs_api import  logger, data_db
+from flask import abort, current_app
 import phonetic
 
 MAX_RESULTS=30 # aka chunk size
@@ -174,9 +173,9 @@ def fsearch(max_results=15, **kwargs):
             abort(400, "{} argument couldn't be empty".format(key))
 
 
-    collection = data_db['genTreeIndividuals']
+    collection = current_app.data_db['genTreeIndividuals']
     search_query = build_query(search_dict)
-    logger.debug('FSearch query:\n{}'.format(search_query))
+    current_app.logger.debug('FSearch query:\n{}'.format(search_query))
 
     if 'debug' in search_dict:
         projection = None
@@ -186,7 +185,7 @@ def fsearch(max_results=15, **kwargs):
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
     results = results.limit(MAX_RESULTS)
-    logger.debug('FSearch query:\n{} returning {} results'.format(
+    current_app.logger.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
     return ({"items": clean_private_data(results),
              "total": results.count()})
