@@ -16,6 +16,7 @@ CONF_FILE = '/etc/bhs/config.yml'
 # Create app
 def create_app(testing=False):
     from bhs_api.models import User, Role
+    from bhs_api.forms import LoginForm
 
     app = Flask(__name__)
     app.testing = testing
@@ -73,7 +74,8 @@ def create_app(testing=False):
     app.mail = Mail(app)
     app.db = MongoEngine(app)
     app.user_datastore = MongoEngineUserDatastore(app.db, User, Role)
-    app.security = Security(app, app.user_datastore)
+    app.security = Security(app, app.user_datastore,
+                            passwordless_login_form=LoginForm)
     # Create database connection object
     app.client_data_db = pymongo.MongoClient(conf.data_db_host, conf.data_db_port,
                     read_preference=pymongo.ReadPreference.SECONDARY_PREFERRED)

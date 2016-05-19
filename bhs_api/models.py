@@ -18,7 +18,6 @@ class User(Document, UserMixin):
     email = StringField(max_length=255)
     password = StringField(max_length=255)
     name = StringField(max_length=255)
-    next = StringField(max_length=1023)
     active = BooleanField(default=True)
     confirmed_at = DateTimeField()
     roles = ListField(ReferenceField(Role))

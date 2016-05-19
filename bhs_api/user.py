@@ -30,7 +30,6 @@ def setup_users():
                                 roles=[user_role])
 '''
 
-
 def is_admin(flask_user_obj):
     if flask_user_obj.has_role('admin'):
         return True
