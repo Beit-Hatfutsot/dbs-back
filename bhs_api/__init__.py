@@ -52,11 +52,12 @@ def create_app(testing=False):
     app.config['FRONTEND_SERVER'] = conf.frontend_server
     # Security Config
     app.config['SECRET_KEY'] = conf.secret_key
+    app.config['WTF_CSRF_ENABLED'] = False
     app.config['SECURITY_PASSWORDLESS'] = True
     app.config['SECURITY_EMAIL_SENDER'] = 'support@bh.org.il'
     app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = 'email'
     app.config['SECURITY_EMAIL_SUBJECT_PASSWORDLESS'] = 'BH Login Instructions'
-    app.config['WTF_CSRF_ENABLED'] = False
+    app.config['SECURITY_POST_LOGIN_VIEW'] = '/mjs'
     # Mail Config
     app.config['MAIL_SERVER'] = conf.mail_server
     app.config['MAIL_PORT'] = conf.mail_port
