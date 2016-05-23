@@ -1,3 +1,4 @@
+import logging
 import os
 import inspect
 from datetime import timedelta
@@ -14,7 +15,7 @@ from bhs_api.utils import get_logger
 SEARCH_CHUNK_SIZE = 15
 CONF_FILE = '/etc/bhs/config.yml'
 # Create app
-def create_app(testing=False):
+def create_app(testing=False, live=False):
     from bhs_api.models import User, Role
     from bhs_api.forms import LoginForm
 
@@ -93,17 +94,26 @@ def create_app(testing=False):
     #allow CORS
     cors = CORS(app, origins=['*'], headers=['content-type', 'accept',
                                             'authentication-token', 'Authorization'])
+    # logging
+    if live:
+        app.config['PROPAGATE_EXCEPTIONS'] = True
+        try:
+            fh = logging.FileHandler(conf.log_file)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            fh.setFormatter(formatter)
+            app.logger.addHandler(fh)
+        except AttributeError:
+            pass
+
+    app.logger.debug("Hellow world")
+
     return app, conf
 
-app, conf = create_app()
+if __name__ == "__main__":
+    app, conf = create_app()
+
 # Specify the bucket name for user generated content
 ugc_bucket = 'bhs-ugc'
 
 # Specify the email address of the editor for UGC moderation
 editor_address = 'inna@bh.org.il,bennydaon@bh.org.il'
-
-# Logging config
-logger = app.logger
-
-
-

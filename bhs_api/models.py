@@ -24,6 +24,4 @@ class User(Document, UserMixin):
     story_items = EmbeddedDocumentListField(StoryLine)
     story_branches = ListField(field=StringField(max_length=64),
                                   default=4*[''])
-    next = StringField(max_length=1023, default='mjs')
-
-
+    next = StringField(max_length=1023, default='/mjs')
