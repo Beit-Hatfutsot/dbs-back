@@ -130,10 +130,7 @@ def update_user(user_id, user_dict):
     if 'email' in user_dict.keys():
         user_obj.email = user_dict['email']
     if 'name' in user_dict.keys():
-        user_obj.email = user_dict['name']
-    if 'password' in user_dict.keys():
-        enc_password = encrypt_password(user_dict['password'])
-        user_obj.password = enc_password
+        user_obj.name = user_dict['name']
 
     user_obj.save()
     return clean_user(user_obj)
