@@ -18,7 +18,6 @@ def test_send_ticket(client, app):
     with mail.record_messages() as outbox:
         ticket = send_ticket({'email': 'ster@example.com', 'next': '/mjs'})
         assert len(outbox) == 1
-        assert outbox[0].subject == "BH Login Instructions"
         urls = re.findall('http\S+', outbox[0].body)
         assert len(urls) == 1
     res = client.get(urls[0], headers={'Accept': 'application/json'})
