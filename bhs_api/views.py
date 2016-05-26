@@ -32,7 +32,7 @@ from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             remove_item_from_story)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
-from bhs_api.fsearch import fsearch
+from bhs_api.fsearch import fsearch, get_person
 
 import phonetic
 
@@ -738,8 +738,8 @@ def ftree_search():
     if len(keys) == 1 and keys[0]=='sex':
         em = "Sex only is not enough"
         abort (400, em)
-    items = fsearch(**args)
-    return humanify({"items": items, "total": items.count()})
+    total, items = fsearch(**args)
+    return humanify({"items": items, "total": total})
 
 @blueprint.route('/person/<tree_number>/<node_id>')
 @autodoc.doc()
@@ -748,9 +748,8 @@ def person_view(tree_number, node_id):
     This view returns a part of family tree starting with a given tree number
     and node id.
     '''
-    person = current_app.data_db['genTreeIndividuals'].find_one({'GTN': int(tree_number),
-                                                'II': node_id})
-    # TODO: who cleans the living? should be here if not part of the migration
+    person = get_person(tree=int(tree_number), id=node_id)
+
     if not person:
         abort(404, 'person not found')
     return humanify(person)

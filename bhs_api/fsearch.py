@@ -181,25 +181,33 @@ def fsearch(max_results=15, **kwargs):
         projection = None
 
     results = collection.find(search_query, PROJECTION)
+    total = results.count()
 
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
     results = results.limit(MAX_RESULTS)
     current_app.logger.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
-    return results
+    return total, map(clean_person, results)
 
-def clean_private_data(ppl):
-    ''' Remove details of the living '''
-    ret = []
-    for i in ppl:
-        if 'tree' in i and not i['tree']['deceased']:
-            for key in ('BD', 'BP', 'MD', 'MP'):
-                i[key] = ''
-            for key in ('BIRT_PLAC', 'BIRT_DATE', 'MARR_PLAC', 'MARR_DATE',
-                        'OCCU', 'NOTE'):
-                i['tree'][key] = {}
-        ret.append(i)
-    return ret
+ 
+def clean_person(person):
+    private_key = re.compile(
+        "[BD|BP|MD|MP]")
+    private_dict = re.compile(
+        '[BIRT_PLAC|BIRT_DATE|MARR_PLAC|MARR_DATE|OCCU|NOTE]')
+    if 'tree' in person and not person['tree']['deceased']:
+        for key in person.keys():
+            if private_key.match(key):
+                person[key] = ''
+            if private_dict.match(key):
+                person['tree'][key] = {}
+    return person
 
+
+def get_person(tree, id):
+    ''' get a specific person '''
+    person = current_app.data_db['genTreeIndividuals'].find_one(
+                                            {'GTN': tree, 'II': id})
+    return clean_person(person)
 
