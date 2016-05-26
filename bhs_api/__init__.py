@@ -109,9 +109,6 @@ def create_app(testing=False, live=False):
 
     return app, conf
 
-if __name__ == "__main__":
-    app, conf = create_app()
-
 # Specify the bucket name for user generated content
 ugc_bucket = 'bhs-ugc'
 

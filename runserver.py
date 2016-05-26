@@ -19,5 +19,6 @@ def flaskrun(db=None):
     app.run(debug=args.debug)
 
 
-flaskrun()
+if __name__ == "__main__":
+    flaskrun()
 
