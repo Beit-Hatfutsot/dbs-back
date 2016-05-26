@@ -4,7 +4,6 @@ Flask-Login==0.3.2
 Flask-Mail==0.9.1
 Flask-Principal==0.4.0
 -e git+https://github.com/Beit-Hatfutsot/flask-security.git#egg=Flask-Security
-# Flask-Security==1.7.4
 Flask-WTF==0.10.2
 Flask-Autodoc==0.1.2
 Jinja2==2.7.3
