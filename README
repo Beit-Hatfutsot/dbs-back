@@ -1,0 +1,21 @@
+Server Setup
+------------
+
+Required packages and directories, run as root on the server:
+
+ $ apt-get install uwsgi-core uwsgi-plugin-python supervisor
+ $ mkdir /etc/bhs
+ $ mkdir /var/log/bhs
+ $ mkdir /var/run/bhs
+ $ chown bhs /etc/bhs /var/log/bhs /var/run/bhs
+
+Putting the source, run on local dev:
+
+ $ fab [-H server_addresss] deploy # default is devapi.dbs.bh.org.il
+
+First time copying of conf files:
+
+ $ cd ~bhs/api
+ $ cp conf/supervisor_conf.d/* /etc/supervisor/conf.d
+ $ cp conf/api-uwsgi.ini /etc/bhs
+ $ supervisorctl update
