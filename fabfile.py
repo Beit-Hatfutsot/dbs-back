@@ -4,6 +4,7 @@ from datetime import datetime
 import logging
 
 from fabric.api import *
+from fabric.contrib import files
 
 API_SERVERS = {'bhs-dev': 'test-api.myjewishidentity.org',
                'bhs-prod': 'api.dbs.bh.org.il'}
@@ -40,16 +41,14 @@ def restart_api():
 
 
 def push_code(branch='dev'):
-    local('find . -name "*.pyc" -exec rm -rf {} \;')
-    with lcd(".."):
-        local('tar czf api.tgz --exclude=env --exclude-vcs api')
-        put('api.tgz', '~')
-    run('tar xzf api.tgz')
+    local('tar archive -o /tmp/api.tar.gz HEAD')
+    put('/tmp/api.tar.gz', '~')
+    run('tar xzf api.tar.gz')
     with cd("api"):
-        run('virtualenv env')
+        if not files.exists('env'):
+            run('virtualenv env')
         with prefix('. env/bin/activate'):
             run('pip install -r requirements.txt')
-
 
 @hosts('bhs-infra')
 def pull_mongo(dbname):
