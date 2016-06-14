@@ -653,12 +653,12 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
-@blueprint.route('/item/<item_id>')
+@blueprint.route('/item/<slugs>')
 @autodoc.doc()
-def get_items(item_id):
+def get_items(slugs):
     '''
     This view returns a list of jsons representing one or more item(s).
-    The item_id argument is in the form of "collection_name.item_slug", like
+    The slugs argument is in the form of "collection_name.item_slug", like
     "personalities.albert_einstein" and could contain multiple IDs split
     by commas.
     Only the first 10 ids will be returned to prevent abuse.
@@ -667,7 +667,7 @@ def get_items(item_id):
     '''
     args = request.args
 
-    items_list = item_id.split(',')
+    items_list = slugs.split(',')
     # Check if there are items from ugc collection and test their access control
     ugc_items = []
     for item in items_list:
@@ -675,7 +675,7 @@ def get_items(item_id):
             ugc_items.append(item)
     user_oid = current_user.is_authenticated and current_user.id
 
-    items = fetch_items(items_list[:10])
+    items = fetch_items(items_list[:50])
     if len(items) == 1 and 'error_code' in items[0]:
         error = items[0]
         abort(error['error_code'],  error['msg'])
