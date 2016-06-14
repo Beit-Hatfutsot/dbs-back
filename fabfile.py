@@ -17,14 +17,28 @@ env.now = datetime.now().strftime('%Y%m%d-%H%M')
 def dev():
     env.hosts = ['bhs-dev']
 
+def push_code(branch='dev'):
+    local('git archive -o /tmp/api.tar.gz HEAD')
+    put('/tmp/api.tar.gz', '~/api')
+    with cd("api"):
+        run('tar xzf api.tar.gz')
+        if not files.exists('env'):
+            run('virtualenv env')
+        with prefix('. env/bin/activate'):
+            run('pip install -r requirements.txt')
+
 def deploy(branch='dev'):
     push_code(branch)
+    test()
     restart_api()
 
-def restart_api():
+def test():
     with cd("api"):
         with prefix('. env/bin/activate'):
             run('py.test tests bhs_api/*.py')
+
+def restart_api():
+    with cd("api"):
         '''
         run("cp conf/supervisord.conf ~")
         run("kill -HUP `cat /run/bhs/supervisord.pid`")
@@ -32,23 +46,7 @@ def restart_api():
         '''
         sudo("cp conf/api-uwsgi.ini /etc/bhs/")
         # change the ini file to use the corrent uid for bhs
-        sudo('sed -i "s/1000/`id -u bhs`/" /etc/bhs/api-uwsgi.ini')
-        sudo("service uwsgi stop")
-        # TODO bring uwsgi under supervisord
-        sudo("cp conf/uwsgi /etc/init.d/")
-        sudo("service uwsgi start")
-        sudo("service uwsgi status")
-
-
-def push_code(branch='dev'):
-    local('tar archive -o /tmp/api.tar.gz HEAD')
-    put('/tmp/api.tar.gz', '~')
-    run('tar xzf api.tar.gz')
-    with cd("api"):
-        if not files.exists('env'):
-            run('virtualenv env')
-        with prefix('. env/bin/activate'):
-            run('pip install -r requirements.txt')
+        sudo("supervisorctl restart uwsgi")
 
 @hosts('bhs-infra')
 def pull_mongo(dbname):
