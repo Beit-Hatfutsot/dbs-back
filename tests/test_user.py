@@ -4,7 +4,6 @@ import logging
 import pytest
 
 from pytest_flask.plugin import client
-from fixtures import get_auth_header,app
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
