@@ -19,3 +19,9 @@ First time copying of conf files:
  $ cp conf/supervisor_conf.d/* /etc/supervisor/conf.d
  $ cp conf/api-uwsgi.ini /etc/bhs
  $ supervisorctl update
+
+Using the shell
+---------------
+
+ $ python flask_shell.py
+

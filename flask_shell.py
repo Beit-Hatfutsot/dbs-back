@@ -1,6 +1,7 @@
-from bhs_api import app
+from bhs_api import create_app
 import IPython
 
+app, conf = create_app(testing=True)
 app.testing = True
 test_client = app.test_client()
 
