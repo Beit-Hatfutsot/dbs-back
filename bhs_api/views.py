@@ -29,7 +29,7 @@ from utils import (upload_file, send_gmail, humanify,
                    get_referrer_host_url, dictify)
 from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
-            remove_item_from_story)
+            remove_item_from_story, collect_editors_items)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
 from bhs_api.fsearch import fsearch, get_person
@@ -834,3 +834,9 @@ def newsletter_register():
         log = open("var/log/bhs/newsletters.log", "a")
         log.write("  ".join([res.status_code, data['email'], date['langs']]))
         log.close()
+
+
+@blueprint.route('/collection/<name>')
+def get_country(name):
+    items = collect_editors_items(name)
+    return humanify ({'items': items})

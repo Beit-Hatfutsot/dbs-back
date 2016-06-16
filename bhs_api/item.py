@@ -102,14 +102,14 @@ def fetch_items(slug_list, db=None):
     rv = []
     for slug in slug_list:
         try:
-            item = _fetch_item(slug, db)
+            item = fetch_item(slug, db)
             rv.append(item)
         except (Forbidden, NotFound) as e:
             rv.append({'slug': slug, 'error_code': e.code, 'msg': e.description})
     return rv
 
 
-def _fetch_item(slug, db):
+def fetch_item(slug, db=None):
     """
     Gets an item based on slug and returns it
     If slug is bad or item is not found, raises an exception.

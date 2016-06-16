@@ -7,6 +7,7 @@ from flask.ext.security.passwordless import send_login_instructions
 
 from utils import get_referrer_host_url, humanify, dictify, send_gmail
 from .models import StoryLine
+from .item import fetch_item
 
 SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next')
 
@@ -198,3 +199,19 @@ def set_item_in_branch(item_id, branch_num, value):
 def remove_item_from_story(item_id):
     current_user.story_items = [i for i in current_user.story_items if i.id != item_id]
     current_user.save()
+
+def collect_editors_items(name):
+    """ 
+        look for a branch named `name` in all editors stories, collect the items
+        and return them
+    """
+    editor_role = current_app.user_datastore.find_role('editor')
+    editors = current_app.user_datastore.user_model.objects(roles=editor_role,
+                                                            story_branches=name)
+    items = []
+    for user in editors:
+        i = user.story_branches.index(name)
+        for j in user.story_items:
+            if j.in_branch[i]:
+                items.append(fetch_item(j.id))
+    return items
