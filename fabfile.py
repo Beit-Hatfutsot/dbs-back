@@ -22,10 +22,14 @@ def push_code(branch='dev'):
     put('/tmp/api.tar.gz', '~/api')
     with cd("api"):
         run('tar xzf api.tar.gz')
+        sudo("cp conf/api-uwsgi.ini /etc/bhs/")
+        sudo("rsync -rv conf/supervisor/ /etc/supervisor/")
+        '''
         if not files.exists('env'):
             run('virtualenv env')
         with prefix('. env/bin/activate'):
             run('pip install -r requirements.txt')
+        '''
 
 def deploy(branch='dev'):
     push_code(branch)
@@ -44,7 +48,6 @@ def restart_api():
         run("kill -HUP `cat /run/bhs/supervisord.pid`")
         run("supervisorctl restart all")
         '''
-        sudo("cp conf/api-uwsgi.ini /etc/bhs/")
         # change the ini file to use the corrent uid for bhs
         sudo("supervisorctl restart uwsgi")
 
