@@ -248,3 +248,38 @@ def uuids_to_str(doc):
         if type(v) == UUID:
             doc[k] = str(v)
 
+
+def slugs_to_urls(slug):
+    ''' gets the slug dictionary, conataining `He` and `En` slug and returning
+        a dict with URLs
+    '''
+
+    r = {}
+    for k, v in slug.items():
+        c, s = v.split('_')
+        if k == 'He':
+            u = u'http://dbs.bh.org.il/he/{}/{}'.format(s, c)
+        else:
+            u = u'http://dbs.bh.org.il/{}/{}'.format(c, s)
+        r[k] = u
+    return r
+
+def collection_to_csv(coll, f):
+    '''
+        dumps a collection to a csv files.
+        the file includes the URL of the hebrew page, its title,
+        the url of the english page and its title.
+    '''
+    from bhs_api.item import SHOW_FILTER
+    for i in coll.find(SHOW_FILTER):
+        url = slugs_to_urls(i['Slug'])
+        try:
+            line = ','.join([url['He'], i['Header']['He'].replace(',','|')])
+        except KeyError:
+            line = ','
+        try:
+            line = ','.join([line, url['En'], i['Header']['En'].replace(',','|')])
+        except KeyError:
+            line = ','.join([line, '', ''])
+        line += '\n'
+        f.write(line.encode('utf8'))
