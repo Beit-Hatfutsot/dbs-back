@@ -1,7 +1,6 @@
 import json
 
 import pytest
-from fixtures import get_auth_header
 from pytest_flask.plugin import client
 
 @pytest.fixture

@@ -3,7 +3,6 @@ import logging
 import pytest
 
 from pytest_flask.plugin import client
-from fixtures import get_auth_header
 from bhs_api.fsearch import get_person
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/

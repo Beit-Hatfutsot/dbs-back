@@ -10,11 +10,26 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
 
 from bhs_api import create_app
 
-# See pytest-flask plugin documentation at https://pypi.python.org/pypi/pytest-flask
+
+@pytest.fixture
+def get_auth_header(app):
+    user = app.user_datastore.get_user("tester@example.com")
+    # do some cleanup
+    user.story_branches = 4*['']
+    user.save()
+    return {'Authentication-Token': user.get_auth_token()}
+
+
 
 @pytest.fixture(scope="session")
 def app():
-    test_app, conf = create_app(True)
-    # Enable exception propagation to the test context
-    return test_app
+    app, conf = create_app(testing=True)
+    return app
+
+
+@pytest.fixture
+def tester_headers(client, get_auth_header):
+    headers = {'Content-Type': 'application/json'}
+    headers.update(get_auth_header)
+    return headers
 
