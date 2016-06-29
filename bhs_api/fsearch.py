@@ -190,7 +190,7 @@ def fsearch(max_results=15, **kwargs):
                     search_query, results.count()))
     return total, map(clean_person, results)
 
- 
+
 def clean_person(person):
     private_key = re.compile(
         "[BD|BP|MD|MP]")
@@ -203,11 +203,4 @@ def clean_person(person):
             if private_dict.match(key):
                 person['tree'][key] = {}
     return person
-
-
-def get_person(tree, id):
-    ''' get a specific person '''
-    person = current_app.data_db['genTreeIndividuals'].find_one(
-                                            {'GTN': tree, 'II': id})
-    return clean_person(person)
 

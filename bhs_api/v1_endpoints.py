@@ -32,7 +32,7 @@ from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
             remove_item_from_story, collect_editors_items)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
-from bhs_api.fsearch import fsearch, get_person
+from bhs_api.fsearch import fsearch
 
 import phonetic
 
@@ -744,19 +744,6 @@ def ftree_search():
         abort (400, em)
     total, items = fsearch(**args)
     return humanify({"items": items, "total": total})
-
-@v1_endpoints.route('/person/<tree_number>/<node_id>')
-@v1_docs.doc()
-def person_view(tree_number, node_id):
-    '''
-    This view returns a part of family tree starting with a given tree number
-    and node id.
-    '''
-    person = get_person(tree=int(tree_number), id=node_id)
-
-    if not person:
-        abort(404, 'person not found')
-    return humanify(person)
 
 @v1_endpoints.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
