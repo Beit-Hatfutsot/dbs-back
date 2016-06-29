@@ -59,6 +59,7 @@ def create_app(testing=False, live=False):
     app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = 'email'
     app.config['SECURITY_EMAIL_SUBJECT_PASSWORDLESS'] = 'Login link for your jewish story'
     app.config['SECURITY_POST_LOGIN_VIEW'] = '/mjs'
+    app.config['SECURITY_LOGIN_URL'] = '/v1/login'
     # Mail Config
     app.config['MAIL_SERVER'] = conf.mail_server
     app.config['MAIL_PORT'] = conf.mail_port
