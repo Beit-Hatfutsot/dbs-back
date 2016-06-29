@@ -86,11 +86,14 @@ def create_app(testing=False, live=False):
 
     # Create the elasticsearch connection
     app.es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
-    # Add the views
-    from bhs_api.views import blueprint, autodoc
-    app.register_blueprint(blueprint)
+    # Add the general endpoints
+    from bhs_api.endpoints import endpoints
+    app.register_blueprint(endpoints)
+    # Add the v1 endpoint
+    from bhs_api.v1_endpoints import v1_endpoints, v1_docs
+    app.register_blueprint(v1_endpoints, url_prefix='/v1')
     # Initialize autodoc - https://github.com/acoomans/flask-autodoc
-    autodoc.init_app(app)
+    v1_docs.init_app(app)
     #allow CORS
     cors = CORS(app, origins=['*'], headers=['content-type', 'accept',
                                             'authentication-token', 'Authorization'])

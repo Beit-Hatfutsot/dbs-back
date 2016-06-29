@@ -12,11 +12,11 @@ def test_get_person(client):
     assert person['LN'] == 'Gurfinkel'
     assert person['BP'] == ''
 
-    res = client.get('/person/7846/I5')
+    res = client.get('/v1/person/7846/I5')
     assert res.json['LN'] == 'Gurfinkel'
     assert res.json['BP'] == ''
 
 def test_fsearch_api(client):
-    res = client.get('/fsearch?last_name=Cohen')
+    res = client.get('/v1/person?last_name=Cohen')
     assert 'items' in res.json
     assert int(res.json['total']) > 10000

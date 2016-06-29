@@ -36,8 +36,8 @@ from bhs_api.fsearch import fsearch, get_person
 
 import phonetic
 
-blueprint = Blueprint('', __name__)
-autodoc = Autodoc() 
+v1_endpoints = Blueprint('v1', __name__)
+v1_docs = Autodoc()
 
 def get_activation_link(user_id):
     s = URLSafeSerializer(current_app.secret_key)
@@ -276,23 +276,23 @@ def get_phonetic(collection, string, limit=5):
     return retval[:limit]
 
 # Views
-@blueprint.route('/documentation')
+@v1_endpoints.route('/docs')
 def documentation():
-    return autodoc.html(title='My Jewish Identity API documentation')
+    return v1_docs.html(title='Beit HatfutsotAPI documentation')
 
-@blueprint.route('/')
+@v1_endpoints.route('/')
 def home():
     if _check_token():
         return humanify({'access': 'private'})
     else:
         return humanify({'access': 'public'})
 
-@blueprint.route('/private')
+@v1_endpoints.route('/private')
 @auth_token_required
 def private_space():
     return humanify({'access': 'private', 'email': current_user.email})
 
-@blueprint.route('/users/activate/<payload>')
+@v1_endpoints.route('/users/activate/<payload>')
 def activate_user(payload):
     s = URLSafeSerializer(current_app.secret_key)
     try:
@@ -307,8 +307,8 @@ def activate_user(payload):
     return humanify(clean_user(user))
 
 
-@blueprint.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
-@blueprint.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@v1_endpoints.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@v1_endpoints.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @auth_token_required
 def manage_user(user_id=None):
     '''
@@ -341,13 +341,13 @@ def manage_user(user_id=None):
         return user_handler(user_id, request)
 
 
-@blueprint.route('/mjs/<item_id>', methods=['DELETE'])
+@v1_endpoints.route('/mjs/<item_id>', methods=['DELETE'])
 @auth_token_required
 def delete_item_from_story(item_id):
     remove_item_from_story(item_id)
     return humanify(get_mjs())
     
-@blueprint.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
+@v1_endpoints.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
 @auth_token_required
 def remove_item_from_branch(item_id, branch_num=None):
     try:
@@ -359,7 +359,7 @@ def remove_item_from_branch(item_id, branch_num=None):
     return humanify(get_mjs())
 
 
-@blueprint.route('/mjs/<branch_num>', methods=['POST'])
+@v1_endpoints.route('/mjs/<branch_num>', methods=['POST'])
 @auth_token_required
 def add_to_story_branch(branch_num):
     item_id = request.data
@@ -371,7 +371,7 @@ def add_to_story_branch(branch_num):
     return humanify(get_mjs())
 
 
-@blueprint.route('/mjs/<branch_num>/name', methods=['POST'])
+@v1_endpoints.route('/mjs/<branch_num>/name', methods=['POST'])
 @auth_token_required
 def set_story_branch_name(branch_num):
 
@@ -381,7 +381,7 @@ def set_story_branch_name(branch_num):
     return humanify(get_mjs())
 
 
-@blueprint.route('/mjs', methods=['GET', 'POST'])
+@v1_endpoints.route('/mjs', methods=['GET', 'POST'])
 @auth_token_required
 def manage_jewish_story():
     '''Logged in user may GET or POST their jewish story links.
@@ -408,9 +408,9 @@ def manage_jewish_story():
         add_to_my_story(data)
         return humanify(get_mjs())
 
-@blueprint.route('/upload', methods=['POST'])
+@v1_endpoints.route('/upload', methods=['POST'])
 @auth_token_required
-@autodoc.doc()
+@v1_docs.doc()
 def save_user_content():
     '''Logged in user POSTs a multipart request that includes a binary
     file and metadata.
@@ -551,8 +551,8 @@ def save_user_content():
     else:
         abort(500, 'Failed to save {}'.format(filename))
 
-@blueprint.route('/search')
-@autodoc.doc()
+@v1_endpoints.route('/search')
+@v1_docs.doc()
 def general_search():
     """
     This view initiates a full text search for `request.args.q` on the
@@ -581,7 +581,7 @@ def general_search():
             abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)
 
-@blueprint.route('/wsearch')
+@v1_endpoints.route('/wsearch')
 def wizard_search():
     '''
     We must have either `place` or `name` (or both) of the keywords.
@@ -631,7 +631,7 @@ def wizard_search():
     '''
     return humanify(rv)
 
-@blueprint.route('/suggest/<collection>/<string>')
+@v1_endpoints.route('/suggest/<collection>/<string>')
 def get_suggestions(collection,string):
     '''
     This view returns a json with 3 fields:
@@ -653,21 +653,25 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
-@blueprint.route('/item/<slugs>')
-@autodoc.doc()
+@v1_endpoints.route('/', defaults={'slugs': None})
+@v1_endpoints.route('/item/<slugs>')
+@v1_docs.doc()
 def get_items(slugs):
     '''
     This view returns a list of jsons representing one or more item(s).
     The slugs argument is in the form of "collection_name.item_slug", like
-    "personalities.albert_einstein" and could contain multiple IDs split
+    "personality_einstein-albert" and could contain multiple IDs split
     by commas.
-    Only the first 10 ids will be returned to prevent abuse.
     By default we don't return the documents that fail the show_filter,
     unless a `debug` argument was provided.
     '''
     args = request.args
 
-    items_list = slugs.split(',')
+    if slugs:
+        items_list = slugs.split(',')
+    elif request.is_json:
+        items_list = request.get_json()
+
     # Check if there are items from ugc collection and test their access control
     ugc_items = []
     for item in items_list:
@@ -675,7 +679,7 @@ def get_items(slugs):
             ugc_items.append(item)
     user_oid = current_user.is_authenticated and current_user.id
 
-    items = fetch_items(items_list[:50])
+    items = fetch_items(items_list)
     if len(items) == 1 and 'error_code' in items[0]:
         error = items[0]
         abort(error['error_code'],  error['msg'])
@@ -690,8 +694,8 @@ def get_items(slugs):
                     abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
         return humanify(items)
 
-@blueprint.route('/fsearch')
-@autodoc.doc()
+@v1_endpoints.route('/person')
+@v1_docs.doc()
 def ftree_search():
     '''
     This view initiates a search for Beit HaTfutsot genealogical data.
@@ -741,8 +745,8 @@ def ftree_search():
     total, items = fsearch(**args)
     return humanify({"items": items, "total": total})
 
-@blueprint.route('/person/<tree_number>/<node_id>')
-@autodoc.doc()
+@v1_endpoints.route('/person/<tree_number>/<node_id>')
+@v1_docs.doc()
 def person_view(tree_number, node_id):
     '''
     This view returns a part of family tree starting with a given tree number
@@ -754,7 +758,7 @@ def person_view(tree_number, node_id):
         abort(404, 'person not found')
     return humanify(person)
 
-@blueprint.route('/get_image_urls/<image_ids>')
+@v1_endpoints.route('/get_image_urls/<image_ids>')
 def fetch_images(image_ids):
     """Validate the comma separated list of image UUIDs and return a list
     of links to these images.
@@ -779,8 +783,8 @@ def fetch_images(image_ids):
     return humanify(image_urls)
 
 
-@blueprint.route('/get_changes/<from_date>/<to_date>')
-@autodoc.doc()
+@v1_endpoints.route('/get_changes/<from_date>/<to_date>')
+@v1_docs.doc()
 def get_changes(from_date, to_date):
     '''
     This view returns the item_ids of documents that were updated during the
@@ -812,7 +816,7 @@ def get_changes(from_date, to_date):
                     rv.add(doc['item_id'])
     return humanify(list(rv))
 
-@blueprint.route('/newsletter', methods=['POST'])
+@v1_endpoints.route('/newsletter', methods=['POST'])
 def newsletter_register():
     data = request.json
     for lang in data['langs']:
@@ -836,7 +840,7 @@ def newsletter_register():
         log.close()
 
 
-@blueprint.route('/collection/<name>')
+@v1_endpoints.route('/collection/<name>')
 def get_country(name):
     items = collect_editors_items(name)
     return humanify ({'items': items})

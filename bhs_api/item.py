@@ -139,8 +139,8 @@ def fetch_item(slug, db=None):
     else:
         item = get_item(slug, db)
         item = enrich_item(item, db)
-
         return _make_serializable(item)
+        return item
 
 def enrich_item(item, db):
     if not 'thumbnail' in item.keys():
@@ -174,10 +174,17 @@ def get_item_query(slug):
     if isinstance(slug, basestring):
         slug = Slug(slug)
     first = slug.full[0]
-    if first >= 'a' and first <='z':
-        return {'Slug.En': slug.full}
+    if slug.full.startswith('person_'):
+        try:
+            tree, id = slug.local_slug.split('.')
+            return {'GTN': int(tree), 'II': id}
+        except ValueError:
+            raise NotFound, "Bad person slug - "+slug.local_slug
     else:
-        return {'Slug.He': slug.full}
+        if first >= 'a' and first <='z':
+            return {'Slug.En': slug.full}
+        else:
+            return {'Slug.He': slug.full}
 
 def get_item(slug, db=None):
     if not db:
@@ -188,11 +195,15 @@ def get_item(slug, db=None):
     and therefore Forbidden.
     '''
     slug_query = get_item_query(slug)
-    return _filter_doc(slug_query, slug.collection, db)
+    if slug_query:
+        return _filter_doc(slug_query, slug.collection, db)
+    else:
+        return None
 
 def _filter_doc(query, collection, db):
     search_query = query.copy()
-    search_query.update(SHOW_FILTER)
+    if collection != 'genTreeIndividuals':
+        search_query.update(SHOW_FILTER)
     item = db[collection].find_one(search_query)
     if item:
         if collection == 'movies':
