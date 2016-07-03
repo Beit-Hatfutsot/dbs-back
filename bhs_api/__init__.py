@@ -87,9 +87,9 @@ def create_app(testing=False, live=False):
 
     # Create the elasticsearch connection
     app.es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
-    # Add the general endpoints
-    from bhs_api.endpoints import endpoints
-    app.register_blueprint(endpoints)
+    # Add the user's endpoints
+    from bhs_api.user import user_endpoints
+    app.register_blueprint(user_endpoints)
     # Add the v1 endpoint
     from bhs_api.v1_endpoints import v1_endpoints, v1_docs
     app.register_blueprint(v1_endpoints, url_prefix='/v1')

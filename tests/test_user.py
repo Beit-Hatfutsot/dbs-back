@@ -11,7 +11,8 @@ def test_api_public_view(client):
     res = client.get('/')
     assert res.json == {'access': 'public'}
 
-def test_send_ticket(client, app):
+def test_login_scenario(client, app):
+    ''' login scenario, starting with sending the ticket '''
     from bhs_api.user import send_ticket
     mail = app.extensions.get('mail')
     with mail.record_messages() as outbox:
@@ -25,6 +26,10 @@ def test_send_ticket(client, app):
     token = res.json['response']['user']['authentication_token']
     res = client.get('/', headers={'Authentication-Token': token})
     assert "private" in res.data
+    # now get the user
+    res = client.get('/user', headers={'Authentication-Token': token})
+    assert res.status_code == 200
+    assert res.json['email'] == 'ster@example.com'
 
 def test_dummy_token(client):
     res = client.get('/', headers={'Authentication-Token': 'dfdfdfdf'})
