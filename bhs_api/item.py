@@ -161,6 +161,9 @@ def enrich_item(item, db):
         else:
             return {}
             #abort(404, 'No video URL was found for this movie item.')
+    if 'Slug' not in item and 'GTN' in item:
+        item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
+
     return item
 
 
