@@ -552,7 +552,6 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
-@v1_endpoints.route('/', defaults={'slugs': None})
 @v1_endpoints.route('/item/<slugs>')
 @v1_docs.doc()
 def get_items(slugs):
@@ -668,39 +667,6 @@ def fetch_images(image_ids):
     image_urls = [get_image_url(i) for i in valid_ids]
     return humanify(image_urls)
 
-
-@v1_endpoints.route('/get_changes/<from_date>/<to_date>')
-@v1_docs.doc()
-def get_changes(from_date, to_date):
-    '''
-    This view returns the item_ids of documents that were updated during the
-    date range specified by the arguments. The dates should be supplied in the
-    timestamp format.
-    '''
-    rv = set()
-    # Validate the dates
-    dates = {'start': from_date, 'end': to_date}
-    for date in dates:
-        try:
-            dates[date] = datetime.fromtimestamp(float(dates[date]))
-        except ValueError:
-            abort(400, 'Bad timestamp - {}'.format(dates[date]))
-
-    log_collection = current_app.data_db['migration_log']
-    query = {'date': {'$gte': dates['start'], '$lte': dates['end']}}
-    projection = {'item_id': 1, '_id': 0}
-    cursor = log_collection.find(query, projection)
-    if not cursor:
-        return humanify([])
-    else:
-        for doc in cursor:
-            col, _id = doc['item_id'].split('.')
-            if col == 'genTreeIndividuals':
-                continue
-            else:
-                if filter_doc_id(_id, col):
-                    rv.add(doc['item_id'])
-    return humanify(list(rv))
 
 @v1_endpoints.route('/newsletter', methods=['POST'])
 def newsletter_register():
