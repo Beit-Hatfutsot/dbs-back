@@ -32,6 +32,7 @@ from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
 from bhs_api.fsearch import fsearch
+from bhs_api.user import get_user
 
 import phonetic
 
@@ -668,3 +669,9 @@ def newsletter_register():
 def get_collection(name):
     items = collect_editors_items(name)
     return humanify ({'items': items})
+
+@v1_endpoints.route('/story/<hash>')
+def get_story(hash):
+    user = get_user(hash)
+    del user['email']
+    return humanify (user)

@@ -12,7 +12,7 @@ from utils import get_referrer_host_url, humanify, dictify, send_gmail
 from .models import StoryLine
 from .item import fetch_item
 
-SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next')
+SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next', 'hash')
 
 user_endpoints = Blueprint('user', __name__)
 
