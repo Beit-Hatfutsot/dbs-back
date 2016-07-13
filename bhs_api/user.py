@@ -197,11 +197,17 @@ def get_user_or_error(user_id):
 
 
 def clean_user(user_obj):
+
+    # some old users might not have a hash, saving will generate one
+    if not user_obj.hash:
+        user_obj.save()
+
     user_dict = dictify(user_obj)
     ret = {}
     for key in SAFE_KEYS:
         ret[key] = user_dict.get(key, None)
     ret.update(get_mjs(user_obj))
+
     return ret
 
 
