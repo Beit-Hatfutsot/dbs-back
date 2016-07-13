@@ -40,8 +40,7 @@ def create_app(testing=False, live=False):
     if os.path.exists(CONF_FILE):
         conf = get_conf(CONF_FILE, must_have_keys)
     else:
-        current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) # script directory
-        conf = get_conf(os.path.join(current_dir, 'conf', 'bhs_config.yaml'),
+        conf = get_conf(os.path.join('conf', 'bhs_config.yaml'),
                         must_have_keys)
 
     # Our config - need to move everything here
