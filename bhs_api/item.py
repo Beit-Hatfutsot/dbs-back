@@ -28,6 +28,7 @@ class Slug:
         "lexicon": "lexicon",
         u"מלון": "lexicon",
         "personality": "personalities",
+        "luminary": "personalities",
         u"אישיות": "personalities",
         "place": "places",
         u"מקום": "places",
