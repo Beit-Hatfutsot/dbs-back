@@ -276,6 +276,7 @@ def get_phonetic(collection, string, limit=5):
     return retval[:limit]
 
 # Views
+@v1_endpoints.route('/')
 @v1_endpoints.route('/docs')
 def documentation():
     return v1_docs.html(title='Beit HatfutsotAPI documentation')
@@ -526,7 +527,6 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
-@v1_endpoints.route('/', defaults={'slugs': None})
 @v1_endpoints.route('/item/<slugs>')
 @v1_docs.doc()
 def get_items(slugs):
