@@ -2,12 +2,15 @@ server {
     listen 80;
     server_tokens off;
 
-    server_name bhs.ezdr.net;
-    access_log  /var/log/nginx/bhs_api.access.log;
-    error_log  /var/log/nginx/bhs_api.error.log;
+    server_name test-api.myjewishidentity.org devapi.dbs.bh.org.il;
+    access_log  /var/log/bhs/api.access.log;
+    error_log  /var/log/bhs/api.error.log;
 
-    location /{
-        uwsgi_pass localhost:5001;
+    location / {
+    	uwsgi_read_timeout 1800;
+
+        uwsgi_pass unix:///tmp/api-uwsgi.sock;
         include uwsgi_params;
     }
 }
+
