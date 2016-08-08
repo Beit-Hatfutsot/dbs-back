@@ -12,7 +12,7 @@ from utils import get_referrer_host_url, humanify, dictify, send_gmail
 from .models import StoryLine, UserName 
 from .item import fetch_item
 
-SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next')
+SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next', 'hash')
 
 user_endpoints = Blueprint('user', __name__)
 
@@ -197,11 +197,17 @@ def get_user_or_error(user_id):
 
 
 def clean_user(user_obj):
+
+    # some old users might not have a hash, saving will generate one
+    if not user_obj.hash:
+        user_obj.save()
+
     user_dict = dictify(user_obj)
     ret = {}
     for key in SAFE_KEYS:
         ret[key] = user_dict.get(key, None)
     ret.update(get_mjs(user_obj))
+
     return ret
 
 
@@ -261,7 +267,7 @@ def get_frontend_activation_link(user_id, referrer_host_url):
 def send_activation_email(user_id, referrer_host_url):
     user = get_user_or_error(user_id)
     email = user.email
-    name = user.name.En
+    name = user.name
     activation_link = get_frontend_activation_link(user_id, referrer_host_url)
     body = _generate_confirmation_body('email_verfication_template.html',
                                        name, activation_link)

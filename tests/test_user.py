@@ -2,6 +2,7 @@ import re
 import json
 import logging
 import pytest
+import hashlib
 
 from pytest_flask.plugin import client
 
@@ -16,7 +17,8 @@ def test_login_scenario(client, app):
     from bhs_api.user import send_ticket
     mail = app.extensions.get('mail')
     with mail.record_messages() as outbox:
-        ticket = send_ticket({'email': 'ster@example.com', 'next': '/mjs'})
+        ticket = client.post('/login',
+                             data={'email': 'ster@example.com', 'next': '/mjs'})
         assert len(outbox) == 1
         urls = re.findall('http\S+', outbox[0].body)
         assert len(urls) == 1
@@ -30,6 +32,13 @@ def test_login_scenario(client, app):
     res = client.get('/user', headers={'Authentication-Token': token})
     assert res.status_code == 200
     assert res.json['email'] == 'ster@example.com'
+    hash = res.json['hash']
+    assert hash == hashlib.md5('ster@example.com').hexdigest()
+    # now let's get the public stroy
+    res = client.get('/v1/story/'+hash)
+    assert res.status_code == 200
+    assert res.json['hash'] == hash
+
 
 def test_dummy_token(client):
     res = client.get('/', headers={'Authentication-Token': 'dfdfdfdf'})

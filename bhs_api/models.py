@@ -2,6 +2,7 @@ from mongoengine import (ListField, StringField, EmbeddedDocumentField,
                         EmbeddedDocumentListField, EmbeddedDocument,
                         GenericEmbeddedDocumentField, BooleanField,
                         DateTimeField, ReferenceField)
+import hashlib
 from flask.ext.mongoengine import Document
 from flask.ext.security import UserMixin, RoleMixin
 
@@ -30,3 +31,13 @@ class User(Document, UserMixin):
     story_branches = ListField(field=StringField(max_length=64),
                                   default=4*[''])
     next = StringField(max_length=1023, default='/mjs')
+    hash = StringField(max_length=255, default='')
+    username = StringField(max_length=255)
+    meta = {
+        'indexes': ['email', 'username', 'hash']
+    }
+
+    def save(self):
+        if not self.hash:
+            self.hash = hashlib.md5(self.email.lower()).hexdigest()
+        super(User, self).save()

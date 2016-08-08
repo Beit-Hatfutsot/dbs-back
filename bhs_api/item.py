@@ -115,6 +115,8 @@ def fetch_item(slug, db=None):
     If slug is bad or item is not found, raises an exception.
 
     """
+    if not db:
+        db = current_app.data_db
 
     try:
         slug = Slug(slug)

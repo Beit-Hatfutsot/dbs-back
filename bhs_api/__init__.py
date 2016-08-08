@@ -40,8 +40,7 @@ def create_app(testing=False, live=False):
     if os.path.exists(CONF_FILE):
         conf = get_conf(CONF_FILE, must_have_keys)
     else:
-        current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) # script directory
-        conf = get_conf(os.path.join(current_dir, 'conf', 'bhs_config.yaml'),
+        conf = get_conf(os.path.join('conf', 'bhs_config.yaml'),
                         must_have_keys)
 
     # Our config - need to move everything here
@@ -59,6 +58,7 @@ def create_app(testing=False, live=False):
     app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = 'email'
     app.config['SECURITY_EMAIL_SUBJECT_PASSWORDLESS'] = 'Login link for Your Jewish Story'
     app.config['SECURITY_POST_LOGIN_VIEW'] = '/mjs'
+    app.config['SECURITY_USER_IDENTITY_ATTRIBUTES'] = ('email', 'username', 'hash')
     # Mail Config
     app.config['MAIL_SERVER'] = conf.mail_server
     app.config['MAIL_PORT'] = conf.mail_port
@@ -108,6 +108,15 @@ def create_app(testing=False, live=False):
         except AttributeError:
             pass
 
+    # rate limit
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+
+    app.limiter = Limiter(
+        app,
+        key_func=get_remote_address,
+        global_limits=["200 per day", "50 per hour"]
+    )
     app.logger.debug("Hellow world")
 
     return app, conf

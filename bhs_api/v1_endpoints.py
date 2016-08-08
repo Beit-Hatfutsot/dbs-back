@@ -13,7 +13,6 @@ from flask import Flask, Blueprint, request, abort, url_for, current_app
 from flask.ext.security import auth_token_required
 from flask.ext.security import current_user
 from flask.ext.autodoc import Autodoc
-from flask_security.decorators import _check_token
 from itsdangerous import URLSafeSerializer, BadSignature
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
@@ -33,6 +32,7 @@ from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
 from bhs_api.fsearch import fsearch
+from bhs_api.user import get_user
 
 import phonetic
 
@@ -280,32 +280,6 @@ def get_phonetic(collection, string, limit=5):
 def documentation():
     return v1_docs.html(title='Beit HatfutsotAPI documentation')
 
-@v1_endpoints.route('/')
-def home():
-    if _check_token():
-        return humanify({'access': 'private'})
-    else:
-        return humanify({'access': 'public'})
-
-@v1_endpoints.route('/private')
-@auth_token_required
-def private_space():
-    return humanify({'access': 'private', 'email': current_user.email})
-
-@v1_endpoints.route('/users/activate/<payload>')
-def activate_user(payload):
-    s = URLSafeSerializer(current_app.secret_key)
-    try:
-        user_id = s.loads(payload)
-    except BadSignature:
-        abort(404)
-
-    user = get_user_or_error(user_id)
-    user.confirmed_at = datetime.now()
-    user.save()
-    current_app.logger.debug('User {} activated'.format(user.email))
-    return humanify(clean_user(user))
-
 
 @v1_endpoints.route('/upload', methods=['POST'])
 @auth_token_required
@@ -552,18 +526,18 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
+@v1_endpoints.route('/', defaults={'slugs': None})
 @v1_endpoints.route('/item/<slugs>')
 @v1_docs.doc()
 def get_items(slugs):
     '''
     This view returns a list of jsons representing one or more item(s).
-    The slugs argument is in the form of "collection_name.item_slug", like
-    "personality_einstein-albert" and could contain multiple IDs split
+    The slugs argument is in the form of "collection_slug", like
+    "personality_einstein-albert" and could contain multiple slugs split
     by commas.
     By default we don't return the documents that fail the show_filter,
     unless a `debug` argument was provided.
     '''
-    args = request.args
 
     if slugs:
         items_list = slugs.split(',')
@@ -600,7 +574,7 @@ def ftree_search():
     The search supports numerous fields and unexact values for search terms.
     For example, to get all individuals whose last name sounds like Abulafia
     and first name is Hanna:
-    curl 'api.myjewishidentity.org/fsearch?last_name=Abulafia;phonetic&first_name=Hanna'
+    curl 'http://api.dbs.bh.org.il/person?last_name=Abulafia;phonetic&first_name=Hanna'
     The full list of fields and their possible options follows:
     _______________________________________________________________________
     first_name
@@ -668,6 +642,39 @@ def fetch_images(image_ids):
     return humanify(image_urls)
 
 
+@v1_endpoints.route('/get_changes/<from_date>/<to_date>')
+@v1_docs.doc()
+def get_changes(from_date, to_date):
+    '''
+    This view returns the item_ids of documents that were updated during the
+    date range specified by the arguments. The dates should be supplied in the
+    timestamp format.
+    '''
+    rv = set()
+    # Validate the dates
+    dates = {'start': from_date, 'end': to_date}
+    for date in dates:
+        try:
+            dates[date] = datetime.fromtimestamp(float(dates[date]))
+        except ValueError:
+            abort(400, 'Bad timestamp - {}'.format(dates[date]))
+
+    log_collection = current_app.data_db['migration_log']
+    query = {'date': {'$gte': dates['start'], '$lte': dates['end']}}
+    projection = {'item_id': 1, '_id': 0}
+    cursor = log_collection.find(query, projection)
+    if not cursor:
+        return humanify([])
+    else:
+        for doc in cursor:
+            col, _id = doc['item_id'].split('.')
+            if col == 'genTreeIndividuals':
+                continue
+            else:
+                if filter_doc_id(_id, col):
+                    rv.add(doc['item_id'])
+    return humanify(list(rv))
+
 @v1_endpoints.route('/newsletter', methods=['POST'])
 def newsletter_register():
     data = request.json
@@ -693,6 +700,12 @@ def newsletter_register():
 
 
 @v1_endpoints.route('/collection/<name>')
-def get_country(name):
+def get_collection(name):
     items = collect_editors_items(name)
     return humanify ({'items': items})
+
+@v1_endpoints.route('/story/<hash>')
+def get_story(hash):
+    user = get_user(hash)
+    del user['email']
+    return humanify (user)
