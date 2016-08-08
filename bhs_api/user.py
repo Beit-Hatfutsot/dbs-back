@@ -9,7 +9,7 @@ from flask.ext.security.passwordless import send_login_instructions
 from flask.ext.security.decorators import _check_token
 
 from utils import get_referrer_host_url, humanify, dictify, send_gmail
-from .models import StoryLine
+from .models import StoryLine, UserName 
 from .item import fetch_item
 
 SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next', 'hash')
@@ -247,11 +247,13 @@ def send_ticket(user_dict, referrer_host_url=None):
 
 def update_user(user_id, user_dict):
     user_obj = get_user_or_error(user_id)
-    if 'email' in user_dict.keys():
+    if 'email' in user_dict:
         user_obj.email = user_dict['email']
-    if 'name' in user_dict.keys():
-        user_obj.name = user_dict['name']
-
+    if 'name' in user_dict:
+        if not user_obj.name:
+            user_obj.name = UserName()
+        for k,v in user_dict['name'].items():
+            setattr(user_obj.name, k, v)
     user_obj.save()
     return clean_user(user_obj)
 
