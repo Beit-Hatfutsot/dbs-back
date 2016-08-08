@@ -1,6 +1,7 @@
-from mongoengine import (ListField, StringField, EmbeddedDocumentListField,
-                         EmbeddedDocument, GenericEmbeddedDocumentField,
-                         BooleanField, DateTimeField, ReferenceField)
+from mongoengine import (ListField, StringField, EmbeddedDocumentField,
+                        EmbeddedDocumentListField, EmbeddedDocument,
+                        GenericEmbeddedDocumentField, BooleanField,
+                        DateTimeField, ReferenceField)
 from flask.ext.mongoengine import Document
 from flask.ext.security import UserMixin, RoleMixin
 
@@ -13,11 +14,15 @@ class StoryLine(EmbeddedDocument):
     id = StringField(max_length=512, unique=True)
     in_branch = ListField(BooleanField(), default=4*[False])
 
+class UserName(EmbeddedDocument):
+    en = StringField(max_length=64)
+    he = StringField(max_length=64) 
+
 
 class User(Document, UserMixin):
     email = StringField(max_length=255)
     password = StringField(max_length=255, default="lookmanopassword")
-    name = StringField(max_length=255)
+    name = EmbeddedDocumentField(UserName)
     active = BooleanField(default=True)
     confirmed_at = DateTimeField()
     roles = ListField(ReferenceField(Role))
