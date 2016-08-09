@@ -12,6 +12,10 @@ if __name__ == "__main__":
 
     for i in user_db['user'].find({'name': {'$exists': True}}):
         name = i['name']
+        if not isinstance(name, basestring):
+            print 'skipping: ' + str(name)
+            continue
+
         if is_english.match(name):
             new_name = {'en': name}
         else:
