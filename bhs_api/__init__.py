@@ -10,7 +10,6 @@ from flask.ext.cors import CORS
 from flask.ext.mail import Mail
 from flask.ext.security import Security, MongoEngineUserDatastore
 from bhs_common.utils import get_conf
-from bhs_api.utils import get_logger
 
 SEARCH_CHUNK_SIZE = 15
 CONF_FILE = '/etc/bhs/config.yml'
@@ -40,7 +39,7 @@ def create_app(testing=False, live=False):
     if os.path.exists(CONF_FILE):
         conf = get_conf(CONF_FILE, must_have_keys)
     else:
-        conf = get_conf(os.path.join('conf', 'bhs_config.yaml'),
+        conf = get_conf(os.path.join(os.pardir, 'conf', 'bhs_config.yaml'),
                         must_have_keys)
 
     # Our config - need to move everything here
