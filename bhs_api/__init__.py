@@ -108,14 +108,6 @@ def create_app(testing=False, live=False):
             pass
 
     # rate limit
-    from flask_limiter import Limiter
-    from flask_limiter.util import get_remote_address
-
-    app.limiter = Limiter(
-        app,
-        key_func=get_remote_address,
-        global_limits=["200 per day", "50 per hour"]
-    )
     app.logger.debug("Hellow world")
 
     return app, conf
