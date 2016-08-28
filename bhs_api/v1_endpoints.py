@@ -12,7 +12,6 @@ from uuid import UUID
 from flask import Flask, Blueprint, request, abort, url_for, current_app
 from flask.ext.security import auth_token_required
 from flask.ext.security import current_user
-from flask.ext.autodoc import Autodoc
 from itsdangerous import URLSafeSerializer, BadSignature
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
@@ -37,7 +36,6 @@ from bhs_api.user import get_user
 import phonetic
 
 v1_endpoints = Blueprint('v1', __name__)
-v1_docs = Autodoc()
 
 def get_activation_link(user_id):
     s = URLSafeSerializer(current_app.secret_key)
@@ -275,24 +273,10 @@ def get_phonetic(collection, string, limit=5):
     retval = phonetic.get_similar_strings(string, collection)
     return retval[:limit]
 
-# Views
-@v1_endpoints.route('/')
-@v1_endpoints.route('/docs')
-def documentation():
-    return v1_docs.html(title='Beit HatfutsotAPI documentation')
-
 
 @v1_endpoints.route('/upload', methods=['POST'])
 @auth_token_required
-@v1_docs.doc()
 def save_user_content():
-    '''Logged in user POSTs a multipart request that includes a binary
-    file and metadata.
-    The server stores the metadata in the ugc collection and uploads the file
-    to a bucket.
-    Only the first file and set of metadata is recorded.
-    After successful upload the server sends an email to editor.
-    '''
     if not request.files:
         abort(400, 'No files present!')
 
@@ -426,22 +410,7 @@ def save_user_content():
         abort(500, 'Failed to save {}'.format(filename))
 
 @v1_endpoints.route('/search')
-@v1_docs.doc()
 def general_search():
-    """
-    This view initiates a full text search for `request.args.q` on the
-    collection(s) specified in the `request.args.collection` or on all the
-    searchable collections if nothing was specified.
-    To search in 2 or more but not all collections, separate the arguments
-    by comma: `collection=movies,places`
-    The searchable collections are: 'movies', 'places', 'personalities',
-    'photoUnits' and 'familyNames'.
-    In addition to `q` and `collection`, the view could be passed `from_`
-    and `size` arguments.
-    `from_` specifies an integer for scrolling the result set and `size` specifies
-    the maximum amount of documents in response.
-    The view returns a json with an elasticsearch response.
-    """
     args = request.args
     parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None}
     for param in parameters.keys():
@@ -528,17 +497,7 @@ def get_suggestions(collection,string):
 
 
 @v1_endpoints.route('/item/<slugs>')
-@v1_docs.doc()
 def get_items(slugs):
-    '''
-    This view returns a list of jsons representing one or more item(s).
-    The slugs argument is in the form of "collection_slug", like
-    "personality_einstein-albert" and could contain multiple slugs split
-    by commas.
-    By default we don't return the documents that fail the show_filter,
-    unless a `debug` argument was provided.
-    '''
-
     if slugs:
         items_list = slugs.split(',')
     elif request.is_json:
@@ -567,45 +526,7 @@ def get_items(slugs):
         return humanify(items)
 
 @v1_endpoints.route('/person')
-@v1_docs.doc()
 def ftree_search():
-    '''
-    This view initiates a search for Beit HaTfutsot genealogical data.
-    The search supports numerous fields and unexact values for search terms.
-    For example, to get all individuals whose last name sounds like Abulafia
-    and first name is Hanna:
-    curl 'http://api.dbs.bh.org.il/person?last_name=Abulafia;phonetic&first_name=Hanna'
-    The full list of fields and their possible options follows:
-    _______________________________________________________________________
-    first_name
-    maiden_name
-    last_name
-    birth_place
-    marriage_place
-    death_place
-    The *_place and *_name fields could be specified exactly,
-    by the prefix (this is the only kind of "regex" we currently support)
-    or phonetically.
-    To match by the last name yehuda, use yehuda
-    To match by the last names that start with yehud, use yehuda;prefix
-    To match by the last names that sound like yehud, use yehuda;phonetic
-    _______________________________________________________________________
-    birth_year
-    marriage_year
-    death_year
-    The *_year fields could be specified as an integer with an optional fudge
-    factor signified by a collon, like 1907:2
-    The query for birth_year 1907 will match the records from this year only,
-    while the query for 1907:2 will match the records from 1905, 1906, 1907
-    1908 and 1909, making the match wider.
-    _______________________________________________________________________
-    sex
-    The sex field value could be either m or f.
-    _______________________________________________________________________
-    tree_number
-    The tree_number field value could be an integer with a valid tree number,
-    like 7806
-    '''
     args = request.args
     keys = args.keys()
     if len(keys) == 0:
@@ -643,13 +564,7 @@ def fetch_images(image_ids):
 
 
 @v1_endpoints.route('/get_changes/<from_date>/<to_date>')
-@v1_docs.doc()
 def get_changes(from_date, to_date):
-    '''
-    This view returns the item_ids of documents that were updated during the
-    date range specified by the arguments. The dates should be supplied in the
-    timestamp format.
-    '''
     rv = set()
     # Validate the dates
     dates = {'start': from_date, 'end': to_date}

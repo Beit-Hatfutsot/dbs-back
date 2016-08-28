@@ -1,0 +1,560 @@
+FORMAT: 1A
+
+# API for Beit-Hatfutsot Databases
+
+## Group Genealogical Collection
+
+### Search for a Person [GET /v1/person{?place,first_name,maiden_name,last_name,birth_place,marriage_place,death_place,birth_year,marriage_year,death_year,sex,tree_number}]
+
+This view initiates persons search in Beit HaTfutsot genealogical data.
+
++ Parameters
+    + place (string, optional)
+        A place that the person been born, married or died in
+    + first_name: `morton` (string, optional)
+        Supports two suffixes - `;prefix` to look for names
+        begining with the given string and `;phonetic` to use phonetic matching.
+    + maiden_name (string, optional)
+        Supports two suffixes - `;prefix` to look for names
+        begining with the given string and `;phonetic` to use phonetic matching.
+    + last_name: `mandel` (string, optional)
+        Supports two suffixes - `;prefix` to look for names
+        begining with the given string and `;phonetic` to use phonetic matching.
+    + birth_place (string, optional)
+        Supports two suffixes - `;prefix` to look for names
+        begining with the given string and `;phonetic` to use phonetic matching.
+    + marriage_place (string, optional)
+        Supports two suffixes - `;prefix` to look for names
+        begining with the given string and `;phonetic` to use phonetic matching.
+    + death_place (string, optional)
+        Supports two suffixes - `;prefix` to look for names
+        begining with the given string and `;phonetic` to use phonetic matching.
+    + birth_year (number, optional)
+        Supports an optional fudge factor suffix, i.e. to search for a person
+        born between 1905 to 1909 use "1907:2"
+    + marriage_year (number, optional)
+        Supports an optional fudge factor suffix.
+    + death_year (number, optional)
+        Supports an optional fudge factor suffix.
+    + tree_number (number, optional)
+        A valid tree number, like 7806
+    + sex (enum[String], optional)
+        + Members
+            + 'f'
+            + 'm'
+
++ Response 200 (application/json)
+
+    + Body
+
+            {
+                "items": [
+                    {
+                    "BD": "",
+                    "MD": "",
+                    "EditorRemarks": "SD 10071991\r\nfarkas.ged\r\nUPD 26032008\r\n628Update26032008AFamily tree",
+                    "G": "M",
+                    "GTF": {
+                        "$uuid": "d251b845b71646ed8e8d71084a0b2ab5"
+                    },
+                    "LN": "Mandel",
+                    "DD": "",
+                    "tree": {
+                        "BD": {},
+                        "partners": [],
+                        "_id": {},
+                        "name": [
+                        "MELISSA",
+                        "TRESTMAN"
+                        ],
+                        "DP": {},
+                        "MD": {},
+                        "LN": {},
+                        "DD": {},
+                        "BP": {},
+                        "sex": "F",
+                        "II": {},
+                        "meta": {
+                        "gedc_ver": "5.5",
+                        "tree_num": 628,
+                        "num_nodes": 2244,
+                        "source": "BTDATABASE",
+                        "date": "30 JAN 2006",
+                        "gedc_form": "Lineage-Linked"
+                        },
+                        "parents": [
+                        {
+                            "partners": [
+                            {
+                                "id": "I1579",
+                                "sex": "F",
+                                "name": [
+                                "DORA ABRAMSON",
+                                "TRESTMAN"
+                                ],
+                                "deceased": false,
+                                "children": []
+                            }
+                            ],
+                            "name": [
+                            "IRVING",
+                            "TRESTMAN"
+                            ],
+                            "sex": "M",
+                            "parents": [],
+                            "id": "I1238",
+                            "deceased": false
+                        },
+                        {
+                            "partners": [
+                            {
+                                "id": "I1238",
+                                "sex": "M",
+                                "name": [
+                                "IRVING",
+                                "TRESTMAN"
+                                ],
+                                "deceased": false,
+                                "children": []
+                            }
+                            ],
+                            "name": [
+                            "DORA ABRAMSON",
+                            "TRESTMAN"
+                            ],
+                            "sex": "F",
+                            "parents": [
+                            {
+                                "sex": "M",
+                                "name": [
+                                "HARRY",
+                                "ABRAMSON"
+                                ],
+                                "deceased": true,
+                                "id": "I456"
+                            },
+                            {
+                                "sex": "F",
+                                "name": [
+                                "ANN BLOOM",
+                                "ABRAMSON"
+                                ],
+                                "deceased": true,
+                                "id": "I1924"
+                            }
+                            ],
+                            "id": "I1579",
+                            "deceased": false
+                        }
+                        ],
+                        "MP": {},
+                        "siblings": [
+                        {
+                            "sex": "M",
+                            "name": [
+                            "HARRIS",
+                            "TRESTMAN"
+                            ],
+                            "deceased": false,
+                            "id": "I230"
+                        },
+                        {
+                            "sex": "M",
+                            "name": [
+                            "GREG",
+                            "TRESTMAN"
+                            ],
+                            "deceased": false,
+                            "id": "I232"
+                        },
+                        {
+                            "sex": "F",
+                            "name": [
+                            "TOBA",
+                            "TRESTMAN"
+                            ],
+                            "deceased": false,
+                            "id": "I233"
+                        }
+                        ],
+                        "EditorRemarks": {},
+                        "id": "I231",
+                        "deceased": false,
+                        "IBLN": {}
+                    },
+                    "GTN": 628,
+                    "II": "I231",
+                    "MP": "",
+                    "BP": "",
+                    "FN": "Morton",
+                    "_id": {
+                        "$oid": "5703a8416bc07aa7271d9f68"
+                    },
+                    "DP": "",
+                    "IBLN": null
+                    },
+                    {
+                    "BD": "",
+                    "MD": "",
+                    "EditorRemarks": "SD 11092002\r\nRECEIVED JG GED 1_12286",
+                    "G": "M",
+                    "GTF": {
+                        "$uuid": "c34b9988ed2c402598145d1f1955c714"
+                    },
+                    "LN": "Mandel",
+                    "DD": "",
+                    "tree": {
+                        "BD": {},
+                        "partners": [],
+                        "_id": {},
+                        "name": [
+                        "Morton",
+                        "Mandel"
+                        ],
+                        "DP": {},
+                        "MD": {},
+                        "LN": {},
+                        "DD": {},
+                        "BP": {},
+                        "sex": "M",
+                        "II": {},
+                        "meta": {
+                        "gedc_ver": "?",
+                        "tree_num": 4950,
+                        "num_nodes": 20313,
+                        "source": "BROSKEEP",
+                        "date": "23 NOV 1999",
+                        "gedc_form": ""
+                        },
+                        "parents": [
+                        {
+                            "partners": [
+                            {
+                                "id": "I10009",
+                                "sex": "F",
+                                "name": [
+                                "Mae",
+                                "Pearsol"
+                                ],
+                                "deceased": false,
+                                "children": []
+                            }
+                            ],
+                            "name": [
+                            "Jake",
+                            "Mandel"
+                            ],
+                            "sex": "M",
+                            "parents": [
+                            {
+                                "sex": "M",
+                                "name": [
+                                "Herman",
+                                "Mandel"
+                                ],
+                                "deceased": true,
+                                "id": "I277"
+                            },
+                            {
+                                "sex": "F",
+                                "name": [
+                                "Rose",
+                                "Glick"
+                                ],
+                                "deceased": true,
+                                "id": "I276"
+                            }
+                            ],
+                            "id": "I1383",
+                            "deceased": true
+                        },
+                        {
+                            "partners": [
+                            {
+                                "id": "I1383",
+                                "sex": "M",
+                                "name": [
+                                "Jake",
+                                "Mandel"
+                                ],
+                                "deceased": true,
+                                "children": []
+                            }
+                            ],
+                            "name": [
+                            "Mae",
+                            "Pearsol"
+                            ],
+                            "sex": "F",
+                            "parents": [],
+                            "id": "I10009",
+                            "deceased": false
+                        }
+                        ],
+                        "MP": {},
+                        "siblings": [
+                        {
+                            "sex": "M",
+                            "name": [
+                            "Sanford",
+                            "Mandel"
+                            ],
+                            "deceased": true,
+                            "id": "I10010"
+                        },
+                        {
+                            "sex": "M",
+                            "name": [
+                            "Leonard",
+                            "Mandel"
+                            ],
+                            "deceased": false,
+                            "id": "I10012"
+                        }
+                        ],
+                        "EditorRemarks": {},
+                        "id": "I10011",
+                        "deceased": false,
+                        "IBLN": {}
+                    },
+                    "GTN": 4950,
+                    "II": "I10011",
+                    "MP": "",
+                    "BP": "",
+                    "FN": "Morton",
+                    "_id": {
+                        "$oid": "5703abef6bc07aa7273266f3"
+                    },
+                    "DP": "",
+                    "IBLN": null
+                    }
+                ],
+                "total": 2
+            }
+
+## Group Database Search
+
+### Search [GET /v1/search{?q}]
+
+This view initiates a full text search on all our collections except for the
+geneological one.
+
++ Parameters
+    + q: `netta` (string)
+        The search string
+    + collection (enum, optional)
+        A comma separated list of collections to search in.
+        + Members
+            + 'movies'
+            + 'places'
+            + 'personalities'
+            + 'photoUnits'
+            + 'familyNames'
+    + from_ (number, optional)
+        Which search result to start from.
+    + size (number, optional)
+        How many results to return.
+
++ Response 200 (application/json)
+
+    + Body
+
+            {
+            "hits": {
+                "hits": [
+                {
+                    "_score": 0.2899917, 
+                    "_type": "familyNames", 
+                    "_id": "83352", 
+                    "_source": {
+                    "LocationInMuseum": null, 
+                    "Pictures": [], 
+                    "PictureUnitsIds": null, 
+                    "related": [
+                        "image_chief-rabbi-abraham-palaggi-1809-1899-izmir-turkey-1896", 
+                        "familyname_eisner", 
+                        "personality_offenbach-jacques-composer", 
+                        "place_vancouver", 
+                        "image_rabbi-abraham-palaggi-chief-rabbi-of-izmir-with-members-of-the-jewish-community-izmir-turkey-1896", 
+                        "familyname_isaac"
+                    ], 
+                    "UpdateDate": "2012-11-30T10:22:00", 
+                    "OldUnitId": "FM010344.HTM", 
+                    "UpdateUser": "Haim - Family Names (2012)", 
+                    "UnitDisplayStatus": 2, 
+                    "PrevPicturePaths": null, 
+                    "TS": "000000000001950f", 
+                    "UnitType": 6, 
+                    "UnitTypeDesc": "Family Name", 
+                    "EditorRemarks": "hasavot from Family Names", 
+                    "thumbnail": {
+                        "path": "", 
+                        "data": ""
+                    }, 
+                    "RightsDesc": "Full", 
+                    "Bibiliography": {
+                        "En": null, 
+                        "He": null
+                    }, 
+                    "UnitText1": {
+                        "En": "IZAAKS, IZAACS\r\n\r\nSurnames derive from one of many different origins. Sometimes there may be more than one explanation for the same name. This family name is a patronymic surname based on a male ancestor's personal name, in this case of biblical origin.  Izaaks, in which the ending \"-s\" stands for \"son of\", is an equivalent of Ben Isaac. The biblical Isaac is derived from the Hebrew biblical male personal name Yitzchak, the second of the patriarchs, son of Abraham and Sarah. His name means \"he will laugh\" (Genesis 21.6). The name of the first German Jew recorded in history is Isaac. Probably a merchant residing in Aachen (Aix-La-Chapelle), he was a member of the embassy sent by Emperor Charlemagne (Carolus Magnus) to the Caliph Harun Al Rashid in 797 CE.\r\n\r\nA widespread personal name, Isaac produced many Jewish family names in several languages, among them the Yiddish Itzig and Hitzig, the French Isacquet and Haquet, the Arabic Ishak, and the English Hitchcock.  In the 20th century, Izaaks is recorded as a Jewish family name with Netta Levi Izaaks, who was killed in the German death camp at Auschwitz during World War II.", 
+                        "He": "IZAAKS, IZAACS\r\n\r\n\u05e9\u05de\u05d5\u05ea \u05de\u05e9\u05e4\u05d7\u05d4 \u05e0\u05d5\u05d1\u05e2\u05d9\u05dd \u05de\u05db\u05de\u05d4 \u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05e9\u05d5\u05e0\u05d9\u05dd. \u05dc\u05e2\u05d9\u05ea\u05d9\u05dd \u05dc\u05d0\u05d5\u05ea\u05d5 \u05e9\u05dd \u05e7\u05d9\u05d9\u05dd \u05d9\u05d5\u05ea\u05e8 \u05de\u05d4\u05e1\u05d1\u05e8 \u05d0\u05d7\u05d3. \u05e9\u05dd \u05de\u05e9\u05e4\u05d7\u05d4 \u05d6\u05d4 \u05d4\u05d5\u05d0 \u05de\u05e1\u05d5\u05d2 \u05d4\u05e9\u05de\u05d5\u05ea \u05d4\u05e4\u05d8\u05e8\u05d5\u05e0\u05d9\u05de\u05d9\u05d9\u05dd (\u05e9\u05de\u05d5\u05ea \u05e9\u05de\u05e7\u05d5\u05e8\u05dd \u05d1\u05e9\u05de\u05d5 \u05e9\u05dc \u05d4\u05d0\u05d1) \u05de\u05db\u05d9\u05d5\u05d5\u05df \u05e9\u05d4\u05dd \u05e0\u05d2\u05d6\u05e8\u05d9\u05dd \u05de\u05e9\u05de\u05d5 \u05d4\u05e4\u05e8\u05d8\u05d9 \u05e9\u05dc \u05d0\u05d7\u05d3 \u05de\u05d0\u05d1\u05d5\u05ea \u05d4\u05de\u05e9\u05e4\u05d7\u05d4, \u05db\u05d0\u05e9\u05e8 \u05d1\u05de\u05e7\u05e8\u05d4 \u05d6\u05d4 \u05d4\u05d5\u05d0 \u05de\u05de\u05e7\u05d5\u05e8 \u05de\u05e7\u05e8\u05d0\u05d9. \u05d0\u05d9\u05d6\u05d0\u05e7\u05e1, \u05d4\u05de\u05db\u05d9\u05dc \u05d0\u05ea \u05d4\u05e1\u05d5\u05e4\u05d9\u05ea \"-\u05e1\" \u05e9\u05e4\u05d9\u05e8\u05d5\u05e9\u05d4 \"\u05d1\u05e0\u05d5 \u05e9\u05dc\" \u05d1\u05d2\u05e8\u05de\u05e0\u05d9\u05ea \u05d5\u05d9\u05d9\u05d3\u05d9\u05e9, \u05d4\u05d5\u05d0 \u05e9\u05dd \u05de\u05e7\u05d1\u05d9\u05dc \u05dc\u05e9\u05dd \u05d4\u05e2\u05d1\u05e8\u05d9 \u05d1\u05df \u05d9\u05e6\u05d7\u05e7.  \u05d0\u05d9\u05d6\u05d0\u05e7 / \u05d0\u05d9\u05e1\u05d0\u05e7 \u05e0\u05d2\u05d6\u05e8 \u05de\u05d4\u05e9\u05dd \u05d4\u05e4\u05e8\u05d8\u05d9 \u05d4\u05e2\u05d1\u05e8\u05d9 \u05de\u05de\u05e7\u05d5\u05e8 \u05de\u05e7\u05e8\u05d0\u05d9 \u05d9\u05e6\u05d7\u05e7, \u05d4\u05e9\u05e0\u05d9 \u05de\u05e9\u05dc\u05d5\u05e9\u05ea \u05d4\u05d0\u05d1\u05d5\u05ea, \u05d1\u05e0\u05d5 \u05e9\u05dc \u05d0\u05d1\u05e8\u05d4\u05dd \u05d5\u05e9\u05e8\u05d4. \u05e4\u05d9\u05e8\u05d5\u05e9 \u05e9\u05de\u05d5 \u05de\u05d5\u05e1\u05d1\u05e8 \u05d1\u05de\u05e7\u05e8\u05d0 (\u05d1\u05e8\u05d0\u05e9\u05d9\u05ea, \u05db\"\u05d0, \u05d5). \u05d9\u05e6\u05d7\u05e7 \u05d4\u05d9\u05d4 \u05e9\u05de\u05d5 \u05e9\u05dc \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9 \u05d4\u05e8\u05d0\u05e9\u05d5\u05df \u05e9\u05de\u05ea\u05d5\u05e2\u05d3 \u05d1\u05d4\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05e9\u05dc \u05d2\u05e8\u05de\u05e0\u05d9\u05d4. \u05db\u05db\u05dc \u05d4\u05e0\u05e8\u05d0\u05d4 \u05d4\u05d5\u05d0 \u05d4\u05d9\u05d4 \u05e1\u05d5\u05d7\u05e8 \u05e9\u05d4\u05ea\u05d2\u05d5\u05e8\u05e8 \u05d1\u05e2\u05d9\u05e8 \u05d0\u05d0\u05db\u05df, \u05d4\u05d5\u05d0 \u05de\u05d5\u05d6\u05db\u05e8 \u05db\u05d0\u05d7\u05d3 \u05d4\u05d7\u05d1\u05e8\u05d9\u05dd \u05d1\u05e9\u05dc\u05d9\u05d7\u05d5\u05ea \u05e9\u05e9\u05dc\u05d7 \u05d4\u05e7\u05d9\u05e1\u05e8 \u05e9\u05e8\u05dc\u05de\u05df (\u05e7\u05e8\u05d5\u05dc \u05d4\u05d2\u05d3\u05d5\u05dc) \u05d0\u05dc \u05d4\u05d7\u05dc\u05d9\u05e3 \u05d7\u05e8\u05d5\u05df \u05d0\u05dc \u05e8\u05e9\u05d9\u05d3 \u05d1\u05e9\u05e0\u05ea 797.\r\n\r\n\u05d9\u05e6\u05d7\u05e7 \u05d4\u05d5\u05d0 \u05e9\u05dd \u05e4\u05e8\u05d8\u05d9 \u05e0\u05e4\u05d5\u05e5 \u05d0\u05e9\u05e8 \u05d9\u05e6\u05e8 \u05e9\u05de\u05d5\u05ea \u05de\u05e9\u05e4\u05d7\u05d4 \u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd \u05e8\u05d1\u05d9\u05dd \u05d1\u05de\u05e1\u05e4\u05e8 \u05e9\u05e4\u05d5\u05ea, \u05d1\u05d9\u05e0\u05d9\u05d4\u05dd \u05d0\u05d9\u05e6\u05d9\u05e7 \u05d5\u05d4\u05d9\u05e6\u05d9\u05e7 \u05d1\u05d9\u05d9\u05d3\u05d9\u05e9, \u05d0\u05d9\u05e1\u05d0\u05e7\u05d4 \u05d5\u05d0\u05e7\u05d4 \u05d1\u05e6\u05e8\u05e4\u05ea\u05d9\u05ea, \u05d0\u05d9\u05e1\u05d7\u05d0\u05e7 \u05d1\u05e2\u05e8\u05d1\u05d9\u05ea \u05d5\u05d4\u05d9\u05e6'\u05e7\u05d5\u05e7 \u05d1\u05d0\u05e0\u05d2\u05dc\u05d9\u05ea.  \u05d1\u05de\u05d0\u05d4 \u05d4-20, \u05d0\u05d9\u05d6\u05d0\u05e7\u05e1 \u05de\u05ea\u05d5\u05e2\u05d3 \u05db\u05e9\u05dd \u05de\u05e9\u05e4\u05d7\u05d4 \u05d9\u05d4\u05d5\u05d3\u05d9\u05e2\u05dd \u05e0\u05d8\u05e2 \u05dc\u05d5\u05d9 \u05d0\u05d9\u05d6\u05d0\u05e7\u05e1 \u05d0\u05e9\u05e8 \u05e0\u05e1\u05e4\u05ea\u05d4 \u05d1\u05de\u05d7\u05e0\u05d4 \u05d4\u05d4\u05e9\u05de\u05d3\u05d4 \u05d4\u05d2\u05e8\u05de\u05e0\u05d9 \u05d0\u05d5\u05e9\u05d5\u05d5\u05d9\u05e5 \u05d1\u05d6\u05de\u05df \u05de\u05dc\u05d7\u05de\u05ea \u05d4\u05e2\u05d5\u05dc\u05dd \u05d4\u05e9\u05e0\u05d9\u05d9\u05d4."
+                    }, 
+                    "UnitText2": {
+                        "En": null, 
+                        "He": null
+                    }, 
+                    "UnitPlaces": [], 
+                    "main_image_url": null, 
+                    "UnitStatus": 3, 
+                    "UnitHeaderDMSoundex": {
+                        "En": "ZZ E044000 ZZ ", 
+                        "He": "ZZ E044000 ZZ "
+                    }, 
+                    "PrevPictureFileNames": null, 
+                    "RightsCode": 1, 
+                    "UnitId": 83352, 
+                    "IsValueUnit": true, 
+                    "StatusDesc": "Completed", 
+                    "DisplayStatusDesc": "Museum only", 
+                    "UserLexicon": null, 
+                    "Attachments": [], 
+                    "Slug": {
+                        "En": "familyname_izaacs", 
+                        "He": "\u05e9\u05dd\u05de\u05e9\u05e4\u05d7\u05d4_\u05d0\u05d9\u05d6\u05d0\u05e7\u05e1"
+                    }, 
+                    "Header": {
+                        "En": "IZAACS", 
+                        "He": "\u05d0\u05d9\u05d6\u05d0\u05e7\u05e1"
+                    }, 
+                    "ForPreview": false, 
+                    "Id": 343879
+                    }, 
+                    "_index": "bhp1"
+                }
+                ], 
+                "total": 1, 
+                "max_score": 0.2899917
+            }, 
+            "_shards": {
+                "successful": 5, 
+                "failed": 0, 
+                "total": 5
+            }, 
+            "took": 4, 
+            "timed_out": false
+            }
+
+## Group Database Items
+
+### get items [GET /v1/item/{slugs}]
+
+This view returns a list of jsons representing one or more item(s).
+
++ Parameters
+    + slugs: `place_paris` (string)
+        The slugs argument is in the form of "collection_slug", as in 
+        "personality_einstein-albert" and could contain multiple slugs split
+        by commas.
+
++ Response 200 (application/json)
+
+    + Body
+
+            [
+            {
+                "LocationInMuseum": null, 
+                "Pictures": [
+                {
+                    "PictureId": "00E201C7-BCD4-404A-B551-0D5B1DE8DEE3", 
+                    "IsPreview": "0"
+                }, 
+                {
+                    "PictureId": "5A8D1CC0-3D01-4AB0-B515-4B27873703D8", 
+                    "IsPreview": "1"
+                }, 
+                {
+                    "PictureId": "212BE375-83E7-440A-9C5A-AAE09BEB89B1", 
+                    "IsPreview": "0"
+                }, 
+                {
+                    "PictureId": "29202878-0C3C-4DE6-BE00-B2A708693B2D", 
+                    "IsPreview": "0"
+                }, 
+                {
+                    "PictureId": "5687F54F-66DC-4BCB-A6CD-FB9AEAD4D00A", 
+                    "IsPreview": "0"
+                }
+                ], 
+                "PictureUnitsIds": "19652,1935,38107,4682,23069,", 
+                "related": [
+                "image_ose-summer-camp-for-children-vilkoviskis-lithuania-1929-1930", 
+                "familyname_berlin", 
+                "luminary_moses-ben-nahman", 
+                "place_krefeld", 
+                "image_jewish-settlers-working-in-the-fields-of-gross-gaglow-germany-1930s", 
+                "familyname_weil"
+                ], 
+                "UpdateDate": "2016-01-07 09:30:00", 
+                "OldUnitId": "HB001520.HTM-EB001338.HTM", 
+                "id": 189648, 
+                "UpdateUser": "simona", 
+                "PrevPictureFileNames": "01934000.JPG,00143500.JPG,03014600.JPG,00418900.JPG,02294100.JPG,", 
+                "PrevPicturePaths": "Photos\\00001024.scn\\01934000.JPG,Photos\\00000033.scn\\00143500.JPG,Photos\\00000639.scn\\03014600.JPG,Photos\\00000285.scn\\00418900.JPG,Photos\\00000807.scn\\02294100.JPG,", 
+                "PlaceTypeCode": 1, 
+                "TS": "\u0000\u0000\u0000\u0000\u0000LZo", 
+                "PlaceTypeDesc": {
+                "En": "City", 
+                "He": "\u05e2\u05d9\u05e8"
+                }, 
+                "UnitType": 5, 
+                "UnitTypeDesc": "Place", 
+                "EditorRemarks": "hasavot from Places ", 
+                "thumbnail": {
+                "path": "Photos/00000033.scn/00143500.JPG", 
+                "data": "..."
+                }, 
+                "RightsDesc": "Full", 
+                "Bibiliography": {
+                "En": null, 
+                "He": "\u05d0\u05e0\u05e6\u05d9\u05e7\u05dc\u05d5\u05e4\u05d3\u05d9\u05d4 \u05d9\u05d5\u05d3\u05d0\u05d9\u05e7\u05d4 \n\u05de\u05db\u05d5\u05df \u05e7\u05d5\u05e0\u05d2\u05e8\u05e1 \u05d9\u05d4\u05d5\u05d3\u05d9 \u05e2\u05d5\u05dc\u05de\u05d9"
+                }, 
+                "UnitText1": {
+                "En": "PARIS \n\nCapital of France \n\nIn 582, the date of the first documentary evidence of the presence of Jews in Paris, there was already a community with a synagogue. In 614 or 615, the sixth council of Paris decided that Jews who held public office, and their families, must convert to Christianity. From the 12th century on there was a Jewish quarter. According to one of the sources of Joseph ha- Kohen's Emek ha-Bakha, Paris Jews owned about half the land in Paris and the vicinity. They employed many Christian servants and the objects they took in pledge included even church vessels.\n\nFar more portentous was the blood libel which arose against the Jews of Blois in 1171. In 1182, Jews were expelled. The crown confiscated the houses of the Jews as well as the synagogue and the king gave 24 of them to the drapers of Paris and 18 to the furriers. When the Jews were permitted to return to the kingdom of France in 1198 they settled in Paris, in and around the present rue Ferdinand Duval, which became the Jewish quarter once again in the modern era.\n\nThe famous disputation on the Talmud was held in Paris in 1240. The Jewish delegation was led by Jehiel b. Joseph of Paris. After the condemnation of the Talmud, 24 cart-loads of Jewish books were burned in public in the Place de Greve, now the Place de l'Hotel de Ville. A Jewish moneylender called Jonathan was accused of desecrating the host in 1290. It is said that this was the main cause of the expulsion of 1306.\n\nTax rolls of the Jews of Paris of 1292 and 1296 give a good picture of their economic and social status. One striking fact is that a great many of them originated from the provinces. In spite of the prohibition on the settlement of Jews expelled from England, a number of recent arrivals from that country are listed. As in many other places, the profession of physician figures most prominently among the professions noted. The majority of the rest of the Jews engaged in moneylending and commerce. During the same period the composition of the Jewish community, which numbered at least 100 heads of families, changed to a large extent through migration and the number also declined to a marked degree. One of the most illustrious Jewish scholars of medieval France, Judah b. Isaac, known as Sir Leon of Paris, headed the yeshiva of Paris in the early years of the 13th century. He was succeeded by Jehiel b. Joseph, the Jewish leader at the 1240 disputation. After the wholesale destruction of\nJewish books on this occasion until the expulsion of 1306, the yeshivah of Paris produced no more scholars of note.\n\nIn 1315, a small number of Jews returned and were expelled again in 1322. The new community was formed in Paris in 1359. Although the Jews were under the protection of the provost of Paris, this was to no avail against the murderous attacks and looting in 1380 and 1382 perpetrated by a populace in revolt against the tax burden. King Charles VI relieved the Jews of responsibility for the valuable pledges which had been stolen from them on this occasion and granted them other financial concessions, but the community was unable to recover. In 1394, the community was struck by the Denis de Machaut affair. Machaut, a Jewish convert to Christianity, had disappeared and the Jews were accused of having murdered him or, at the very least, of having imprisoned him until he agreed to return to Judaism. Seven Jewish notables were condemned to death, but their sentence was commuted to a heavy fine allied to imprisonment until Machaut reappeared. This affair was a prelude to the \"definitive\" expulsion of the Jews from France in 1394.\n\nFrom the beginning of the 18th century the Jews of Metz applied to the authorities for permission to enter Paris on their business pursuits; gradually the periods of their stay in the capital increased and were prolonged. At the same time, the city saw the arrival of Jews from Bordeaux (the \"Portuguese\") and from Avignon. From 1721 to 1772 a police inspector was given special charge over the Jews.\nAfter the discontinuation of the office, the trustee of the Jews from 1777 was Jacob Rodrigues Pereire, a Jew from Bordeaux, who had charge over a group of Spanish and Portuguese Jews, while the German Jews (from Metz, Alsace, and Loraine) were led by Moses Eliezer Liefman Calmer, and those from Avignon by Israel Salom. The German Jews lived in the poor quarters of Saint-Martin and Saint-Denis, and those from Bordeaux, Bayonne, and Avignon inhabited the more luxurious quarters of Saint Germaine and Saint Andr\u00e9.\n\nLarge numbers of the Jews eked out a miserable living in peddling. The more well-to-do were moneylenders, military purveyors and traders in jewels. There were also some craftsmen among them. Inns preparing kosher food existed from 1721; these also served as prayer rooms. The first publicly acknowledged synagogue was opened in rue de Brisemiche in 1788. The number of Jews of Paris just before the revolution was probably no greater than 500. On Aug. 26, 1789 they presented the constituent assembly with a petition asking for the rights of citizens. Full citizenship rights were granted to the Spanish, Portuguese, and Avignon Jews on Jan. 28, 1790.\n\nAfter the freedom of movement brought about by emancipation, a large influx of Jews arrived in Paris, numbering 2,908 in 1809. When the Jewish population of Paris had reached between 6,000 and 7,000 persons, the Consistory began to build the first great synagogue. The Consistory established its first primary school in 1819.\n\nThe 30,000 or so Jews who lived in Paris in 1869 constituted about 40% of the Jewish population of France. The great majority originated from Metz, Alsace, Lorraine, and Germany, and there were already a few hundreds from Poland. Apart from a very few wealthy capitalists, the great majority of the Jews belonged to the middle economic level. The liberal professions also attracted numerous Jews; the community included an increasing number of professors, lawyers, and physicians. After 1881 the Jewish population increased with the influx of refugees from Poland, Russia, and the Slav provinces of Austria and Romania. At the same time, there was a marked increase in the anti-Semitic movement. The Dreyfus affair, from 1894, split the intellectuals of Paris into \"Dreyfusards\" and \"anti-Dreyfusards\" who frequently clashed on the streets, especially in the Latin Quarter. With the law separating church and state in 1905, the Jewish consistories lost their official status, becoming no more than private religious associations. The growing numbers of Jewish immigrants to Paris resented the heavy hand of a Consistory, which was largely under the control of Jews from Alsace and Lorraine, now a minority group. These immigrants formed the greater part of the 13,000 \"foreign\" Jews who enlisted in World War 1. Especially after 1918, Jews began to arrive from north Africa, Turkey, and the Balkans, and in greatly increased numbers from eastern Europe. Thus in 1939 there were around 150,000 Jews in Paris (over half the total in France). The Jews lived all over the city but there were large concentrations of them in the north and east. More than 150 landmanschaften composed of immigrants from eastern Europe and many charitable societies united large numbers of Jews, while at this period the Paris Consistory (which retained the name with its changed function) had no more than 6,000 members.\n\nOnly one of the 19th-century Jewish primary schools was still in existence in 1939, but a few years earlier the system of Jewish education which was strictly private in nature acquired a secondary school and a properly supervised religious education, for which the Consistory was responsible. Many great Jewish scholars were born and lived in Paris in the modern period. They included the Nobel Prize winners Rene Cassin and A. Lwoff. On June 14, 1940, the Wehrmacht entered Paris, which was proclaimed an open city. Most Parisians left, including the Jews. However, the population returned in the following weeks. A sizable number of well-known Jews fled to England and the USA. (Andre Maurois), while some, e.g. Rene Cassin and Gaston Palewski, joined General de Gaulle's free French movement in London. Parisian Jews were active from the very beginning in resistance movements. The march to the etoile on Nov. 11, 1940, of high school and university students, the first major public manifestation of resistance, included among its organizers Francis Cohen, Suzanne Dijan, and Bernard Kirschen.\n\nThe first roundups of Parisian Jews of foreign nationality took place in 1941; about 5,000 \"foreign\" Jews were deported on May 14, about 8,000 \"foreigners\" in August, and about 100 \"intellectuals\" on December 13. On July 16, 1942, 12,884 Jews were rounded up in Paris (including about 4,000 children). The Parisian Jews represented over half the 85,000 Jews deported from France to extermination camps in the east. During the night of Oct. 2-3, 1941, seven Parisian synagogues were attacked.\n\nSeveral scores of Jews fell in the Paris insurrection in August, 1944. Many streets in Paris and the outlying suburbs bear the names of Jewish heroes and martyrs of the Holocaust period and the memorial to the unknown Jewish martyr, a part of the Centre de documentation juive contemporaire, was erected in in 1956 in the heart of Paris.\n\nBetween 1955 and 1965, the Jewish community experienced a demographic transformation with the arrival of more than 300,000 Sephardi Jews from North Africa. These Jewish immigrants came primarily from Morocco, Tunisia and Egypt. At the time, Morocco and Tunisia were French protectorates unlike Algeria which was directly governed by France. Since their arrival, the Sephardi Jews of North Africa have remained the majority (60%) of French Jewry. \n\nIn 1968 Paris and its suburbs contained about 60% of the Jewish population of France. In 1968 it was estimated at between 300,000 and 350,000 (about 5% of the total population). In 1950, two-thirds of the Jews were concentrated in about a dozen of the poorer or commercial districts in the east of the city. The social and economic advancement of the second generation of east European immigrants, the influx of north Africans, and the gradual implementation of the urban renewal program caused a considerable change in the once Jewish districts and the dispersal of the Jews throughout other districts of Paris.\n\nBetween 1957 and 1966 the number of Jewish communities in the Paris region rose from 44 to 148. The Paris Consistory, traditionally presided over by a member of the Rothschild family, officially provides for all religious needs. Approximately 20 synagogues and meeting places for prayer observing Ashkenazi or Sephardi rites are affiliated with the Consistory, which also provides for the religious needs of new communities in the suburbs. This responsibility is shared by traditional orthodox elements, who, together with the reform and other independent groups, maintain another 30 or so synagogues. The orientation and information office of the Fonds social juif unifie had advised or assisted over 100,000 refugees from north Africa. It works in close cooperation with government services and social welfare and educational institutions of the community. Paris was one of the very few cities in the diaspora with a full-fledged Israel-type school, conducted by Israeli teachers according to an Israeli curriculum. \n\nThe Six-Day War (1967), which drew thousands of Jews into debates and\nPro-Israel demonstrations, was an opportunity for many of them to reassess their personal attitude toward the Jewish people. During the \"students' revolution\" of 1968 in nearby Nanterre and in the Sorbonne, young Jews played an outstanding role in the leadership of left-wing activists and often identified with Arab anti-Israel propaganda extolling the Palestinian organizations. Eventually, however, when the \"revolutionary\" wave subsided, it appeared that the bulk of Jewish students in Paris, including many supporters of various new left groups, remained loyal to Israel and strongly opposed Arab terrorism.\n\nAs of 2015, France was home to the third largest Jewish population in the world. It was also the largest in all of Europe. More than half the Jews in France live in the Paris metropolitan area. According to the World Jewish Congress, an estimated 350,000 Jews live in the city of Paris and its many districts. By 2014, Paris had become the largest Jewish city outside of Israel and the United States. Comprising 6% of the city\u2019s total population (2.2 million), the Jews of Paris are a sizeable minority. \n\nThere are more than twenty organizations dedicated to serving the Jewish community of Paris. Several offer social services while others combat anti-Semitism. There are those like the Paris Consistory which financially supports many of the city's congregations. One of the largest organizations is the Alliance Isra\u00e9lite Universelle which focuses on self-defense, human rights and Jewish education. The FSJU or Unified Social Jewish Fund assists in the absorption of new immigrants. Other major organizations include the ECJC (European Council of Jewish Communities), EAJCC (European Association of Jewish Communities), ACIP (Association Consitoriale Israelit\u00e9), CRIF (Representative Council of Jewish Institutions), and the UEJF (Jewish Students Union of France). \n\nBeing the third largest Jewish city behind New York and Los Angeles, Paris is home to numerous synagogues. By 2013, there were more than eighty three individual congregations. While the majority of these are orthodox, many conservative and liberal congregations can be found across Paris. During the 1980s, the city received an influx of orthodox Jews, primarily as a result of the Lubavitch movement which has since been very active in Paris and throughout France. \n\nApproximately 4% of school-age children in France are enrolled in Jewish day schools. In Paris, there are over thirty private Jewish schools. These include those associated with both the orthodox and liberal movements. Chabad Lubavitch has established many educational programs of its own. The Jewish schools in Paris range from the pre-school to High School level. There are additionally a number of Hebrew schools which enroll students of all ages.  \n\nAmong countless cultural institutions are museums and memorials which preserve the city's Jewish history. Some celebrate the works of Jewish artists while others commemorate the Holocaust and remember its victims. The Museum of Jewish art displays sketches by Mane-Katz, the paintings of Alphonse Levy and the lithographs of Chagall. At the Center of Contemporary Jewish Documentation (CDJC), stands the Memorial de la Shoah. Here, visitors can view the center's many Holocaust memorials including the Memorial of the Unknown Jewish Martyrs, the Wall of Names, and the Wall of the Righteous Among the Nations. Located behind the Notre Dame is the Memorial of Deportation, a memorial to the 200,000 Jews who were deported from Vichy France to the Nazi concentration camps. On the wall of a primary school on rue Buffault is a plaque commemorating the 12,000 Parisian Jewish children who died in Auschwitz following their deportation from France between 1942 and 1944.\n\nFor decades, Paris has been the center of the intellectual and cultural life of French Jewry. The city offers a number of institutions dedicated to Jewish history and culture. Located at the Alliance Isra\u00e9lite Universalle is the largest Jewish library in all of Europe. At the Biblioth\u00e8que Medem is the Paris Library of Yiddish. The Mercaz Rashi is home to the University Center for Jewish Studies, a well known destination for Jewish education. One of the most routinely visited cultural centers in Paris is the Chabad House. As of 2014, it was the largest in the world. The Chabad House caters to thousands of Jewish students from Paris and elsewhere every year.\n\nLocated in the city of Paris are certain districts, many of them historic, which are well known for their significant Jewish populations. One in particular is Le Marais \u201cThe Marsh\u201d, which had long been an aristocratic district of Paris until much of the city\u2019s nobility began to move. By the end of the 19th century, the district had become an active commercial area. It was at this time that thousands of Ashkenazi Jews fleeing persecution in Eastern Europe began to settle Le Marais, bringing their specialization in clothing with them. Arriving from Romania, Austria, Hungary and Russia, they developed a new community alongside an already established community of Parisian Jews. As Jewish immigration continued into the mid 20th century, this Jewish quarter in the fourth arrondissement of Paris became known as the \u201cPletzl\u201d, a Yiddish term meaning \u201clittle place\u201d. Despite having been targeted by the Nazis during World War II, the area has continued to be a major center of the Paris Jewish community. Since the 1990s, the area has grown. Along the Rue des Rosiers are a number of Jewish restaurants, bookstores, kosher food outlets and synagogues. Another notable area with a sizeable Jewish community is in the city\u2019s 9th district. Known as the Faubourg-Montmarte, it is home to several synagogues, kosher restaurants as well as many offices to a number of Jewish organizations. \n\nWith centuries-old Jewish neighborhoods, Paris has its share of important Jewish landmarks. Established in 1874 is the Rothschild Synagogue and while it may not be ancient, its main attraction is its rabbis who are well known for being donned in Napoleonic era apparel. The synagogue on Rue Buffault opened in 1877 and was the first synagogue in Paris to adopt the Spanish/Portuguese rite. Next to the synagogue is a memorial dedicated to the 12,000 children who perished in the Holocaust. The Copernic synagogue is the city\u2019s largest non-orthodox congregation. In 1980 it was the target of an anti-Semitic bombing which led to the death of four people during the celebration of Simchat Torah, the first attack against the Jewish people in France since World War II. In the 1970s, the remains of what many believed to have been a Yeshiva were found under the Rouen Law Courts. Just an hour outside of Paris, this site is presumed to be from the 12th century when Jews comprised nearly 20% of the total population. \n\nServing many of the medical needs of the Jewish community of Paris are organizations such as the OSE and CASIP. While the Rothschild hospital provides general medical care, the OSE or Society for the Health of the Jewish Population, offers several health centers around the city. CASIP focuses on providing the community social services include children and elderly homes. \n\nBeing a community of nearly 400,000 people, the Jews of Paris enjoy a diversity of media outlets centered on Jewish culture. Broadcasted every week are Jewish television programs which include news and a variety of entertainment. On radio are several stations such as Shalom Paris which airs Jewish music, news and programming. Circulating throughout Paris are two weekly Jewish papers and a number of monthly journals. One of the city\u2019s major newspapers is the Actualit\u00e9 Juive. There are also online journals such as the Israel Infos and Tribute Juive. ", 
+                "He": "\u05e4\u05e8\u05d9\u05e1\n\n\u05d1\u05d9\u05e8\u05ea \u05e6\u05e8\u05e4\u05ea.\n\n\u05e2\u05d3\u05d5\u05ea \u05e8\u05d0\u05e9\u05d5\u05e0\u05d4 \u05e2\u05dc \u05e7\u05d9\u05d5\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1\u05e4\u05e8\u05d9\u05e1 \u05e0\u05e9\u05ea\u05de\u05e8\u05d4 \u05de\u05e1\u05d5\u05e3 \u05d4\u05de\u05d0\u05d4 \u05d4-6 \u05d5\u05db\u05d1\u05e8 \u05d0\u05d6 \u05d4\u05d9\u05d9\u05ea\u05d4 \u05d1\u05de\u05e7\u05d5\u05dd \u05e7\u05d4\u05d9\u05dc\u05d4 \u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d5\u05dc\u05d4 \u05d1\u05d9\u05ea-\u05db\u05e0\u05e1\u05ea \u05de\u05e9\u05dc\u05d4. \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4 \u05e7\u05d9\u05d9\u05de\u05d4 \u05d9\u05d7\u05e1\u05d9 \u05e9\u05db\u05e0\u05d5\u05ea \u05ea\u05e7\u05d9\u05e0\u05d9\u05dd \u05e2\u05dd \u05e9\u05d0\u05e8 \u05ea\u05d5\u05e9\u05d1\u05d9 \u05d4\u05e2\u05d9\u05e8.\n\n\u05d4\u05d0\u05d9\u05e1\u05d5\u05e8 \u05e2\u05dc \u05e7\u05d1\u05dc\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05dc\u05de\u05e9\u05e8\u05d4 \u05e6\u05d9\u05d1\u05d5\u05e8\u05d9\u05ea, \u05e9\u05e0\u05e7\u05d1\u05e2 \u05d1\u05e7\u05d5\u05e0\u05e1\u05d9\u05dc \u05d4\u05e9\u05d9\u05e9\u05d9 \u05d1\u05e4\u05e8\u05d9\u05e1 (614 \u05d0\u05d5 615), \u05de\u05e2\u05d9\u05d3 \u05e2\u05dc \u05de\u05e2\u05de\u05d3\u05dd \u05d4\u05e8\u05dd \u05d1\u05d7\u05d1\u05e8\u05d4.\n\n\u05de\u05ea\u05d7\u05d9\u05dc\u05ea \u05d4\u05de\u05d0\u05d4 \u05d4-12 \u05d4\u05d9\u05d4 \u05d1\u05e2\u05d9\u05e8 \u05e8\u05d5\u05d1\u05e2 \u05de\u05d9\u05d5\u05d7\u05d3 \u05dc\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd, \u05d5\u05dc\u05d3\u05d1\u05e8\u05d9 \u05d0\u05d7\u05d3 \u05d4\u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05e9\u05dc \u05d9\u05d5\u05e1\u05e3 \u05d4\u05db\u05d4\u05df, \"\u05e1\u05e4\u05e8 \u05d4\u05d1\u05db\u05d0\", \u05d4\u05d9\u05d5 \u05d1\u05d1\u05e2\u05dc\u05d5\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05db\u05de\u05d7\u05e6\u05d9\u05ea \u05d4\u05d0\u05d3\u05de\u05d5\u05ea \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d5\u05e1\u05d1\u05d9\u05d1\u05ea\u05d4. \u05d4\u05d9\u05d5 \u05dc\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05e8\u05d1\u05d4 \u05e2\u05d1\u05d3\u05d9\u05dd \u05d5\u05e9\u05e4\u05d7\u05d5\u05ea, \u05d5\u05d1\u05d9\u05df \u05d4\u05e4\u05e7\u05d3\u05d5\u05e0\u05d5\u05ea \u05e9\u05d4\u05d9\u05d5 \u05dc\u05d5\u05e7\u05d7\u05d9\u05dd \u05dc\u05d4\u05d1\u05d8\u05d7\u05ea \u05d4\u05d4\u05dc\u05d5\u05d5\u05d0\u05d5\u05ea \u05d4\u05d9\u05d5 \u05d2\u05dd \u05db\u05dc\u05d9 \u05e4\u05d5\u05dc\u05d7\u05df \u05e0\u05d5\u05e6\u05e8\u05d9\u05d9\u05dd.\n\n\u05e2\u05dc\u05d9\u05dc\u05ea-\u05d3\u05dd \u05e2\u05dc \u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05dc\u05d5\u05d0\u05d4 (1171) \u05e2\u05d5\u05e8\u05e8\u05d4 \u05e1\u05e2\u05e8\u05ea \u05e8\u05d5\u05d7\u05d5\u05ea \u05d2\u05dd \u05d1\u05e4\u05e8\u05d9\u05e1, \u05d5\u05d4\u05d9\u05d9\u05ea\u05d4 \u05d1\u05d9\u05df \u05d4\u05d2\u05d5\u05e8\u05de\u05d9\u05dd \u05dc\u05d2\u05d9\u05e8\u05d5\u05e9\u05dd \u05de\u05d4\u05e2\u05d9\u05e8 \u05d1\u05e9\u05e0\u05ea 1182. \u05d0\u05ea \u05d1\u05ea\u05d9 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d7\u05d9\u05dc\u05e7 \u05d4\u05de\u05dc\u05da \u05d1\u05d9\u05df \u05e1\u05d5\u05d7\u05e8\u05d9 \u05d4\u05d0\u05e8\u05d9\u05d2\u05d9\u05dd \u05d5\u05d4\u05e4\u05e8\u05d5\u05d5\u05ea \u05d1\u05e2\u05d9\u05e8.\n\n\u05db\u05e2\u05d1\u05d5\u05e8 16 \u05e9\u05e0\u05d4 \u05d4\u05d5\u05ea\u05e8 \u05dc\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05dc\u05d7\u05d6\u05d5\u05e8 \u05dc\u05e4\u05e8\u05d9\u05e1. \u05d4\u05e4\u05e2\u05dd \u05d4\u05ea\u05d9\u05d9\u05e9\u05d1\u05d5 \u05d1\u05d0\u05d9\u05d6\u05d5\u05e8-\u05de\u05d2\u05d5\u05e8\u05d9\u05dd, \u05e9\u05e9\u05d9\u05de\u05e9 \u05d0\u05d5\u05ea\u05dd \u05d2\u05dd \u05d1\u05e2\u05ea \u05d4\u05d7\u05d3\u05e9\u05d4.\n\n\u05d1\u05d9\u05de\u05d9\u05d5 \u05e9\u05dc \u05dc\u05d5\u05d0\u05d9 \u05d4-9 \u05e0\u05e2\u05e8\u05da \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d4\u05d5\u05d5\u05d9\u05db\u05d5\u05d7 \u05d4\u05de\u05e4\u05d5\u05e8\u05e1\u05dd \u05e2\u05dc \u05d4\u05ea\u05dc\u05de\u05d5\u05d3 (1240), \u05e2\u05dd \u05e8' \u05d9\u05d7\u05d9\u05d0\u05dc \u05d1\u05df \u05d9\u05d5\u05e1\u05e3 \u05d1\u05e8\u05d0\u05e9 \u05d4\u05de\u05e9\u05dc\u05d7\u05ea \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d5\u05d4\u05de\u05d5\u05de\u05e8 \u05e0\u05d9\u05e7\u05d5\u05dc\u05d0\u05e1 \u05d3\u05d5\u05e0\u05d9\u05df \u05d1\u05e6\u05d3 \u05e9\u05db\u05e0\u05d2\u05d3. \u05d1\u05ea\u05d5\u05dd \u05d4\u05d5\u05d5\u05d9\u05db\u05d5\u05d7 \u05d4\u05d5\u05e2\u05dc\u05d5 \u05e2\u05dc \u05d4\u05d0\u05e9 \u05d1\u05d0\u05d7\u05ea \u05de\u05db\u05d9\u05db\u05e8\u05d5\u05ea \u05d4\u05e2\u05d9\u05e8 (\u05db\u05d9\u05d5\u05dd \"\u05e4\u05dc\u05d0\u05e1 \u05d3\u05d4 \u05dc'\u05d4\u05d5\u05d8\u05dc \u05d3\u05d4 \u05d5\u05d9\u05dc) \u05e1\u05e4\u05e8\u05d9 \u05e7\u05d5\u05d3\u05e9 \u05e9\u05d4\u05d5\u05d1\u05d0\u05d5 \u05dc\u05de\u05e7\u05d5\u05dd \u05d1-24 \u05e2\u05d2\u05dc\u05d5\u05ea \u05e1\u05d5\u05e1\u05d9\u05dd.\n\n\u05d1- 1290 \u05d4\u05d5\u05d0\u05e9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05d7\u05d9\u05dc\u05d5\u05dc \u05dc\u05d7\u05dd \u05d4\u05e7\u05d5\u05d3\u05e9; \u05d4\u05d4\u05e1\u05ea\u05d4 \u05e9\u05e0\u05ea\u05dc\u05d5\u05d5\u05ea\u05d4 \u05dc\u05db\u05da \u05d4\u05d9\u05d9\u05ea\u05d4 \u05d4\u05e1\u05d9\u05d1\u05d4 \u05d4\u05e2\u05d9\u05e7\u05e8\u05d9\u05ea \u05dc\u05d2\u05d9\u05e8\u05d5\u05e9 \u05e9\u05dc 1306. \u05de\u05e8\u05e9\u05d9\u05de\u05d5\u05ea \u05d4\u05de\u05e1\u05d9\u05dd \u05e9\u05dc \u05d0\u05d5\u05ea\u05df \u05d4\u05e9\u05e0\u05d9\u05dd \u05de\u05ea\u05d1\u05e8\u05e8, \u05e9\u05e8\u05d1\u05d9\u05dd \u05de\u05d9\u05d4\u05d5\u05d3\u05d9 \u05e4\u05e8\u05d9\u05e1 \u05d4\u05d2\u05d9\u05e2\u05d5 \u05dc\u05de\u05e7\u05d5\u05dd \u05de\u05e2\u05e8\u05d9-\u05e9\u05d3\u05d4, \u05d5\u05d0\u05d7\u05e8\u05d9 1290 \u05e7\u05dc\u05d8\u05d4 \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4, \u05dc\u05de\u05e8\u05d5\u05ea \u05d4\u05d0\u05d9\u05e1\u05d5\u05e8 \u05d4\u05e8\u05e9\u05de\u05d9, \u05d2\u05dd \u05de\u05d2\u05d5\u05e8\u05e9\u05d9\u05dd \u05de\u05d0\u05e0\u05d2\u05dc\u05d9\u05d4. \u05d1\u05d9\u05df \u05d1\u05e2\u05dc\u05d9 \u05d4\u05de\u05e7\u05e6\u05d5\u05e2\u05d5\u05ea \u05d1\u05d5\u05dc\u05d8\u05d9\u05dd \u05d4\u05d9\u05d5 \u05e8\u05d5\u05e4\u05d0\u05d9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd, \u05d0\u05d1\u05dc \u05d4\u05e8\u05d5\u05d1 \u05d4\u05de\u05db\u05e8\u05d9\u05e2 \u05e2\u05e1\u05e7 \u05d1\u05d4\u05dc\u05d5\u05d5\u05d0\u05ea \u05db\u05e1\u05e4\u05d9\u05dd \u05d5\u05d1\u05de\u05e1\u05d7\u05e8. \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4, \u05e9\u05de\u05e0\u05ea\u05d4 \u05d0\u05d6 \u05db\u05de\u05d0\u05d4 \u05d1\u05ea\u05d9-\u05d0\u05d1, \u05e0\u05ea\u05e8\u05d5\u05e9\u05e9\u05d4 \u05e2\u05d3 \u05de\u05d4\u05e8\u05d4 \u05d5\u05e8\u05d1\u05d9\u05dd \u05e2\u05d6\u05d1\u05d5 \u05d0\u05ea \u05d4\u05e2\u05d9\u05e8 \u05e2\u05d5\u05d3 \u05dc\u05e4\u05e0\u05d9 \u05d4\u05d2\u05d9\u05e8\u05d5\u05e9. \u05d9\u05e9\u05d9\u05d1\u05ea \u05e4\u05e8\u05d9\u05e1 \u05d9\u05e8\u05d3\u05d4 \u05de\u05d2\u05d3\u05d5\u05dc\u05ea\u05d4 \u05d0\u05d7\u05e8\u05d9 \u05e9\u05e8\u05d9\u05e4\u05ea \u05d4\u05ea\u05dc\u05de\u05d5\u05d3 \u05d5\u05d2\u05d9\u05e8\u05d5\u05e9 1306.\n\n\u05d1-1315 \u05d7\u05d6\u05e8\u05d5 \u05de\u05e2\u05d8\u05d9\u05dd \u05d5\u05d2\u05d5\u05e8\u05e9\u05d5 \u05e9\u05d5\u05d1 \u05d1-1322. \u05d4\u05d9\u05d9\u05e9\u05d5\u05d1 \u05d4\u05ea\u05d7\u05d3\u05e9 \u05d1\u05e9\u05e0\u05ea 1359 \u05d5\u05d0\u05e3 \u05e9\u05d6\u05db\u05d4 \u05d1\u05d7\u05e1\u05d5\u05ea \u05d4\u05e9\u05dc\u05d8\u05d5\u05e0\u05d5\u05ea \u05d4\u05e6\u05d1\u05d0\u05d9\u05d9\u05dd \u05d1\u05e2\u05d9\u05e8 \u05dc\u05d0 \u05e0\u05d9\u05e6\u05dc \u05de\u05d9\u05d3\u05d9 \u05d4\u05d4\u05de\u05d5\u05df \u05d1\u05d4\u05ea\u05de\u05e8\u05d3\u05d5\u05ea \u05e0\u05d2\u05d3 \u05e0\u05d8\u05dc \u05d4\u05de\u05d9\u05e1\u05d9\u05dd \u05d1\u05e9\u05e0\u05d9\u05dd 1380, 1382. \u05d4\u05de\u05dc\u05da \u05e9\u05d0\u05e8\u05dc \u05d4-6 \u05d0\u05de\u05e0\u05dd \u05e4\u05d8\u05e8 \u05d0\u05ea \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05de\u05d0\u05d7\u05e8\u05d9\u05d5\u05ea \u05dc\u05e4\u05e7\u05d3\u05d5\u05e0\u05d5\u05ea \u05d4\u05d9\u05e7\u05e8\u05d9\u05dd \u05e9\u05e0\u05d2\u05d6\u05dc\u05d5 \u05de\u05d4\u05dd \u05d5\u05d4\u05e2\u05e0\u05d9\u05e7 \u05dc\u05d4\u05dd \u05d4\u05e7\u05dc\u05d5\u05ea \u05d0\u05d7\u05e8\u05d5\u05ea, \u05d0\u05d1\u05dc \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4 \u05e9\u05d5\u05d1 \u05dc\u05d0 \u05d4\u05ea\u05d0\u05d5\u05e9\u05e9\u05d4. \u05de\u05db\u05d4 \u05e0\u05d5\u05e1\u05e4\u05ea \u05d4\u05d5\u05e0\u05d7\u05ea\u05d4 \u05e2\u05dc\u05d9\u05d4 \u05d1\u05e4\u05e8\u05e9\u05ea \u05d3\u05e0\u05d9\u05e1 \u05d3\u05d4 \u05de\u05d0\u05e9\u05d5, \u05de\u05d5\u05de\u05e8 \u05e9\u05e0\u05e2\u05dc\u05dd \u05d5\u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05d5\u05d0\u05e9\u05de\u05d5 \u05d1\u05e8\u05e6\u05d9\u05d7\u05ea\u05d5; \u05e2\u05dc \u05e9\u05d1\u05e2\u05d4 \u05de\u05e8\u05d0\u05e9\u05d9 \u05d4\u05e2\u05d3\u05d4 \u05e0\u05d2\u05d6\u05e8 \u05d3\u05d9\u05df- \u05de\u05d5\u05d5\u05ea, \u05d5\u05d4\u05d5\u05d7\u05dc\u05e3 \u05d1\u05e7\u05e0\u05e1 \u05db\u05d1\u05d3 \u05d5\u05d1\u05de\u05d0\u05e1\u05e8. \u05d4\u05d3\u05d1\u05e8 \u05d0\u05d9\u05e8\u05e2 \u05e2\u05dc \u05e1\u05e3 \u05d4\u05d2\u05d9\u05e8\u05d5\u05e9 \u05d4\u05db\u05dc\u05dc\u05d9 \u05de\u05e6\u05e8\u05e4\u05ea \u05d1-1394. \u05d1\u05d9\u05df \u05d2\u05d3\u05d5\u05dc\u05d9 \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4 \u05e2\u05d3 \u05d2\u05d9\u05e8\u05d5\u05e9 \"\u05e1\u05d5\u05e4\u05d9\" \u05d6\u05d4 \u05d4\u05d9\u05d5 \u05d7\u05db\u05de\u05d9 \u05e4\u05e8\u05d9\u05e1 \u05de\u05df \u05d4\u05de\u05d0\u05d4 \u05d4-12, \u05e8' \u05e9\u05dc\u05de\u05d4 \u05d1\u05df \u05de\u05d0\u05d9\u05e8 (\u05d4\u05e8\u05e9\u05d1\"\u05dd) \u05d5\u05e8' \u05d9\u05e2\u05e7\u05d1 \u05d1\u05df \u05de\u05d0\u05d9\u05e8 (\u05e8\u05d1\u05d9\u05e0\u05d5 \u05ea\u05dd); \u05e8\u05d0\u05e9 \u05d4\u05d9\u05e9\u05d9\u05d1\u05d4 \u05e8' \u05de\u05ea\u05ea\u05d9\u05d4\u05d5 \u05d2\u05d0\u05d5\u05df \u05d5\u05d1\u05e0\u05d5 \u05d4\u05e4\u05d5\u05e1\u05e7 \u05d9\u05d7\u05d9\u05d0\u05dc, \u05d1\u05e2\u05dc\u05d9 \u05d4\u05ea\u05d5\u05e1\u05e4\u05d5\u05ea \u05d9' \u05d9\u05d5\u05dd-\u05d8\u05d5\u05d1 \u05d5\u05e8' \u05d7\u05d9\u05d9\u05dd \u05d1\u05df \u05d7\u05e0\u05e0\u05d0\u05dc \u05d4\u05db\u05d4\u05df, \u05d4\u05e4\u05d5\u05e1\u05e7 \u05d9' \u05d0\u05dc\u05d9\u05d4\u05d5 \u05d1\u05df \u05d9\u05d4\u05d5\u05d3\u05d4 \u05d5\u05e8' \u05d9\u05e2\u05e7\u05d1 \u05d1\u05df \u05e9\u05de\u05e2\u05d5\u05df. \u05d1\u05de\u05d0\u05d4 \u05d4-13 - \u05e8\u05d0\u05e9 \u05d4\u05d9\u05e9\u05d9\u05d1\u05d4 \u05e8' \u05d9\u05d4\u05d5\u05d3\u05d4 \u05d1\u05df \u05d9\u05e6\u05d7\u05e7 \u05d5\u05d9\u05d5\u05e8\u05e9\u05d5 \u05e8' \u05d9\u05d7\u05d9\u05d0\u05dc \u05d1\u05df \u05d9\u05d5\u05e1\u05e3, \u05d5\u05d1\u05de\u05d0\u05d4 \u05d4-14 - \u05e8\u05d0\u05e9 \u05d4\u05d9\u05e9\u05d9\u05d1\u05d4 \u05d4\u05e8\u05d1 \u05d4\u05e8\u05d0\u05e9\u05d9 \u05e9\u05dc \u05e6\u05e8\u05e4\u05ea \u05de\u05ea\u05ea\u05d9\u05d4\u05d5 \u05d1\u05df \u05d9\u05d5\u05e1\u05e3.\n\n\u05d1\u05ea\u05d7\u05d9\u05dc\u05ea \u05d4\u05de\u05d0\u05d4 \u05d4-18 \u05d4\u05d5\u05ea\u05e8 \u05dc\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05de\u05de\u05e5 \u05e9\u05d1\u05d0\u05dc\u05d6\u05d0\u05e1 \u05dc\u05d1\u05e7\u05e8 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05dc\u05e8\u05d2\u05dc \u05e2\u05e1\u05e7\u05d9\u05dd, \u05d5\u05d1\u05de\u05e8\u05d5\u05e6\u05ea \u05d4\u05d6\u05de\u05df \u05d4\u05d5\u05d0\u05e8\u05db\u05d4 \u05d9\u05d5\u05ea\u05e8 \u05d5\u05d9\u05d5\u05ea\u05e8 \u05ea\u05e7\u05d5\u05e4\u05ea \u05e9\u05d4\u05d5\u05ea\u05dd \u05d1\u05e2\u05d9\u05e8. \u05dc\u05e6\u05d3\u05dd \u05d4\u05d2\u05d9\u05e2\u05d5 \u05dc\u05e2\u05d9\u05e8 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05de\u05d1\u05d5\u05e8\u05d3\u05d5 (\u05d4\"\u05e4\u05d5\u05e8\u05d8\u05d5\u05d2\u05d9\u05d6\u05d9\u05dd\") \u05d5\u05de\u05d0\u05d5\u05d5\u05d9\u05e0\u05d9\u05d5\u05df. \u05d1\u05de\u05e9\u05d8\u05e8\u05ea \u05e4\u05e8\u05d9\u05e1 \u05e0\u05ea\u05de\u05e0\u05d4 \u05de\u05e4\u05e7\u05d7 \u05de\u05d9\u05d5\u05d7\u05d3 \u05dc\u05e2\u05e0\u05d9\u05e0\u05d9 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd. \u05d4\u05de\u05e9\u05e8\u05d4 \u05d1\u05d5\u05d8\u05dc\u05d4, \u05d5\u05de-1777 \u05e9\u05d9\u05de\u05e9\u05d5 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05db\u05de\u05de\u05d5\u05e0\u05d9\u05dd: \u05d9\u05e2\u05e7\u05d1 \u05e8\u05d5\u05d3\u05e8\u05d9\u05d2\u05d6 \u05e4\u05e8\u05d9\u05d9\u05e8\u05d0 - \u05e2\u05dc \u05d9\u05d5\u05e6\u05d0\u05d9 \u05e1\u05e4\u05e8\u05d3 \u05d5\u05e4\u05d5\u05e8\u05d8\u05d5\u05d2\u05d0\u05dc, \u05de\u05e9\u05d4 \u05d0\u05dc\u05d9\u05e2\u05d6\u05e8 \u05dc\u05d9\u05e4\u05de\u05df \u05e7\u05d0\u05dc\u05de\u05e8 - \u05e2\u05dc \u05d9\u05d5\u05e6\u05d0\u05d9 \u05d2\u05e8\u05de\u05e0\u05d9\u05d4 \u05d5\u05d9\u05e9\u05e8\u05d0\u05dc \u05e9\u05dc\u05d5\u05dd - \u05e2\u05dc \u05d9\u05d4\u05d5\u05d3\u05d9 \u05d0\u05d5\u05d5\u05d9\u05e0\u05d9\u05d5\u05df. \u05d4\"\u05d2\u05e8\u05de\u05e0\u05d9\u05dd\" \u05d9\u05e9\u05d1\u05d5 \u05d1\u05e9\u05db\u05d5\u05e0\u05d5\u05ea \u05d4\u05d3\u05dc\u05d5\u05ea \u05e1\u05e0\u05d8-\u05de\u05d0\u05e8\u05d8\u05df \u05d5\u05e1\u05e0\u05d8-\u05d3\u05e0\u05d9, \u05d4\u05d0\u05d7\u05e8\u05d9\u05dd \u05d1\u05d0\u05de\u05d9\u05d3\u05d5\u05ea \u05de\u05e1\u05d5\u05d2 \u05e1\u05e0\u05d8-\u05d2'\u05e8\u05de\u05df \u05d5\u05e1\u05e0\u05d8-\u05d0\u05e0\u05d3\u05e8\u05d9\u05d9. \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05e8\u05d1\u05d9\u05dd \u05e2\u05e1\u05e7\u05d5 \u05d1\u05e8\u05d5\u05db\u05dc\u05d5\u05ea \u05d5\u05d1\u05de\u05db\u05d9\u05e8\u05ea \u05d1\u05d2\u05d3\u05d9\u05dd \u05de\u05e9\u05d5\u05de\u05e9\u05d9\u05dd. \u05d4\u05de\u05d1\u05d5\u05e1\u05e1\u05d9\u05dd \u05d9\u05d5\u05ea\u05e8 \u05d4\u05d9\u05d5 \u05de\u05dc\u05d5\u05d5\u05d9\u05dd \u05d1\u05e8\u05d9\u05d1\u05d9\u05ea, \u05e1\u05e4\u05e7\u05d9 \u05e1\u05d5\u05e1\u05d9\u05dd \u05dc\u05e6\u05d1\u05d0 \u05d5\u05e1\u05d5\u05d7\u05e8\u05d9 \u05ea\u05db\u05e9\u05d9\u05d8\u05d9\u05dd. \u05d4\u05d9\u05d5 \u05d2\u05dd \u05e2\u05d5\u05d1\u05d3\u05d9 \u05d7\u05e8\u05d9\u05ea\u05d4 \u05d5\u05e8\u05d9\u05e7\u05de\u05d4.\n\n\u05d0\u05db\u05e1\u05e0\u05d9\u05d5\u05ea \u05dc\u05d0\u05d5\u05db\u05dc \u05db\u05e9\u05e8 \u05e0\u05e4\u05ea\u05d7\u05d5 \u05d1-1721 \u05d5\u05e9\u05d9\u05de\u05e9\u05d5 \u05d2\u05dd \u05db\"\u05de\u05e0\u05d9\u05d9\u05e0\u05d9\u05dd\" \u05d7\u05e9\u05d0\u05d9\u05d9\u05dd. \u05d1\u05d9\u05ea-\u05db\u05e0\u05e1\u05ea \u05e8\u05d0\u05e9\u05d5\u05df \u05dc\u05d0 \u05e0\u05e4\u05ea\u05d7 \u05d0\u05dc\u05d0 \u05d1- 1788. \u05e2\u05e8\u05d1 \u05d4\u05de\u05d4\u05e4\u05d9\u05db\u05d4 \u05dc\u05d0 \u05d9\u05e9\u05d1\u05d5 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d9\u05d5\u05ea\u05e8 \u05de-500 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd. \u05d1-26 \u05d1\u05d0\u05d5\u05d2\u05d5\u05e1\u05d8 1789 \u05d4\u05d2\u05d9\u05e9\u05d5 \u05e2\u05e6\u05d5\u05de\u05d4 \u05dc\u05d0\u05e1\u05d9\u05e4\u05d4 \u05d4\u05de\u05db\u05d5\u05e0\u05e0\u05ea \u05d5\u05d1\u05d9\u05e7\u05e9\u05d5 \u05d6\u05db\u05d5\u05d9\u05d5\u05ea-\u05d0\u05d6\u05e8\u05d7; \u05d1-28 \u05d1\u05d9\u05e0\u05d5\u05d0\u05e8 1790 \u05d4\u05d5\u05e2\u05e0\u05e7\u05d5 \u05d6\u05db\u05d5\u05d9\u05d5\u05ea \u05d0\u05dc\u05d4 \u05dc\"\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05e6\u05e8\u05e4\u05ea\u05d9\u05d9\u05dd\" \u05d9\u05d5\u05e6\u05d0\u05d9 \u05e1\u05e4\u05e8\u05d3, \u05e4\u05d5\u05e8\u05d8\u05d5\u05d2\u05d0\u05dc \u05d5\u05d0\u05d5\u05d5\u05d9\u05e0\u05d9\u05d5\u05df.\n\n\u05d1-1809 \u05db\u05d1\u05e8 \u05de\u05e0\u05d4 \u05d4\u05d9\u05d9\u05e9\u05d5\u05d1 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d9\u05d5\u05ea\u05e8 \u05de-2,900 \u05d0\u05d9\u05e9 \u05d5\u05db\u05e2\u05d1\u05d5\u05e8 \u05e2\u05e9\u05e8 \u05e9\u05e0\u05d9\u05dd 6,000 - 7,000. \u05d0\u05d6 \u05e0\u05d9\u05d2\u05e9\u05d4 \u05d4\u05e7\u05d5\u05e0\u05e1\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05dc\u05d1\u05e0\u05d9\u05d9\u05ea \u05d1\u05d9\u05ea-\u05d4\u05db\u05e0\u05e1\u05ea \u05d4\u05d2\u05d3\u05d5\u05dc, \u05d5\u05d4\u05e7\u05d9\u05de\u05d4 \u05d0\u05ea \u05d1\u05d9\u05ea-\u05e1\u05e4\u05e8 \u05d4\u05d9\u05e1\u05d5\u05d3\u05d9 \u05d4\u05e8\u05d0\u05e9\u05d5\u05df. \u05d1-1859 \u05d4\u05d5\u05e2\u05ea\u05e7 \u05de\u05de\u05e5 \u05d1\u05d9\u05ea-\u05d4\u05de\u05d3\u05e8\u05e9 \u05dc\u05e8\u05d1\u05e0\u05d9\u05dd \u05d5\u05d1\u05e9\u05e0\u05d4 \u05e9\u05dc\u05d0\u05d7\u05e8\u05d9\u05d4 \u05e0\u05d5\u05e1\u05d3\u05d4 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d7\u05d1\u05e8\u05ea \"\u05db\u05dc \u05d9\u05e9\u05e8\u05d0\u05dc \u05d7\u05d1\u05e8\u05d9\u05dd\".\n\n\u05d1-1869 \u05e0\u05e8\u05e9\u05de\u05d5 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05db-30,000 \u05ea\u05d5\u05e9\u05d1\u05d9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd (\u05db-%40 \u05de\u05db\u05dc\u05dc \u05d4\u05d9\u05d9\u05e9\u05d5\u05d1 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05e6\u05e8\u05e4\u05ea), \u05e8\u05d5\u05d1\u05dd \u05d9\u05d5\u05e6\u05d0\u05d9 \u05d0\u05dc\u05d6\u05d0\u05e1, \u05dc\u05d5\u05e8\u05d9\u05d9\u05df \u05d5\u05d2\u05e8\u05de\u05e0\u05d9\u05d4, \u05d5\u05db\u05de\u05d4 \u05de\u05d0\u05d5\u05ea \u05d9\u05d5\u05e6\u05d0\u05d9 \u05e4\u05d5\u05dc\u05d9\u05df. \u05de\u05e2\u05d8\u05d9\u05dd \u05de\u05d0\u05d3 \u05d4\u05d9\u05d5 \u05e2\u05ea\u05d9\u05e8\u05d9-\u05d4\u05d5\u05df; \u05d4\u05e8\u05d5\u05d1 \u05d4\u05de\u05db\u05e8\u05d9\u05e2 \u05d4\u05e9\u05ea\u05d9\u05d9\u05da \u05dc\u05de\u05e2\u05de\u05d3 \u05d4\u05d1\u05d9\u05e0\u05d5\u05e0\u05d9 \u05d4\u05e0\u05de\u05d5\u05da. \u05d1\u05e7\u05e8\u05d1 \u05d4\u05e0\u05d5\u05e2\u05e8 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9 \u05d8\u05d9\u05e4\u05d7\u05d5 \u05d0\u05ea \u05d0\u05d4\u05d1\u05ea \u05d4\u05e2\u05d1\u05d5\u05d3\u05d4, \u05d5\u05d7\u05dc\u05d4 \u05d2\u05dd \u05e2\u05dc\u05d9\u05d9\u05d4 \u05de\u05ea\u05de\u05d3\u05ea \u05d1\u05de\u05e1\u05e4\u05e8 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1\u05e2\u05dc\u05d9 \u05de\u05e7\u05e6\u05d5\u05e2\u05d5\u05ea \u05d7\u05d5\u05e4\u05e9\u05d9\u05d9\u05dd - \u05de\u05d5\u05e8\u05d9\u05dd \u05d1\u05d0\u05e7\u05d3\u05de\u05d9\u05d4, \u05e2\u05d5\u05e8\u05db\u05d9-\u05d3\u05d9\u05df \u05d5\u05e8\u05d5\u05e4\u05d0\u05d9\u05dd.\n\n\u05d1\u05ea\u05d7\u05d9\u05dc\u05ea \u05e9\u05e0\u05d5\u05ea \u05d4-80 \u05e9\u05dc \u05d4\u05de\u05d0\u05d4 \u05d4- 19 \u05d4\u05d2\u05d9\u05e2\u05d5 \u05dc\u05e4\u05e8\u05d9\u05e1 \u05e4\u05dc\u05d9\u05d8\u05d9\u05dd \u05de\u05e8\u05d5\u05e1\u05d9\u05d4 \u05d5\u05de\u05df \u05d4\u05d0\u05d6\u05d5\u05e8\u05d9\u05dd \u05d4\u05e1\u05dc\u05d0\u05d1\u05d9\u05d9\u05dd \u05e9\u05dc \u05d0\u05d5\u05e1\u05d8\u05e8\u05d9\u05d4 \u05d5\u05e8\u05d5\u05de\u05e0\u05d9\u05d4, \u05d5\u05d7\u05dc \u05d2\u05d9\u05d3\u05d5\u05dc \u05e0\u05d9\u05db\u05e8 \u05d1\u05e7\u05e8\u05d1 \u05e2\u05d5\u05d1\u05d3\u05d9-\u05db\u05e4\u05d9\u05d9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1\u05e2\u05d9\u05e8. \u05e2\u05dd \u05d6\u05d0\u05ea \u05d2\u05d1\u05e8\u05d4 \u05d2\u05dd \u05d4\u05d4\u05e1\u05ea\u05d4 \u05d4\u05d0\u05e0\u05d8\u05d9\u05e9\u05de\u05d9\u05ea, \u05e9\u05d4\u05d2\u05d9\u05e2\u05d4 \u05dc\u05e9\u05d9\u05d0\u05d4 \u05d1\u05e4\u05e8\u05e9\u05ea \u05d3\u05e8\u05d9\u05d9\u05e4\u05d5\u05e1 (\u05de\u05e9\u05e0\u05ea 1894).\n\n\u05e2\u05dd \u05d4\u05e4\u05e8\u05d3\u05ea \u05d4\u05d3\u05ea \u05de\u05df \u05d4\u05de\u05d3\u05d9\u05e0\u05d4 \u05d1-1905 \u05e0\u05e2\u05e9\u05ea\u05d4 \u05d4\u05e7\u05d5\u05e0\u05e1\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d0\u05e8\u05d2\u05d5\u05df \u05d3\u05ea\u05d9 \u05e4\u05e8\u05d8\u05d9; \u05d5\u05e2\u05d3\u05d9\u05d9\u05df \u05d4\u05d9\u05d9\u05ea\u05d4 \u05d1\u05e9\u05dc\u05d9\u05d8\u05ea \u05d9\u05d5\u05e6\u05d0\u05d9 \u05d0\u05dc\u05d6\u05d0\u05e1 \u05d5\u05dc\u05d5\u05e8\u05d9\u05d9\u05df, \u05de\u05d9\u05e2\u05d5\u05d8 \u05d1\u05d9\u05df \u05d9\u05d4\u05d5\u05d3\u05d9 \u05e4\u05e8\u05d9\u05e1, \u05d5\u05d4\u05de\u05d5\u05e0\u05d9 \u05d4\u05de\u05d4\u05d2\u05e8\u05d9\u05dd \u05d4\u05d7\u05d3\u05e9\u05d9\u05dd \u05d4\u05e1\u05ea\u05d9\u05d9\u05d2\u05d5 \u05de\u05de\u05e0\u05d4. \u05de\u05d1\u05d9\u05df \u05d4\u05de\u05d4\u05d2\u05e8\u05d9\u05dd \u05d4\u05d7\u05d3\u05e9\u05d9\u05dd \u05d9\u05e6\u05d0\u05d5 13,000 \"\u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05d6\u05e8\u05d9\u05dd\" \u05e9\u05e9\u05d9\u05e8\u05ea\u05d5 \u05d1\u05e9\u05d5\u05e8\u05d5\u05ea \u05d4\u05e6\u05d1\u05d0 \u05d4\u05e6\u05e8\u05e4\u05ea\u05d9 \u05d1\u05de\u05dc\u05d7\u05de\u05ea-\u05d4\u05e2\u05d5\u05dc\u05dd \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d4 (1914 - 1918).\n\n\u05d0\u05d7\u05e8\u05d9 \u05d4\u05de\u05dc\u05d7\u05de\u05d4 \u05d4\u05ea\u05d7\u05d9\u05dc\u05d4 \u05d4\u05d2\u05d9\u05e8\u05d4 \u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05dc\u05e4\u05e8\u05d9\u05e1 \u05de\u05e6\u05e4\u05d5\u05df-\u05d0\u05e4\u05e8\u05d9\u05e7\u05d4, \u05de\u05d8\u05d5\u05e8\u05e7\u05d9\u05d4, \u05de\u05d0\u05e8\u05e6\u05d5\u05ea \u05d4\u05d1\u05dc\u05e7\u05df \u05d5\u05d1\u05e2\u05d9\u05e7\u05e8 \u05de\u05de\u05d6\u05e8\u05d7-\u05d0\u05d9\u05e8\u05d5\u05e4\u05d4.\n\n\u05d1\u05e9\u05e0\u05ea 1939 \u05d9\u05e9\u05d1\u05d5 \u05d1\u05e4\u05e8\u05d9\u05e1 150,000 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd, \u05e8\u05d5\u05d1\u05dd \u05d4\u05d9\u05d5 \u05d3\u05d5\u05d1\u05e8\u05d9 \u05d9\u05d9\u05d3\u05d9\u05e9, \u05d5\u05d4\u05d9\u05d5 \u05d9\u05d5\u05ea\u05e8 \u05de\u05de\u05d7\u05e6\u05d9\u05ea \u05d4\u05d9\u05d9\u05e9\u05d5\u05d1 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05e6\u05e8\u05e4\u05ea \u05db\u05d5\u05dc\u05d4. \u05e8\u05d9\u05db\u05d5\u05d6\u05d9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd \u05d4\u05d9\u05d5 \u05d1\u05d0\u05d6\u05d5\u05e8\u05d9\u05dd \u05d4\u05e6\u05e4\u05d5\u05e0\u05d9\u05d9\u05dd \u05d5\u05d4\u05de\u05d6\u05e8\u05d7\u05d9\u05d9\u05dd \u05e9\u05dc \u05d4\u05e2\u05d9\u05e8. \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05d9\u05d5 \u05de\u05d0\u05d5\u05e8\u05d2\u05e0\u05d9\u05dd \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-150 \"\u05dc\u05d0\u05e0\u05d3\u05e1\u05de\u05d0\u05e0\u05e9\u05d0\u05e4\u05d8\" (\u05d0\u05e8\u05d2\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc \u05d9\u05d5\u05e6\u05d0\u05d9 \u05e7\u05d4\u05d9\u05dc\u05d5\u05ea \u05e9\u05d5\u05e0\u05d5\u05ea) \u05d5\u05d1\u05d0\u05d2\u05d5\u05d3\u05d5\u05ea \u05de\u05d0\u05d2\u05d5\u05d3\u05d5\u05ea \u05e9\u05d5\u05e0\u05d5\u05ea, \u05d5\u05d0\u05d9\u05dc\u05d5 \u05d4\u05e7\u05d5\u05e0\u05e1\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05e9\u05dc \u05e4\u05e8\u05d9\u05e1 \u05de\u05e0\u05ea\u05d4 \u05e8\u05e7 6,000 \u05d7\u05d1\u05e8\u05d9\u05dd \u05e8\u05e9\u05d5\u05de\u05d9\u05dd. \u05de\u05d1\u05ea\u05d9-\u05d4\u05e1\u05e4\u05e8 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd \u05d4\u05d9\u05e9\u05e0\u05d9\u05dd \u05e9\u05e8\u05d3 \u05e8\u05e7 \u05d0\u05d7\u05d3, \u05d0\u05d1\u05dc \u05dc\u05e6\u05d9\u05d3\u05d5 \u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d4 \u05e8\u05e9\u05ea \u05d7\u05d9\u05e0\u05d5\u05da \u05d3\u05ea\u05d9 \u05d1\u05d1\u05ea\u05d9-\u05d4\u05db\u05e0\u05e1\u05ea \u05d5\u05d1\"\u05de\u05e0\u05d9\u05d9\u05e0\u05d9\u05dd\", \u05d1\u05d9\u05ea-\u05e1\u05e4\u05e8 \u05ea\u05d9\u05db\u05d5\u05df \u05e4\u05e8\u05d8\u05d9 \u05d5\u05d0\u05e4\u05d9\u05dc\u05d5 \u05db\u05de\u05d4 \u05ea\u05d9\u05db\u05d5\u05e0\u05d9\u05dd \u05de\u05de\u05e9\u05dc\u05ea\u05d9\u05d9\u05dd. \u05dc\u05e2\u05d9\u05ea\u05d5\u05e0\u05d5\u05ea \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d1\u05e6\u05e8\u05e4\u05ea\u05d9\u05ea \u05e0\u05d5\u05e1\u05e4\u05d4 \u05e2\u05ea\u05d5\u05e0\u05d5\u05ea \u05d2\u05dd \u05d1\u05d9\u05d9\u05d3\u05d9\u05e9.\n\n\u05d1\u05d9\u05df \u05d4\u05d0\u05d9\u05e9\u05d9\u05dd \u05d4\u05de\u05d5\u05d1\u05d9\u05dc\u05d9\u05dd \u05d1\u05e7\u05d4\u05d9\u05dc\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9 \u05e4\u05e8\u05d9\u05e1 \u05d4\u05d9\u05d5 \u05d7\u05ea\u05e0\u05d9 \u05e4\u05e8\u05e1 \u05e0\u05d5\u05d1\u05dc \u05e8\u05e0\u05d4 \u05e7\u05d0\u05e1\u05df \u05d5\u05d0' \u05dc\u05d1\u05d5\u05d1. \u05d1\u05d0\u05de\u05e0\u05d5\u05ea \u05d4\u05e6\u05d9\u05d5\u05e8 \u05d5\u05d4\u05e4\u05d9\u05e1\u05d5\u05dc \u05ea\u05e4\u05e1\u05d5 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05de\u05e7\u05d5\u05dd \u05d1\u05d5\u05dc\u05d8, \u05d1\u05de\u05d9\u05d5\u05d7\u05d3 \u05d1\u05d0\u05e1\u05db\u05d5\u05dc\u05d4 \u05d4\u05e4\u05e8\u05d9\u05e1\u05d0\u05d9\u05ea \u05d1\u05d9\u05df \u05e9\u05ea\u05d9 \u05de\u05dc\u05d7\u05de\u05d5\u05ea- \u05d4\u05e2\u05d5\u05dc\u05dd.\n\n\u05e2\u05e8\u05d1 \u05de\u05dc\u05d7\u05de\u05ea \u05d4\u05e2\u05d5\u05dc\u05dd \u05d4\u05e9\u05e0\u05d9\u05d9\u05d4 (\u05e1\u05e4\u05d8\u05de\u05d1\u05e8 1939) \u05d9\u05e9\u05d1\u05d5 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05dc\u05de\u05e2\u05dc\u05d4 \u05de- 150,000 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd.\n\n\n\u05ea\u05e7\u05d5\u05e4\u05ea \u05d4\u05e9\u05d5\u05d0\u05d4\n\n\u05d1-14 \u05d1\u05d9\u05d5\u05e0\u05d9 1940 \u05e0\u05db\u05e0\u05e1 \u05d4\u05e6\u05d1\u05d0 \u05d4\u05d2\u05e8\u05de\u05e0\u05d9 \u05dc\u05e4\u05e8\u05d9\u05e1. \u05e8\u05d1\u05d9\u05dd \u05de\u05ea\u05d5\u05e9\u05d1\u05d9 \u05d4\u05e2\u05d9\u05e8 \u05e0\u05de\u05dc\u05d8\u05d5, \u05d0\u05d1\u05dc \u05d7\u05d6\u05e8\u05d5 \u05ea\u05d5\u05da \u05e9\u05d1\u05d5\u05e2\u05d5\u05ea \u05d0\u05d7\u05d3\u05d9\u05dd. \u05d1\u05d9\u05df \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05d9\u05d5 \u05e8\u05d1\u05d9\u05dd \u05e9\u05d4\u05e2\u05d3\u05d9\u05e4\u05d5 \u05dc\u05d4\u05e9\u05d0\u05e8 \u05d1\u05e6\u05e8\u05e4\u05ea \u05d4\u05d1\u05dc\u05ea\u05d9-\u05db\u05d1\u05d5\u05e9\u05d4, \u05d4\u05d9\u05d5 \u05e9\u05d4\u05e8\u05d7\u05d9\u05e7\u05d5 \u05dc\u05d0\u05e8\u05e6\u05d5\u05ea-\u05d4\u05d1\u05e8\u05d9\u05ea (\u05d3\u05d5\u05d2\u05de\u05ea \u05d4\u05e1\u05d5\u05e4\u05e8 \u05d0\u05e0\u05d3\u05e8\u05d9\u05d9 \u05de\u05d5\u05e8\u05d5\u05d0\u05d4) \u05d5\u05d4\u05d9\u05d5 (\u05dc\u05de\u05e9\u05dc, \u05e8\u05e0\u05d4 \u05e7\u05d0\u05e1\u05df \u05d5\u05d2\u05d0\u05e1\u05d8\u05d5\u05df \u05e4\u05d0\u05dc\u05d1\u05e1\u05e7\u05d9) \u05e9\u05d4\u05e6\u05d8\u05e8\u05e4\u05d5 \u05dc\u05ea\u05e0\u05d5\u05e2\u05ea \u05e6\u05e8\u05e4\u05ea \u05d4\u05d7\u05d5\u05e4\u05e9\u05d9\u05ea \u05e9\u05dc \u05d3\u05d4 \u05d2\u05d5\u05dc \u05d1\u05dc\u05d5\u05e0\u05d3\u05d5\u05df.\n\n\u05d9\u05d4\u05d5\u05d3\u05d9 \u05e4\u05d0\u05e8\u05d9\u05e1 \u05d4\u05d9\u05d5 \u05de\u05e8\u05d0\u05e9\u05d5\u05e0\u05d9 \u05d4\u05e4\u05e2\u05d9\u05dc\u05d9\u05dd \u05d1\u05ea\u05e0\u05d5\u05e2\u05d5\u05ea \u05d4\u05de\u05d7\u05ea\u05e8\u05ea; \u05e4\u05e8\u05d0\u05e0\u05e1\u05d9\u05e1 \u05db\u05d4\u05df, \u05e1\u05d5\u05d6\u05d0\u05df \u05d3\u05d2'\u05d9\u05d0\u05df \u05d5\u05d1\u05e8\u05e0\u05e8\u05d3 \u05e7\u05d9\u05e8\u05e9\u05df \u05d4\u05d9\u05d5 \u05de\u05de\u05d0\u05e8\u05d2\u05e0\u05d9 \u05de\u05e6\u05e2\u05d3 \u05d4\u05e1\u05d8\u05d5\u05d3\u05e0\u05d8\u05d9\u05dd \u05d1-11 \u05d1\u05e0\u05d5\u05d1\u05de\u05d1\u05e8 1940, \u05d4\u05e4\u05d2\u05e0\u05ea \u05d4\u05de\u05d7\u05d0\u05d4 \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d4 \u05e0\u05d2\u05d3 \u05d4\u05d2\u05e8\u05de\u05e0\u05d9\u05dd \u05d1\u05e4\u05e8\u05d9\u05e1.\n\n\u05d1\u05d0\u05de\u05e6\u05e2 \u05de\u05d0\u05d9 1941 \u05d2\u05d5\u05e8\u05e9\u05d5 \u05de\u05e4\u05e8\u05d9\u05e1 \u05e8\u05d0\u05e9\u05d5\u05e0\u05d9 \"\u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d4\u05d6\u05e8\u05d9\u05dd\", \u05db- 5,000 \u05d0\u05d9\u05e9, \u05d5\u05e9\u05d5\u05dc\u05d7\u05d5 \u05dc\u05de\u05d7\u05e0\u05d5\u05ea \u05e8\u05d9\u05db\u05d5\u05d6 \u05d5\u05d4\u05e9\u05de\u05d3\u05d4. \u05d1\u05d0\u05d5\u05d2\u05d5\u05e1\u05d8 \u05e9\u05d5\u05dc\u05d7\u05d5 \u05e2\u05d5\u05d3 8,000, \u05d5\u05d1\u05d3\u05e6\u05de\u05d1\u05e8 \u05d2\u05d5\u05e8\u05e9\u05d5 \u05db\u05de\u05d0\u05d4 \u05d0\u05e0\u05e9\u05d9-\u05e8\u05d5\u05d7 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd. \u05d1-16 \u05d1\u05d9\u05d5\u05dc\u05d9 1942 \u05e0\u05ea\u05e4\u05e1\u05d5 \u05d1\u05e2\u05d9\u05e8, \u05d1\u05e9\u05d9\u05ea\u05d5\u05e3 \u05e4\u05e2\u05d5\u05dc\u05d4 \u05d1\u05d9\u05df \u05d4\u05db\u05d5\u05d1\u05e9\u05d9\u05dd \u05d4\u05d2\u05e8\u05de\u05e0\u05d9\u05dd \u05dc\u05d1\u05d9\u05df \u05d4\u05d6'\u05e0\u05d3\u05e8\u05de\u05e8\u05d9\u05d4 \u05d4\u05e6\u05e8\u05e4\u05ea\u05d9\u05ea, 12,884 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd (\u05d1\u05d9\u05e0\u05d9\u05d4\u05dd \u05db-4,000 \u05d9\u05dc\u05d3\u05d9\u05dd).\n\n\u05de\u05e6\u05e8\u05e4\u05ea \u05db\u05d5\u05dc\u05d4 \u05d4\u05d5\u05d1\u05dc\u05d5 \u05dc\u05de\u05d7\u05e0\u05d5\u05ea-\u05d4\u05d4\u05e9\u05de\u05d3\u05d4 \u05d1\u05de\u05d6\u05e8\u05d7 85,000 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd, \u05d9\u05d5\u05ea\u05e8 \u05de\u05de\u05d7\u05e6\u05d9\u05ea\u05dd \u05d4\u05d9\u05d5 \u05ea\u05d5\u05e9\u05d1\u05d9 \u05e4\u05e8\u05d9\u05e1. \u05d1\u05dc\u05d9\u05dc 3 \u05d1\u05d0\u05d5\u05e7\u05d8\u05d5\u05d1\u05e8 1941 \u05d4\u05d5\u05ea\u05e7\u05e4\u05d5 \u05e9\u05d1\u05e2\u05d4 \u05d1\u05ea\u05d9-\u05db\u05e0\u05e1\u05ea \u05d1\u05e2\u05d9\u05e8 \u05d1\u05d9\u05d3\u05d9 \u05e4\u05d0\u05e9\u05d9\u05e1\u05d8\u05d9\u05dd \u05e6\u05e8\u05e4\u05ea\u05d9\u05d9\u05dd \u05d1\u05d7\u05d5\u05de\u05e8\u05d9-\u05e0\u05e4\u05e5 \u05e9\u05e7\u05d9\u05d1\u05dc\u05d5 \u05de\u05de\u05e9\u05d8\u05e8\u05ea \u05d4\u05d1\u05d8\u05d7\u05d5\u05df \u05d4\u05d2\u05e8\u05de\u05e0\u05d9\u05ea.\n\n\u05d1\u05e2\u05ea \u05d4\u05d4\u05ea\u05e7\u05d5\u05de\u05de\u05d5\u05ea \u05d1\u05e4\u05e8\u05d9\u05e1 \u05d1\u05d0\u05d5\u05d2\u05d5\u05e1\u05d8 1944 \u05e0\u05e4\u05dc\u05d5 \u05e2\u05e9\u05e8\u05d5\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1\u05e7\u05e8\u05d1\u05d5\u05ea. \u05e8\u05d7\u05d5\u05d1\u05d5\u05ea \u05e8\u05d1\u05d9\u05dd \u05d1\u05e2\u05d9\u05e8 \u05d5\u05d1\u05e4\u05e8\u05d1\u05e8\u05d9\u05d4 \u05e0\u05e7\u05e8\u05d0\u05d9\u05dd \u05e2\u05dc \u05e9\u05de\u05d5\u05ea \u05d2\u05d9\u05d1\u05d5\u05e8\u05d9 \u05d4\u05de\u05d7\u05ea\u05e8\u05ea, \u05d5\u05d1-1956 \u05d4\u05d5\u05e7\u05de\u05d4 \u05d1\u05dc\u05d1 \u05e4\u05e8\u05d9\u05e1 \u05d9\u05d3-\u05d6\u05db\u05e8\u05d5\u05df \u05dc\u05d7\u05dc\u05dc\u05d9 \u05d4\u05e9\u05d5\u05d0\u05d4, \u05d1\u05de\u05e1\u05d2\u05e8\u05ea \u05d4\u05de\u05e8\u05db\u05d6 \u05dc\u05ea\u05d9\u05e2\u05d5\u05d3 \u05d9\u05d4\u05d5\u05d3\u05d9 \u05d6\u05de\u05e0\u05e0\u05d5.\n\n\n\u05e2\u05dc \u05e4\u05d9 \u05de\u05e4\u05e7\u05d3 1968 \u05de\u05e0\u05ea\u05d4 \u05d0\u05d5\u05db\u05dc\u05d5\u05e1\u05d9\u05d9\u05ea \u05e4\u05e8\u05d9\u05e1 2,590,770; \u05d5\u05d1\u05d0\u05d5\u05ea\u05d4 \u05d4\u05e9\u05e0\u05d4 \u05e0\u05d0\u05de\u05d3 \u05de\u05e1\u05e4\u05e8 \u05ea\u05d5\u05e9\u05d1\u05d9\u05d4 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1-350,000-300,000 - \u05db%60 \u05de\u05db\u05dc\u05dc \u05d4\u05d9\u05d9\u05e9\u05d5\u05d1 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05e6\u05e8\u05e4\u05ea. \u05e2\u05dc\u05d9\u05d9\u05ea\u05dd \u05d4\u05db\u05dc\u05db\u05dc\u05d9\u05ea \u05d5\u05d4\u05d7\u05d1\u05e8\u05ea\u05d9\u05ea \u05e9\u05dc \u05d1\u05e0\u05d9 \u05d4\u05d3\u05d5\u05e8 \u05d4\u05e9\u05e0\u05d9 \u05e9\u05dc \u05d4\u05de\u05d4\u05d2\u05e8\u05d9\u05dd \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05de\u05de\u05d6\u05e8\u05d7-\u05d0\u05d9\u05e8\u05d5\u05e4\u05d4, \u05e0\u05d4\u05d9\u05e8\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05de\u05e6\u05e4\u05d5\u05df- \u05d0\u05e4\u05e8\u05d9\u05e7\u05d4 \u05d5\u05d4\u05e7\u05de\u05ea \u05de\u05e4\u05e2\u05dc\u05d9 \u05d1\u05d9\u05e0\u05d5\u05d9 \u05d7\u05d3\u05e9\u05d9\u05dd; \u05db\u05dc \u05d0\u05dc\u05d4 \u05d2\u05e8\u05de\u05d5 \u05dc\u05e4\u05d9\u05d6\u05d5\u05e8 \u05d4\u05d0\u05d5\u05db\u05dc\u05d5\u05e1\u05d9\u05d9\u05d4 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d1\u05d1\u05d9\u05e8\u05d4 \u05de\u05e4\u05e8\u05d1\u05e8\u05d9\u05d4 \u05d4\u05de\u05d6\u05e8\u05d7\u05d9\u05d9\u05dd \u05dc\u05d0\u05d6\u05d5\u05e8\u05d9\u05dd \u05d0\u05d7\u05e8\u05d9\u05dd \u05d1\u05e2\u05d9\u05e8. \u05d4\u05de\u05e8\u05db\u05d6\u05d9\u05dd \u05d4\u05d9\u05e9\u05e0\u05d9\u05dd \u05d4\u05ea\u05de\u05dc\u05d0\u05d5 \u05d1\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05e6\u05e4\u05d5\u05df-\u05d0\u05e4\u05e8\u05d9\u05e7\u05e0\u05d9\u05dd \u05d3\u05dc\u05d9-\u05d0\u05de\u05e6\u05e2\u05d9\u05dd, \u05d5\u05d1\u05e9\u05e0\u05d9\u05dd 1966-1957 \u05d2\u05d3\u05dc \u05de\u05e1\u05e4\u05e8 \u05d4\u05e2\u05d3\u05d5\u05ea \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05d5\u05ea \u05d1\u05d0\u05d9\u05d6\u05d5\u05e8 \u05e4\u05e8\u05d9\u05e1 \u05de-44 \u05dc-148.\n\n\u05e2\u05dc \u05d7\u05d9\u05d9 \u05d4\u05d3\u05ea \u05d1\u05e7\u05d4\u05d9\u05dc\u05d4 \u05de\u05de\u05d5\u05e0\u05d4 \u05e8\u05e9\u05de\u05d9\u05ea \u05d4\u05e7\u05d5\u05e0\u05e1\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05e9\u05dc \u05e4\u05e8\u05d9\u05e1, \u05d1\u05e0\u05e9\u05d9\u05d0\u05d5\u05ea\u05d5 \u05d4\u05de\u05e1\u05d5\u05e8\u05ea\u05d9\u05ea \u05e9\u05dc \u05d0\u05d7\u05d3 \u05d4\u05e8\u05d5\u05d8\u05e9\u05d9\u05dc\u05d3\u05d9\u05dd. \u05d4\u05e7\u05d5\u05e0\u05e1\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05d0\u05d9\u05d2\u05d3\u05d4 \u05db-20 \u05d1\u05ea\u05d9-\u05db\u05e0\u05e1\u05ea \u05d5\"\u05de\u05e0\u05d9\u05d9\u05e0\u05d9\u05dd\", \u05d0\u05e9\u05db\u05e0\u05d6\u05d9\u05d9\u05dd \u05d5\u05e1\u05e4\u05e8\u05d3\u05d9\u05d9\u05dd. \u05de\u05dc\u05d1\u05d3 \u05d0\u05dc\u05d4 \u05d4\u05d9\u05d5 \u05db-30 \u05d1\u05ea\u05d9-\u05db\u05e0\u05e1\u05ea \u05e9\u05dc \u05d7\u05e8\u05d3\u05d9\u05dd, \u05e8\u05e4\u05d5\u05e8\u05de\u05d9\u05d9\u05dd \u05d5\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e2\u05e6\u05de\u05d0\u05d9\u05d5\u05ea, \u05d0\u05d5\u05dc\u05dd \u05e8\u05e7 \u05db\u05e9\u05dc\u05d9\u05e9 \u05de\u05d9\u05d4\u05d5\u05d3\u05d9 \u05e4\u05e8\u05d9\u05e1 \u05e7\u05d9\u05d9\u05de\u05d5 \u05e7\u05e9\u05e8 \u05e2\u05dd \u05de\u05d5\u05e1\u05d3\u05d5\u05ea \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4 \u05dc\u05de\u05d9\u05e0\u05d9\u05d4\u05dd.\n\n\u05d9\u05d5\u05ea\u05e8 \u05de\u05de\u05d0\u05d4 \u05d0\u05dc\u05e3 \u05e4\u05dc\u05d9\u05d8\u05d9\u05dd \u05de\u05e6\u05e4\u05d5\u05df-\u05d0\u05e4\u05e8\u05d9\u05e7\u05d4 \u05e0\u05e2\u05d6\u05e8\u05d5 \u05d1\u05d9\u05d3\u05d9 \u05d0\u05e8\u05d2\u05d5\u05df \u05de\u05d9\u05d5\u05d7\u05d3 \u05d4\u05e4\u05d5\u05e2\u05dc \u05d1\u05e9\u05d9\u05ea\u05d5\u05e3 \u05e2\u05dd \u05d2\u05d5\u05e8\u05de\u05d9\u05dd \u05de\u05de\u05e9\u05dc\u05ea\u05d9\u05d9\u05dd \u05d5\u05de\u05d5\u05e1\u05d3\u05d5\u05ea \u05d7\u05d1\u05e8\u05d4 \u05d5\u05d7\u05d9\u05e0\u05d5\u05da \u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd. \u05e4\u05e2\u05d5\u05dc\u05d5\u05ea \u05ea\u05e8\u05d1\u05d5\u05ea \u05d5\u05d7\u05d9\u05e0\u05d5\u05da \u05e4\u05e2\u05dc\u05d5 \u05dc\u05d4\u05d2\u05d1\u05e8\u05ea \u05d4\u05ea\u05d5\u05d3\u05e2\u05d4 \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d1\u05e7\u05e8\u05d1 \u05d4\u05e0\u05d5\u05e2\u05e8 \u05d4\u05dc\u05d5\u05de\u05d3; \u05d5\u05e4\u05e8\u05d9\u05e1 \u05d4\u05d9\u05d9\u05ea\u05d4 \u05d0\u05d7\u05ea \u05d4\u05e2\u05e8\u05d9\u05dd \u05d4\u05d9\u05d7\u05d9\u05d3\u05d5\u05ea \u05d1\u05e2\u05d5\u05dc\u05dd \u05e9\u05e7\u05d9\u05d9\u05de\u05d4 \u05d1\u05d9\u05ea-\u05e1\u05e4\u05e8 \u05e2\u05d1\u05e8\u05d9, \u05e9\u05dc\u05d5 \u05ea\u05db\u05e0\u05d9\u05ea \u05dc\u05d9\u05de\u05d5\u05d3\u05d9\u05dd \u05d9\u05e9\u05e8\u05d0\u05dc\u05d9\u05ea \u05dc\u05db\u05dc \u05d3\u05d1\u05e8.\n\n\u05de\u05dc\u05d7\u05de\u05ea \u05e9\u05e9\u05ea \u05d4\u05d9\u05de\u05d9\u05dd \u05d4\u05d5\u05e6\u05d9\u05d0\u05d4 \u05d0\u05dc\u05e4\u05d9 \u05e6\u05e2\u05d9\u05e8\u05d9\u05dd \u05dc\u05d4\u05e4\u05d2\u05e0\u05d5\u05ea \u05d4\u05d6\u05d3\u05d4\u05d5\u05ea \u05e2\u05dd \u05d9\u05e9\u05e8\u05d0\u05dc; \u05d5\u05d2\u05dd \u05d1\"\u05de\u05e8\u05d3 \u05d4\u05e1\u05d8\u05d5\u05d3\u05e0\u05d8\u05d9\u05dd\" (1968) \u05d1\u05dc\u05d8\u05d5 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd, \u05d5\u05d4\u05d9\u05d5 \u05d7\u05d1\u05e8\u05d9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e9\u05de\u05d0\u05dc \u05d4\u05d7\u05d3\u05e9 \u05e9\u05ea\u05de\u05db\u05d5 \u05d1\u05d8\u05e8\u05d5\u05e8 \u05d4\u05e2\u05e8\u05d1\u05d9. \u05d4\u05de\u05ea\u05d9\u05d7\u05d5\u05ea \u05d4\u05d1\u05d9\u05d0\u05d4 \u05dc\u05d7\u05d9\u05db\u05d5\u05db\u05d9\u05dd \u05d1\u05d9\u05df \u05e2\u05e8\u05d1\u05d9\u05dd \u05dc\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d9\u05d5\u05e6\u05d0\u05d9 \u05e6\u05e4\u05d5\u05df-\u05d0\u05e4\u05e8\u05d9\u05e7\u05d4 \u05d5\u05d4\u05ea\u05d0\u05e8\u05d2\u05e0\u05d5 \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9\u05d5\u05ea \u05dc\u05d4\u05d2\u05e0\u05d4 \u05e2\u05e6\u05de\u05d9\u05ea.\n\n\u05d1\u05e9\u05e0\u05ea 1997 \u05d7\u05d9\u05d5 \u05d1\u05e6\u05e8\u05e4\u05ea \u05db\u05d5\u05dc\u05d4 \u05db- 600,000 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd; \u05dc\u05de\u05e2\u05dc\u05d4 \u05de\u05de\u05d7\u05e6\u05d9\u05ea\u05dd (\u05db- 350,000) \u05d9\u05e9\u05d1\u05d5 \u05d1\u05e4\u05e8\u05d9\u05e1 \u05e8\u05d1\u05ea\u05d9. \"\u05d4\u05de\u05d5\u05e2\u05e6\u05d4 \u05e9\u05dc \u05d9\u05d4\u05d5\u05d3\u05d9 \u05e6\u05e8\u05e4\u05ea\"(CRIF) \u05e9\u05d4\u05d5\u05e7\u05de\u05d4 \u05d1\u05e9\u05e0\u05ea 1944 \u05de\u05d9\u05d9\u05e6\u05d2\u05ea \u05d0\u05ea \u05d4\u05e7\u05d4\u05d9\u05dc\u05d5\u05ea \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05d5\u05ea \u05db\u05dc\u05e4\u05d9 \u05d4\u05e9\u05dc\u05d8\u05d5\u05e0\u05d5\u05ea, \u05d5\u05d4\u05e7\u05d5\u05e0\u05e1\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4 \u05d0\u05d7\u05e8\u05d0\u05d9\u05ea \u05dc\u05e4\u05e2\u05d9\u05dc\u05d5\u05ea \u05d4\u05d9\u05d4\u05d5\u05d3\u05d9\u05ea \u05d4\u05d3\u05ea\u05d9\u05ea. \u05db\u05dc \u05d4\u05d0\u05e8\u05d2\u05d5\u05e0\u05d9\u05dd \u05d4\u05e6\u05d9\u05d5\u05e0\u05d9\u05d9\u05dd \u05e4\u05d5\u05e2\u05dc\u05d9\u05dd \u05d1\u05e2\u05d9\u05e8 \u05d5\u05db\u05df \u05db\u05e2\u05e9\u05e8\u05d9\u05dd \u05d1\u05ea\u05d9 \u05e1\u05e4\u05e8 \u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd, \u05e2\u05de\u05de\u05d9\u05d9\u05dd \u05d5\u05ea\u05d9\u05db\u05d5\u05e0\u05d9\u05dd. \u05d5\u05db\u05de\u05e1\u05e4\u05e8 \u05d4\u05d6\u05d4 \u05d1\u05ea\u05d9 \u05db\u05e0\u05e1\u05ea."
+                }, 
+                "UnitText2": {
+                "En": null, 
+                "He": null
+                }, 
+                "UnitPlaces": [], 
+                "main_image_url": "https://storage.googleapis.com/bhs-flat-pics/5A8D1CC0-3D01-4AB0-B515-4B27873703D8.jpg", 
+                "UnitStatus": 3, 
+                "UnitHeaderDMSoundex": {
+                "En": "ZZ E794000 ZZ ", 
+                "He": "ZZ H794000 ZZ "
+                }, 
+                "UnitDisplayStatus": 2, 
+                "RightsCode": 1, 
+                "UnitId": 72312, 
+                "IsValueUnit": true, 
+                "StatusDesc": "Completed", 
+                "DisplayStatusDesc": "Museum only", 
+                "PlaceParentTypeCodeDesc": {
+                "En": "Country"
+                }, 
+                "PlaceParentId": 66873, 
+                "UserLexicon": null, 
+                "Attachments": [], 
+                "Slug": {
+                "En": "place_paris", 
+                "He": "\u05de\u05e7\u05d5\u05dd_\u05e4\u05e8\u05d9\u05e1"
+                }, 
+                "Header": {
+                "En": "PARIS", 
+                "He": "\u05e4\u05e8\u05d9\u05e1"
+                }, 
+                "ForPreview": false, 
+                "_id": "571607a576f1023786eada44"
+            }
+            ]

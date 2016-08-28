@@ -25,3 +25,15 @@ Using the shell
 
  $ python flask_shell.py
 
+Generating Docs
+---------------
+
+The docs are in the `/docs` directory and to generate them you'll need to
+install the aglio:
+
+    # npm install -g aglio
+
+Then, make the changes you want in `docs/index.apib` and compile it using:
+
+    $ apilo -i docs/idex.apib -o docs/index.html
+

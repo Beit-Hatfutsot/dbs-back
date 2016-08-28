@@ -89,10 +89,9 @@ def create_app(testing=False, live=False):
     from bhs_api.user import user_endpoints
     app.register_blueprint(user_endpoints)
     # Add the v1 endpoint
-    from bhs_api.v1_endpoints import v1_endpoints, v1_docs
+    from bhs_api.v1_endpoints import v1_endpoints
     app.register_blueprint(v1_endpoints, url_prefix='/v1')
     # Initialize autodoc - https://github.com/acoomans/flask-autodoc
-    v1_docs.init_app(app)
     #allow CORS
     cors = CORS(app, origins=['*'], headers=['content-type', 'accept',
                                             'authentication-token', 'Authorization'])

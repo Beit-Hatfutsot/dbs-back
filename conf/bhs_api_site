@@ -6,6 +6,10 @@ server {
     access_log  /var/log/bhs/api.access.log;
     error_log  /var/log/bhs/api.error.log;
 
+	location /v1/docs {
+        alias /home/bhs/api/docs/index.html;
+    }
+
     location / {
     	uwsgi_read_timeout 1800;
 
