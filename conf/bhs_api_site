@@ -7,6 +7,7 @@ server {
     error_log  /var/log/bhs/api.error.log;
 
 	location /v1/docs {
+        default_type text/html;
         alias /home/bhs/api/docs/index.html;
     }
 
