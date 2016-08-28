@@ -59,9 +59,8 @@ def test_delete_item_from_story(client, request, tester_headers):
     assert res.status_code == 200
     assert len(res.json['story_items']) == 0
 
-def test_public_story(app, client):
-    user = app.user_datastore.get_user("tester@example.com")
-    res = client.get('/v1/story/'+str(user.hash))
+def test_public_story(app, client, tester):
+    res = client.get('/v1/story/'+str(tester.hash))
     assert res.status_code == 200
     assert 'story_items' in res.json
     assert 'name' in res.json

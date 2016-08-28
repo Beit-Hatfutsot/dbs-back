@@ -12,12 +12,8 @@ from bhs_api import create_app
 
 
 @pytest.fixture
-def get_auth_header(app):
-    user = app.user_datastore.get_user("tester@example.com")
-    # do some cleanup
-    user.story_branches = 4*['']
-    user.save()
-    return {'Authentication-Token': user.get_auth_token()}
+def get_auth_header(app, tester):
+    return {'Authentication-Token': tester.get_auth_token()}
 
 
 
@@ -25,6 +21,20 @@ def get_auth_header(app):
 def app():
     app, conf = create_app(testing=True)
     return app
+
+
+@pytest.fixture(scope="session")
+def tester(app):
+    user = app.user_datastore.get_user("tester@example.com")
+    if not user:
+        user = app.user_datastore.create_user(email='tester@example.com',
+                                       name={'en': 'Test User'})
+
+    else:
+    # do some cleanup
+        user.story_branches = 4*['']
+        user.save()
+    return user
 
 
 @pytest.fixture
