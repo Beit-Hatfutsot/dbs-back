@@ -21,7 +21,7 @@ def test_login_scenario(client, app):
                              data={'email': 'ster@example.com', 'next': '/mjs'})
         assert len(outbox) == 1
         urls = re.findall('http\S+', outbox[0].body)
-        assert len(urls) == 1
+    assert len(urls) == 1
     res = client.get(urls[0], headers={'Accept': 'application/json'})
     assert res.status_code == 200
     assert res.json['meta']['code'] == 200

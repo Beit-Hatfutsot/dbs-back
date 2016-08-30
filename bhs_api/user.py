@@ -174,11 +174,6 @@ def user_handler(user_id, request):
     if method == 'GET':
         return humanify(get_user(user_id))
 
-    elif method == 'POST':
-        if not data:
-            abort(400, 'No data provided')
-        return humanify(send_ticket(data, referrer_host_url))
-
     elif method == 'PUT':
         if not data:
             abort(400, 'No data provided')
@@ -223,26 +218,6 @@ def delete_user(user_id):
     else:
         user.delete()
         return {}
-
-
-def send_ticket(user_dict, referrer_host_url=None):
-    next = getattr(user_dict, 'next', '/welcome')
-    try:
-        email = user_dict['email']
-        # enc_password = encrypt_password(user_dict['password'])
-    except KeyError as e:
-        e_message = '{} key is missing from data'.format(e)
-        current_app.logger.debug(e_message)
-        abort(400, e_message)
-
-    user = current_app.user_datastore.get_user(email)
-    if not user:
-        user = current_app.user_datastore.create_user(email=email, next=next)
-        # Add default role to a newly created user
-        current_app.user_datastore.add_role_to_user(user, 'user')
-
-    send_login_instructions(user)
-    return clean_user(user)
 
 
 def update_user(user_id, user_dict):
