@@ -23,23 +23,15 @@ def home():
     else:
         return humanify({'access': 'public'})
 
-@user_endpoints.route('/user', methods=['GET', 'POST', 'PUT', 'DELETE'])
-@user_endpoints.route('/user/<user_id>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@user_endpoints.route('/user', methods=['GET', 'PUT', 'DELETE'])
+@user_endpoints.route('/user/<user_id>', methods=['GET', 'PUT', 'DELETE'])
 @auth_token_required
 def manage_user(user_id=None):
     '''
     Manage user accounts. If routed as /user, gives access only to logged in
     user, else if routed as /user/<user_id>, allows administrative level access
     if the looged in user is in the admin group.
-    POST gets special treatment, as there must be a way to register new user.
     '''
-    # You can create a new user while not being logged in
-    # ToDo: defend this endpoint with rate limiting or similar means
-    if request.method == 'POST':
-        if not 'application/json' in request.headers['Content-Type']:
-            abort(400, "Please set 'Content-Type' header to 'application/json'")
-        return user_handler(None, request)
-
     if user_id:
         # admin access_mode
         if is_admin(current_user):
