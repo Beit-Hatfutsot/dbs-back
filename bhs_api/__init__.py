@@ -49,6 +49,7 @@ def create_app(testing=False, live=False):
     # Set app config
     app.config['DEBUG'] = True
     app.config['FRONTEND_SERVER'] = conf.frontend_server
+    app.config['DEFAULT_NEXT'] = '/mjs'
     # Security Config
     app.config['SECRET_KEY'] = conf.secret_key
     app.config['WTF_CSRF_ENABLED'] = False

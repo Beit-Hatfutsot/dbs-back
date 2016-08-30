@@ -14,7 +14,7 @@ def test_api_public_view(client):
 
 def test_login_scenario(client, app):
     ''' login scenario, starting with sending the ticket '''
-    from bhs_api.user import send_ticket
+
     mail = app.extensions.get('mail')
     with mail.record_messages() as outbox:
         ticket = client.post('/login',
@@ -44,3 +44,17 @@ def test_dummy_token(client):
     res = client.get('/', headers={'Authentication-Token': 'dfdfdfdf'})
     assert "public" in res.data
 
+def test_bad_next_login(client, app):
+    ''' post a login with bad `next` and ensure the user has the default one '''
+
+    mail = app.extensions.get('mail')
+    with mail.record_messages() as outbox:
+        ticket = client.post('/login',
+                             data={'email': 'tanin@example.com', 'next': '/login/badwolf'})
+        assert len(outbox) == 1
+        urls = re.findall('http\S+', outbox[0].body)
+    assert len(urls) == 1
+    user = app.user_datastore.get_user('tanin@example.com')
+    assert user.next == app.config['DEFAULT_NEXT']
+    # cleanup
+    app.user_datastore.delete_user(user)

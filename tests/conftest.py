@@ -26,14 +26,11 @@ def app():
 @pytest.fixture(scope="session")
 def tester(app):
     user = app.user_datastore.get_user("tester@example.com")
-    if not user:
-        user = app.user_datastore.create_user(email='tester@example.com',
-                                       name={'en': 'Test User'})
+    if user:
+        app.user_datastore.delete_user(user)
 
-    else:
-    # do some cleanup
-        user.story_branches = 4*['']
-        user.save()
+    user = app.user_datastore.create_user(email='tester@example.com',
+                                    name={'en': 'Test User'})
     return user
 
 

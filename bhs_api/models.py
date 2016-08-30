@@ -1,10 +1,13 @@
+import hashlib
 from mongoengine import (ListField, StringField, EmbeddedDocumentField,
                         EmbeddedDocumentListField, EmbeddedDocument,
                         GenericEmbeddedDocumentField, BooleanField,
                         DateTimeField, ReferenceField)
-import hashlib
+
+from flask import current_app
 from flask.ext.mongoengine import Document
 from flask.ext.security import UserMixin, RoleMixin
+
 
 class Role(Document, RoleMixin):
     name = StringField(max_length=80, unique=True)
@@ -38,6 +41,10 @@ class User(Document, UserMixin):
     }
 
     def save(self):
+
         if not self.hash:
             self.hash = hashlib.md5(self.email.lower()).hexdigest()
+
+        if self.next.startswith('/login'):
+            self.next = current_app.config['DEFAULT_NEXT']
         super(User, self).save()
