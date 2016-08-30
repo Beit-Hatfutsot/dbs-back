@@ -7,6 +7,6 @@ from pytest_flask.plugin import client
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
 def test_fsearch_api(client):
-    res = client.get('/v1/person?last_name=Cohen')
+    res = client.get('/v1/person?last_name=Douani')
     assert 'items' in res.json
-    assert int(res.json['total']) > 10000
+    assert int(res.json['total']) > 5
