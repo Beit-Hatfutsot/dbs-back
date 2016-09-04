@@ -4,6 +4,7 @@ import inspect
 from datetime import timedelta
 import pymongo
 import elasticsearch
+import redis
 from flask import Flask
 from flask.ext.mongoengine import MongoEngine
 from flask.ext.cors import CORS
@@ -33,7 +34,11 @@ def create_app(testing=False, live=False):
                         'data_db_port',
                         'data_db_name',
                         'image_bucket_url',
-                        'video_bucket_url'])
+                        'video_bucket_url',
+                        'redis_host',
+                        'redis_port',
+                        'caching_ttl',
+                        ])
 
     # load the conf file. use local copy if nothing in the system
     if os.path.exists(CONF_FILE):
@@ -77,6 +82,8 @@ def create_app(testing=False, live=False):
     app.config['MONGODB_DB'] = conf.user_db_name
     app.config['MONGODB_HOST'] = conf.user_db_host
     app.config['MONGODB_PORT'] = conf.user_db_port
+    # CACHING
+    app.config['CACHING_TTL'] = conf.caching_ttl
 
     app.mail = Mail(app)
     app.db = MongoEngine(app)
@@ -111,7 +118,12 @@ def create_app(testing=False, live=False):
         except AttributeError:
             pass
 
-    # rate limit
+    # redis
+    try:
+        app.redis = redis.StrictRedis(host=conf.redis_host, port=conf.redis_port, db=0)
+    except AttributeError:
+        app.redis = None
+
     app.logger.debug("Hellow world")
 
     return app, conf

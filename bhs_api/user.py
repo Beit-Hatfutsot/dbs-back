@@ -293,6 +293,11 @@ def collect_editors_items(name):
         look for a branch named `name` in all editors stories, collect the items
         and return them
     """
+    redis_key = 'collection:'+name
+    collection = current_app.redis.get(redis_key)
+    if collection:
+        return collection
+
     editor_role = current_app.user_datastore.find_role('editor')
     editors = current_app.user_datastore.user_model.objects(roles=editor_role,
                                                             story_branches=name)
@@ -302,4 +307,5 @@ def collect_editors_items(name):
         for j in user.story_items:
             if j.in_branch[i]:
                 items.append(fetch_item(j.id))
+    current_app.redis.set(redis_key, items, ex=app.config['CACHING_TTL'])
     return items
