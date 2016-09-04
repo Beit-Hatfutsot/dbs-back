@@ -307,5 +307,5 @@ def collect_editors_items(name):
         for j in user.story_items:
             if j.in_branch[i]:
                 items.append(fetch_item(j.id))
-    current_app.redis.set(redis_key, items, ex=app.config['CACHING_TTL'])
+    current_app.redis.set(redis_key, items, ex=current_app.config['CACHING_TTL'])
     return items
