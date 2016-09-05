@@ -225,45 +225,6 @@ def update_user(user_id, user_dict):
     return clean_user(user_obj)
 
 
-def get_frontend_activation_link(user_id, referrer_host_url):
-    s = URLSafeSerializer(current_app.secret_key)
-    payload = s.dumps(user_id)
-    return '{}/verify_email/{}'.format(referrer_host_url, payload)
-
-
-def send_activation_email(user_id, referrer_host_url):
-    user = get_user_or_error(user_id)
-    email = user.email
-    name = user.name
-    activation_link = get_frontend_activation_link(user_id, referrer_host_url)
-    body = _generate_confirmation_body('email_verfication_template.html',
-                                       name, activation_link)
-    subject = 'My Jewish Story: please confirm your email address'
-    sent = send_gmail(subject, body, email, message_mode='html')
-    if not sent:
-        e_message = 'There was an error sending an email to {}'.format(email)
-        current_app.logger.error(e_message)
-        abort(500, e_message)
-    return humanify({'sent': email})
-
-
-def _generate_confirmation_body(template_fn, name, activation_link):
-    try:
-        fh = open(template_fn)
-        template = fh.read()
-        fh.close()
-        return template.format(name, activation_link)
-    except:
-        current_app.logger.debug("Couldn't open template file {}".format(template_fn))
-        abort(500, "Couldn't open template file")
-
-    body = '''Hello {}!
-    Please click on <a href="{}">activation link</a> to activate your user at My Jewish Story web site.
-    If you received this email by mistake, simply delete it.
-
-    Thanks, Beit HaTfutsot Online team.'''
-    return body.format(name, activation_link)
-
 def add_to_my_story(item_id):
     current_user.story_items.append(StoryLine(id=item_id,
                                               in_branch=4*[False]))

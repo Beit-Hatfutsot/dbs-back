@@ -25,7 +25,7 @@ from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
                               get_unit_type, SEARCHABLE_COLLECTIONS)
 from utils import (upload_file, send_gmail, humanify,
                    get_referrer_host_url, dictify)
-from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
+from bhs_api.user import (get_user_or_error, clean_user,
             user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
             remove_item_from_story, collect_editors_items)
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
@@ -33,7 +33,7 @@ from bhs_api.item import (fetch_items, search_by_header, get_image_url,
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
-import phonetic
+from bhs_api import phonetic
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -394,7 +394,7 @@ def save_user_content():
             new_ugc.save()
         # Send an email to editor
         subject = 'New UGC submission'
-        with open('editors_email_template') as fh:
+        with open('templates/editors_email_template') as fh:
             template = jinja2.Template(fh.read())
         body = template.render({'uri': http_uri,
                                 'metadata': clean_md,

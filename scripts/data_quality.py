@@ -4,7 +4,7 @@ import re
 
 import pymongo
 
-from phonetic import is_hebrew
+from bhs_api.phonetic import is_hebrew
 
 def get_bad_headers(collection_obj):
     rv = []
