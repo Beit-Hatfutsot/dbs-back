@@ -1,4 +1,5 @@
 import json
+import cPickle
 
 
 # from flask import Flask, Blueprint, request, abort, url_for, current_app
@@ -289,14 +290,14 @@ def remove_item_from_story(item_id):
     current_user.save()
 
 def collect_editors_items(name):
-    """ 
+    """
         look for a branch named `name` in all editors stories, collect the items
         and return them
     """
     redis_key = 'collection:'+name
-    collection = current_app.redis.get(redis_key)
-    if collection:
-        return collection
+    cache = current_app.redis.get(redis_key)
+    if cache:
+        return cPickle.loads(cache)
 
     editor_role = current_app.user_datastore.find_role('editor')
     editors = current_app.user_datastore.user_model.objects(roles=editor_role,
@@ -307,5 +308,7 @@ def collect_editors_items(name):
         for j in user.story_items:
             if j.in_branch[i]:
                 items.append(fetch_item(j.id))
-    current_app.redis.set(redis_key, items, ex=current_app.config['CACHING_TTL'])
+    current_app.redis.set(redis_key,
+                          cPickle.dumps(items),
+                          ex=current_app.config['CACHING_TTL'])
     return items
