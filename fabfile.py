@@ -6,9 +6,6 @@ import logging
 from fabric.api import *
 from fabric.contrib import files
 
-API_SERVERS = {'bhs-dev': 'test-api.myjewishidentity.org',
-               'bhs-prod': 'api.dbs.bh.org.il'}
-LAST_UPDATE_FILE = '/var/run/bhs/last_update'
 env.user = 'bhs'
 
 env.now = datetime.now().strftime('%Y%m%d-%H%M')
