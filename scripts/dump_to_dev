@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ $1 ]
+then
+    # dump the items starting with 'B' in all-but-genTreeI collections
+    for c in photoUnits movies personalities places familyNames
+    do
+        mongodump --db $1 --query '{"Header.En" : /^B/}' --collection $c
+    done
+    mongodump --db $1 --query '{"GTN": 3372}' --collection genTreeIndividuals
+    tar cz dump/$1
+else
+    echo "dump to dev tar ball"
+    echo "Usage: dump_to_dev [dbname] > [out_file]"
+    echo "i.e.: dump_to_dev bhdata > [bhs_dev_db.tar.gz]"
+fi
