@@ -33,7 +33,7 @@ Once you have MongoDB installed you can go on to install the python code:
 ## Getting a DB
 
 To play with the server you'll need some data in your db. Please download the
-tar ball from [here]() and run
+tar ball from [here](https://storage.googleapis.com/bhs-resources/bhdata.tgz) and run
 
     $ tzr xf bhdata.tgz
     $ mongorestore -d bhdata dump/bhdata
