@@ -1,17 +1,27 @@
 # Beit-Hatfusot Backend
 
-Welcome to the backend of the museum of the jewish people.  The code is in
-Python using Flask licensed under AGPLv3.  Please feel free to
-fork and send us pull requests.
+Welcome to the API server of the museum of the jewish people.  The code is in
+Python using Flask and MongoDB.  The API docs are at
+http://api.dbs.bh.org.il/v1/docs
 
+The server is built on top of 6 datasets the museum has collected in the last four
+decades.  We have >72,000 Pictures and >1,100 movies. We have text articles
+about >6,000 communities >8,000 luminaries and >17,000 family names.
+
+The last dataset is of family trees.
+People have contributed to the museum ~11,000 trees with ~5,000,000 individuals.
 
 ## Installation
 
-This server uses mongodb so you'll have to have one up and running.
+This server uses MongoDB so you'll have to have one up and running.
 Mongo installation is quite simple, just read the
 [manual](https://docs.mongodb.com/manual/installation/).
-Then run (for Debian/Ubuntu, if you're trying to install on other system, best
-of luck and please send us some docs)::
+
+While a search engine is not a must, it is recommended to install
+[Elasticsearch](https://www.elastic.co/downloads/elasticsearch).
+Once you have MongoDB installed you can go on to install the python code:
+
+### Linux
 
 	$ sudo apt-get install libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev
     $ git clone git@bitbucket.org:bhonline/api.git
@@ -28,11 +38,7 @@ tar ball from [here]() and run
     $ tzr xf bhdata.tgz
     $ mongorestore -d bhdata dump/bhdata
 
-## Installing a search engine
-
-If you want to play around with search, you'll need to install
-[Elasticsearch](https://www.elastic.co/downloads/elasticsearch). Once you have
-Elasticsearch running you'll need to fill it with the data from Mongo:
+To load the search engine with the dump you restores run:
 
     $ python scripts/dump_mongo_to_es.py --db bhdata
 
@@ -57,7 +63,11 @@ script and gain access to the `app` object.
 
 The frontend that uses this API server lives
 [here](https://github.com/Beit-Hatfutsot/dbs-front). To run the fronend so it
-will use your local server you just need to set `API_SERVER` to `local`.
+will use your local server you just need to run, in separate window:
+
+    $ API_SERVER=local gulp serve
+
+(the API_SERVER part tells the frontend to use a server at localhost:5000)
 
 ## Contributing
 
