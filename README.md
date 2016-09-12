@@ -24,11 +24,11 @@ Once you have MongoDB installed you can go on to install the python code:
 ### Linux
 
 	$ sudo apt-get install libffi-dev libjpeg62 libjpeg62-dev zlib1g-dev libssl-dev
-    $ git clone git@bitbucket.org:bhonline/api.git
-    $ cd api
+    $ git clone [your_fork@github...]
+    $ cd dbs-back
     $ virtualenv env
     $ . env/bin/activate
-    $ pip install -r requirments.txt
+    $ pip install -r requirements.txt
 
 ## Getting a DB
 
