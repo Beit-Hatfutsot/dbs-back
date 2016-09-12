@@ -10,7 +10,7 @@ from flask.ext.mongoengine import MongoEngine
 from flask.ext.cors import CORS
 from flask.ext.mail import Mail
 from flask.ext.security import Security, MongoEngineUserDatastore
-from bhs_common.utils import get_conf
+from bhs_api.utils import get_conf
 
 SEARCH_CHUNK_SIZE = 15
 CONF_FILE = '/etc/bhs/config.yml'

@@ -7,8 +7,6 @@ from werkzeug.exceptions import NotFound, Forbidden
 from flask import current_app
 
 from bhs_api import phonetic
-from bhs_common.utils import get_unit_type, SEARCHABLE_COLLECTIONS
-from bhs_api.utils import uuids_to_str
 
 SHOW_FILTER = {
                 'StatusDesc': 'Completed',

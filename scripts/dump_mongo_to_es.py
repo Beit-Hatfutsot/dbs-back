@@ -7,8 +7,7 @@ import argparse
 import elasticsearch
 
 from bhs_api import create_app
-from bhs_common.utils import SEARCHABLE_COLLECTIONS
-from bhs_api.utils import uuids_to_str
+from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
 
 

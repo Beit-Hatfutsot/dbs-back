@@ -17,10 +17,15 @@ import pymongo
 from bson.objectid import ObjectId
 from bson import json_util
 from werkzeug import Response
+from PIL import Image
 
 CONF_FILE = '/etc/bhs/config.yml'
 DEFAULT_CONF_FILE = 'conf/dev.yaml'
-
+SEARCHABLE_COLLECTIONS = ('places',
+                          'familyNames',
+                          'photoUnits',
+                          'personalities',
+                          'movies')
 # TODO: delete the next 3 lines
 # Set default GCE project id
 project_id = 'bh-org-01'
@@ -283,3 +288,24 @@ def collection_to_csv(coll, f):
             line = ','.join([line, '', ''])
         line += '\n'
         f.write(line.encode('utf8'))
+
+def binarize_image(image):
+    binary = None
+
+    try:
+        im = Image.open(image)
+        thumb = im.copy()
+        thumb.thumbnail((260, 260))
+        image_buffer = StringIO()
+        thumb.save(image_buffer, "JPEG")
+        binary = Binary(image_buffer.getvalue(), BINARY_SUBTYPE)
+
+    # if image is a file object, rewind it
+    finally:
+        try:
+            image.seek(0)
+        except AttributeError:
+            pass
+
+    return binary
+
