@@ -1,4 +1,5 @@
 import hashlib
+from bson.objectid import ObjectId
 from mongoengine import (ListField, StringField, EmbeddedDocumentField,
                         EmbeddedDocumentListField, EmbeddedDocument,
                         GenericEmbeddedDocumentField, BooleanField,
@@ -7,7 +8,7 @@ from mongoengine import (ListField, StringField, EmbeddedDocumentField,
 from flask import current_app
 from flask.ext.mongoengine import Document
 from flask.ext.security import UserMixin, RoleMixin
-
+from .utils import dictify, humanify
 
 class Role(Document, RoleMixin):
     name = StringField(max_length=80, unique=True)
@@ -40,8 +41,86 @@ class User(Document, UserMixin):
         'indexes': ['email', 'username', 'hash']
     }
 
-    def save(self):
+    safe_keys = ('email', 'name', 'confirmed_at', 'next', 'hash')
 
+    def handle(self, request):
+        method = request.method
+        data = request.data
+        referrer = request.referrer
+        if referrer:
+            referrer_host_url = get_referrer_host_url(referrer)
+        else:
+            referrer_host_url = None
+        if data:
+            try:
+                data = json.loads(data)
+                if not isinstance(data, dict):
+                    abort(
+                        400,
+                        'Only dict like objects are supported for user management')
+            except ValueError:
+                e_message = 'Could not decode JSON from data'
+                current_app.logger.debug(e_message)
+                abort(400, e_message)
+
+        if method == 'GET':
+            r =  self.clean()
+
+        elif method == 'PUT':
+            if not data:
+                abort(400, 'No data provided')
+            r = self.update(data)
+
+        elif method == 'DELETE':
+            r = self.refresh()
+
+        if not r:
+            abort(500, 'User handler accepts only GET, PUT or DELETE')
+        return humanify(r)
+
+    def update(self, user_dict):
+        if 'email' in user_dict:
+            self.email = user_dict['email']
+        if 'name' in user_dict:
+            if not self.name:
+                self.name = UserName()
+            for k,v in user_dict['name'].items():
+                setattr(self.name, k, v)
+        self.save()
+        return self.clean()
+
+    def clean(self):
+        # some old users might not have a hash, saving will generate one
+        if not self.hash:
+            self.save()
+
+        user_dict = dictify(self)
+        ret = {}
+        for key in self.safe_keys:
+            ret[key] = user_dict.get(key, None)
+        ret.update(self.get_mjs())
+
+        return ret
+
+
+    def refresh(self):
+        self = get_self_or_error(self_id)
+        if is_admin(self):
+            return {'error': 'God Mode!'}
+        else:
+            new_id = ObjectId()
+            r = {'old_id': self.id, 'new_id': new_id}
+            self.id = new_id
+            self.save()
+            return r
+
+
+    def get_mjs(self):
+        return {'story_items': [{'id': o.id, 'in_branch': o.in_branch} for o in self.story_items],
+                'story_branches': self.story_branches}
+
+
+    def save(self):
         if not self.hash:
             self.hash = hashlib.md5(self.email.lower()).hexdigest()
 

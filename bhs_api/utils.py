@@ -214,7 +214,7 @@ def get_referrer_host_url(referrer):
 # Utility functions
 def humanify(obj, status_code=200):
     """ Gets an obj and possibly a status code and returns a flask Resonse
-        with a jsonified obj, with newlines.
+        with a jsonified obj, not suitable for humans
     >>> humanify({"a": 1})
     <Response 13 bytes [200 OK]>
     >>> humanify({"a": 1}, 404)
@@ -224,21 +224,20 @@ def humanify(obj, status_code=200):
     >>> humanify([1,2,3]).get_data()
     '[\\n  1, \\n  2, \\n  3\\n]\\n'
     """
+    # TODO: refactor the name to `response`
     # jsonify function doesn't work with lists
     if type(obj) == list:
-        data = json.dumps(obj, default=json_util.default, indent=2) + '\n'
+        data = json.dumps(obj, default=json_util.default)
     elif type(obj) == pymongo.cursor.Cursor:
         rv = []
         for doc in obj:
             doc['_id'] = str(doc['_id'])
-            rv.append(dumps(doc, indent=2))
+            rv.append(dumps(doc))
         data = '[' + ',\n'.join(rv) + ']' + '\n'
     else:
         data = dumps(obj,
                           default=json_util.default,
-                          indent=2,
                           cls=MongoJsonEncoder)
-        data += '\n'
     resp = Response(data, mimetype='application/json')
     resp.status_code = status_code
     return resp
