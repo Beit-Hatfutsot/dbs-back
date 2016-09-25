@@ -220,13 +220,13 @@ def humanify(obj, status_code=200):
     """ Gets an obj and possibly a status code and returns a flask Resonse
         with a jsonified obj, not suitable for humans
     >>> humanify({"a": 1})
-    <Response 13 bytes [200 OK]>
+    <Response 8 bytes [200 OK]>
     >>> humanify({"a": 1}, 404)
-    <Response 13 bytes [404 NOT FOUND]>
+    <Response 8 bytes [404 NOT FOUND]>
     >>> humanify({"a": 1}).get_data()
-    '{\\n  "a": 1\\n}\\n'
+    '{"a": 1}'
     >>> humanify([1,2,3]).get_data()
-    '[\\n  1, \\n  2, \\n  3\\n]\\n'
+    '[1, 2, 3]'
     """
     # TODO: refactor the name to `response`
     # jsonify function doesn't work with lists
