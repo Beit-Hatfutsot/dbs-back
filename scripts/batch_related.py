@@ -8,12 +8,11 @@ import argparse
 import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 
-from bhs_common.utils import SEARCHABLE_COLLECTIONS
 from bhs_api import create_app
 from bhs_api.item import (SHOW_FILTER, Slug, get_item_slug,
                           get_item_by_id, get_item, get_collection_name,
                           get_item_query)
-from bhs_api.utils import uuids_to_str
+from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 
 data_db = None
 es = None

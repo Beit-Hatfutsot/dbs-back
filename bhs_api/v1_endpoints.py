@@ -31,7 +31,7 @@ from bhs_api.item import (fetch_items, search_by_header, get_image_url,
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
-import phonetic
+from bhs_api import phonetic
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -392,7 +392,7 @@ def save_user_content():
             new_ugc.save()
         # Send an email to editor
         subject = 'New UGC submission'
-        with open('editors_email_template') as fh:
+        with open('templates/editors_email_template') as fh:
             template = jinja2.Template(fh.read())
         body = template.render({'uri': http_uri,
                                 'metadata': clean_md,

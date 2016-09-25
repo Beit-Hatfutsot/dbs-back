@@ -9,14 +9,14 @@ mail_port: 25
 # mail_password: 'sss'
 
 # Data DB
-data_db_host: 104.155.92.186
+data_db_host: localhost
 data_db_port: 27017
-data_db_name: bhp6
+data_db_name: bhdata
 
 # User DB config
 user_db_host: localhost
 user_db_port: 27017
-user_db_name: bh
+user_db_name: bhuser
 
 # Email config
 email_username: bhatfutsot@gmail.com

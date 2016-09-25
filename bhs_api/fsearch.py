@@ -1,7 +1,7 @@
 import re
 
 from flask import abort, current_app
-import phonetic
+from bhs_api import phonetic
 
 MAX_RESULTS=30 # aka chunk size
 
