@@ -21,10 +21,8 @@ import jinja2
 import requests
 
 from bhs_api import SEARCH_CHUNK_SIZE
-from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                              get_unit_type, SEARCHABLE_COLLECTIONS)
-from utils import (upload_file, send_gmail, humanify,
-                   get_referrer_host_url, dictify)
+from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
+                           upload_file, send_gmail, humanify)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           SHOW_FILTER)
