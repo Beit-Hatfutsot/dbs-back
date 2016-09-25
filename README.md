@@ -1,3 +1,4 @@
+![CI status](https://codeship.com/projects/401c8740-652d-0134-fcd9-3aa7f9d29c3d/status?branch=dev)
 # Beit-Hatfusot Backend
 
 Welcome to the API server of the museum of the jewish people.  The code is in
