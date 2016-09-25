@@ -23,8 +23,8 @@ def home():
     else:
         return humanify({'access': 'public'})
 
-@user_endpoints.route('/user', methods=['GET', 'PUT', 'DELETE'])
-@user_endpoints.route('/user/<user_id>', methods=['GET', 'PUT', 'DELETE'])
+@user_endpoints.route('/user', methods=['GET', 'PUT'])
+@user_endpoints.route('/user/<user_id>', methods=['GET', 'PUT'])
 @auth_token_required
 def manage_user(user_id=None):
     '''
@@ -34,9 +34,9 @@ def manage_user(user_id=None):
     '''
     if user_id:
         # admin access_mode
-        if is_admin(current_user):
+        if current_user.is_admin():
             user = get_user_or_error(user_id)
-            return user.handle(request)
+            return humanify(user.handle(request))
         else:
             current_app.logger.debug('Non-admin user {} tried to access user id {}'.format(
                                                   current_user.email, user_id))
@@ -45,14 +45,14 @@ def manage_user(user_id=None):
         # Deny POSTing to logged in non-admin users to avoid confusion with PUT
         if request.method == 'POST':
             abort(400, 'POST method is not supported for logged in users.')
-        return current_user.handle(request)
+        return humanify(current_user.handle(request))
 
 
 @user_endpoints.route('/mjs/<item_id>', methods=['DELETE'])
 @auth_token_required
 def delete_item_from_story(item_id):
     remove_item_from_story(item_id)
-    return current_user.get_mjs()
+    return humanify(current_user.get_mjs())
 
 @user_endpoints.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
 @auth_token_required
@@ -63,7 +63,7 @@ def remove_item_from_branch(item_id, branch_num=None):
         raise BadRequest("branch number must be an integer")
 
     set_item_in_branch(item_id, branch_num-1, False)
-    return current_user.get_mjs()
+    return humanify(current_user.get_mjs())
 
 
 @user_endpoints.route('/mjs/<branch_num>', methods=['POST'])
@@ -75,7 +75,7 @@ def add_to_story_branch(branch_num):
     except ValueError:
         raise BadRequest("branch number must be an integer")
     set_item_in_branch(item_id, branch_num-1, True)
-    return current_user.get_mjs()
+    return humanify(current_user.get_mjs())
 
 
 @user_endpoints.route('/mjs/<branch_num>/name', methods=['POST'])
@@ -85,7 +85,7 @@ def set_story_branch_name(branch_num):
     name = request.data
     current_user.story_branches[int(branch_num)-1] = name
     current_user.save()
-    return current_user.get_mjs()
+    return humanify(current_user.get_mjs())
 
 
 @user_endpoints.route('/mjs', methods=['GET', 'POST'])
@@ -98,7 +98,7 @@ def manage_jewish_story():
     POST requests should be sent with a string in form of "collection_name.id".
     '''
     if request.method == 'GET':
-        return current_user.get_mjs()
+        return humanify(current_user.get_mjs())
 
     elif request.method == 'POST':
         try:
@@ -113,7 +113,7 @@ def manage_jewish_story():
             abort(400, e_message)
 
         add_to_my_story(data)
-        return current_user.get_mjs()
+        return humanify(current_user.get_mjs())
 
 # Ensure we have a user to test with
 '''
@@ -135,12 +135,6 @@ def setup_users():
                                 roles=[user_role])
 '''
 
-def is_admin(flask_user_obj):
-    if flask_user_obj.has_role('admin'):
-        return True
-    else:
-        return False
-
 
 def get_user_or_error(user_id):
     user = current_app.user_datastore.get_user(user_id)
@@ -152,7 +146,7 @@ def get_user_or_error(user_id):
 
 def get_user(user_id):
     user = get_user_or_error(user_id)
-    return user.clean()
+    return user.render()
 
 
 def get_frontend_activation_link(user_id, referrer_host_url):
