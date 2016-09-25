@@ -17,7 +17,6 @@ import pymongo
 from bson.objectid import ObjectId
 from bson import json_util
 from werkzeug import Response
-from PIL import Image
 
 CONF_FILE = '/etc/bhs/config.yml'
 DEFAULT_CONF_FILE = 'conf/dev.yaml'
@@ -289,6 +288,8 @@ def collection_to_csv(coll, f):
         f.write(line.encode('utf8'))
 
 def binarize_image(image):
+    from PIL import Image
+
     binary = None
 
     try:
