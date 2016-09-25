@@ -26,7 +26,7 @@ def push_code():
         with prefix('. env/bin/activate'):
             run('pip install -r requirements.txt')
 
-def update_conf():
+def push_conf():
     with cd("api"):
         sudo("cp conf/api-uwsgi.ini /etc/bhs/")
         sudo("rsync -rv conf/supervisor/ /etc/supervisor/")
@@ -34,7 +34,6 @@ def update_conf():
 
 def deploy():
     push_code()
-    update_conf()
     test()
     restart_api()
 
