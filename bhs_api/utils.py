@@ -3,8 +3,7 @@ import json
 import datetime
 import os
 import getpass
-from bson.json_util import dumps
-
+from StringIO import StringIO
 from uuid import UUID
 
 import yaml
@@ -16,6 +15,8 @@ import gmail
 import pymongo
 from bson.objectid import ObjectId
 from bson import json_util
+from bson.json_util import dumps
+from bson.binary import Binary, BINARY_SUBTYPE
 from werkzeug import Response
 
 CONF_FILE = '/etc/bhs/config.yml'
@@ -308,4 +309,43 @@ def binarize_image(image):
             pass
 
     return binary
+
+
+def create_thumb(image_doc, photo_mount_path):
+    filename = image_doc['PicturePath']
+    if filename:
+        # try:
+        filename = filename.replace(u'\\', '/')
+        image_path = photo_mount_path + '/' + filename 
+        binary = binarize_image(image_path)
+    else:
+        binary = None
+        print '%s: has no file name' % image_doc['PictureId']
+
+    return binary
+
+
+def get_unit_type(collection_identifier):
+    """
+    returns unit type description if input is an integer, 
+    or unit type code if input is a string
+    """
+    type_map = {
+        0: 'synonyms',
+        1: 'photoUnits',
+        4: 'familyTrees',
+        5: 'places',
+        6: 'familyNames',
+        8: 'personalities',
+        9: 'movies',
+        10: 'lexicon'
+    }
+
+    if type(collection_identifier) == str:
+        type_map = {v: k for k, v in type_map.items()}
+    try:
+        map_output = type_map[collection_identifier]
+    except KeyError:
+        map_output = None
+    return map_output
 
