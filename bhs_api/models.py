@@ -8,7 +8,7 @@ from mongoengine import (ListField, StringField, EmbeddedDocumentField,
 from flask import current_app, abort
 from flask.ext.mongoengine import Document
 from flask.ext.security import UserMixin, RoleMixin
-from .utils import dictify
+from .utils import dictify, get_referrer_host_url
 
 class Role(Document, RoleMixin):
     name = StringField(max_length=80, unique=True)
