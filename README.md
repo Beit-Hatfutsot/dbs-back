@@ -70,6 +70,25 @@ will use your local server you just need to run, in separate window:
 
 (the API_SERVER part tells the frontend to use a server at localhost:5000)
 
+## Migration
+
+Part of the code in this repository deals with migrating the databases from the
+legacy MSSQL server.  You don't haver to do it, as you get all the data you need
+from the dump above, but if you want to contribute to the migration you'll need 
+access to MoJP local server on MoJP local network.
+The migration process is executed done using a celery based task
+queue and redis as a storage backend.  To install the required packages run:
+
+    $ pip install -r requirements.migrate.txt
+
+To activate the migration worker run:
+
+    $ celery -A migration.tasks worker --loglevel info
+
+Once the worker is listening, run in a separate window:
+
+    $ python scripts/migrate.py --lasthours 200
+
 ## Contributing
 
 Contributions from both Jews and Gentiles are welcomed! We even have a

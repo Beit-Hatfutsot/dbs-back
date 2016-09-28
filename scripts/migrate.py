@@ -22,9 +22,7 @@ from migration.tasks import update_row
 slugify = Slugify(translate=None, safe_chars='_')
 
 
-conf = get_conf(os.path.join('/etc/bhs/'
-                             'migrate_config.yaml'),
-                set(['queries_repo_path',
+conf = get_conf(set(['queries_repo_path',
                      'sql_server',
                      'sql_user',
                      'sql_password',
@@ -35,7 +33,9 @@ conf = get_conf(os.path.join('/etc/bhs/'
                      'gentree_mount_point',
                      'gentree_bucket_name',
                      'photos_bucket_name',
-                     'movies_bucket_name']))
+                     'movies_bucket_name']),
+                    os.path.join('/etc/bhs/'
+                             'migrate_config.yaml'))
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)-15s %(message)s',
@@ -268,13 +268,6 @@ def parse_synonym(doc):
 
     return parsed
 
-def reslugify(document, collection_name, traget_db):
-    for lang, val in document['Slug'].items():
-        if val:
-            doc_id = get_collection_id_field(collection_name)
-            document['Slug'][lang] += '-' + str(document[doc_id])
-
-
 def add_slug(document, collection_name):
     collection_slug_map = {
         'places': {'En': 'place',
@@ -350,23 +343,6 @@ def get_collection_id_field(collection_name):
         doc_id = '_id'
     return doc_id
 
-
-def handle_bulk_errors(details, collection_name, target_db):
-    #TODO: need to regenerate keys
-    collection = target_db[collection_name]
-    bulk = collection.initialize_unordered_bulk_op()
-    for error in details['writeErrors']:
-        if error['code'] == 11000:
-            doc = error['op']
-            reslugify(doc, collection_name, target_db)
-            bulk.insert(doc)
-        else:
-            logging.error('got unknown write error:' + error)
-    try:
-        bulk.execute()
-    except BulkWriteError as bwe:
-        for error in details['writeErrors']:
-            logging.error(error['errmsg'])
 
 def get_touched_units(collection_name,  since, until):
     query = get_queries('audit')['audit']
