@@ -13,7 +13,6 @@ from flask.ext.security import Security, MongoEngineUserDatastore
 from bhs_api.utils import get_conf
 
 SEARCH_CHUNK_SIZE = 15
-CONF_FILE = '/etc/bhs/config.yml'
 # Create app
 def create_app(testing=False, live=False):
     from bhs_api.models import User, Role
@@ -22,35 +21,8 @@ def create_app(testing=False, live=False):
     app = Flask(__name__)
     app.testing = testing
 
-    # Get configuration from file
-    must_have_keys = set(['secret_key',
-                        'mail_server',
-                        'mail_port',
-                        'user_db_host',
-                        'user_db_port',
-                        'elasticsearch_host',
-                        'user_db_name',
-                        'data_db_host',
-                        'data_db_port',
-                        'data_db_name',
-                        'image_bucket_url',
-                        'video_bucket_url',
-                        'redis_host',
-                        'redis_port',
-                        'caching_ttl',
-                        ])
-
-    # load the conf file. use local copy if nothing in the system
-    if os.path.exists(CONF_FILE):
-        conf = get_conf(CONF_FILE, must_have_keys)
-    else:
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                            os.pardir,
-                            'conf',
-                            'bhs_config.yaml')
-        conf = get_conf(path,
-                        must_have_keys)
-
+    # load the config file
+    conf = get_conf()
     # Our config - need to move everything here
     app.config['VIDEO_BUCKET_URL'] = "https://storage.googleapis.com/bhs-movies"
     app.config['IMAGE_BUCKET_URL'] = "https://storage.googleapis.com/bhs-flat-pics"
