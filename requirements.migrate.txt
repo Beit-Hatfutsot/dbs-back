@@ -1,3 +1,4 @@
 awesome-slugify==1.6.5
 Pillow==3.3.1
 pymssql==2.1.1
+-e git+https://github.com/copperleaftech/celerytest.git#egg=celerytest
