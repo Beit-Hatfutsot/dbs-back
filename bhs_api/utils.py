@@ -8,7 +8,8 @@ from uuid import UUID
 
 import yaml
 import boto
-import gcs_oauth2_boto_plugin
+# TODO: can we access google clopud storage without the next line?
+# import gcs_oauth2_boto_plugin
 import bson
 import soundcloud
 import gmail

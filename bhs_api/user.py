@@ -9,7 +9,7 @@ from flask.ext.security.utils import encrypt_password, verify_password
 from flask.ext.security.passwordless import send_login_instructions
 from flask.ext.security.decorators import _check_token
 
-from utils import get_referrer_host_url, humanify, dictify, send_gmail
+from utils import humanify, dictify, send_gmail
 from .models import StoryLine, UserName 
 from .item import fetch_item
 

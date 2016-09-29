@@ -6,7 +6,6 @@ from datetime import timedelta, datetime
 import re
 import urllib
 import mimetypes
-import magic
 from uuid import UUID
 
 from flask import Flask, Blueprint, request, abort, url_for, current_app
@@ -273,6 +272,8 @@ def get_phonetic(collection, string, limit=5):
 @v1_endpoints.route('/upload', methods=['POST'])
 @auth_token_required
 def save_user_content():
+    import magic
+
     if not request.files:
         abort(400, 'No files present!')
 
