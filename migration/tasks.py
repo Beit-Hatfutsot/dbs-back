@@ -32,6 +32,7 @@ def update_row(document, collection_name):
                         ]))
     target_db = pymongo.MongoClient(host=conf.data_db_host,
                                     port=conf.data_db_port)[conf.data_db_name]
+    collection = target_db[collection_name]
     update_doc(collection, document)
 
 def update_doc(collection, document):
