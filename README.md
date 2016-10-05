@@ -81,6 +81,12 @@ queue and redis as a storage backend.  To install the required packages run:
 
     $ pip install -r requirements.migrate.txt
 
+You'll also need to create some local system folders:
+
+    # mkdir /run/bhs
+    # mkdir /etc/bhs
+
+And get the super secret `migrate_config.yaml` file into `/etc/bhs`.
 To activate the migration worker run:
 
     $ celery -A migration.tasks worker --loglevel info
