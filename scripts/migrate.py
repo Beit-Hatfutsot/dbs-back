@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import re
 import os
 import sys
@@ -16,8 +15,8 @@ from bson.code import Code
 from slugify import Slugify
 
 from migration.migration_sqlclient import MigrationSQLClient
-from bhs_api.utils import get_conf, create_thumb, get_unit_type
 from migration.tasks import update_row
+from bhs_api.utils import get_conf, create_thumb, get_unit_type
 
 slugify = Slugify(translate=None, safe_chars='_')
 
@@ -40,6 +39,8 @@ conf = get_conf(set(['queries_repo_path',
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)-15s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger('scripts.migrate')
+logger.setLevel(logging.getLevelName('INFO'))
 
 repeated_slugs = {'He': {}, 'En': {}}
 
@@ -85,7 +86,7 @@ def get_queries(collection_name=None):
         try:
             fh = open(repo_path + filename)
         except IOError:
-            logging.error('Could not open file for query: \'{}\'. Make sure there is a SQL file for this query.'.format(filename[:-4]) )
+            logger.error('Could not open file for query: \'{}\'. Make sure there is a SQL file for this query.'.format(filename[:-4]) )
             sys.exit(1)
 
         queries[filename[:-4]] = fh.read()
@@ -104,7 +105,7 @@ def make_array(val, to_int=False):
             try:
                 return [int(x) for x in split(val[:-1])]
             except ValueError:
-                logging.error('Value error while converting {}'.format(val))
+                logger.error('Value error while converting {}'.format(val))
                 return []
 
 def make_subdocument_array(doc_arr, key, val_string):
@@ -114,7 +115,7 @@ def make_subdocument_array(doc_arr, key, val_string):
         return returned_arr
     elif len(val_string) > 10000:
         doc_id = None
-        logging.error('Given string is too long for {}!'.format(doc_id))
+        logger.error('Given string is too long for {}!'.format(doc_id))
         return returned_arr
 
     sub_values = make_array(val_string)
@@ -161,9 +162,9 @@ def parse_common(doc):
                         parsed_doc[key] = val.encode('hex')
                         continue
                 except:
-                    logging.warning('failed to migrate key: %s' % key)
+                    logger.warning('failed to migrate key: %s' % key)
             except:
-                logging.warning('failed to migrate key: %s' % key)
+                logger.warning('failed to migrate key: %s' % key)
 
         if key == 'LexiconIds':
             parsed_doc[key] = make_array(val)
@@ -394,22 +395,19 @@ if __name__ == '__main__':
     for collection_name, query in queries.items():
         unit_cursor = get_touched_units(collection_name, since, until)
         if not unit_cursor:
-            logging.info('{}:Skipping'.format(collection_name))
+            logger.info('{}:Skipping'.format(collection_name))
             continue
         units = list(unit_cursor)
         unit_ids = [unit['UnitId'] for unit in units]
-        logging.info('{}:Updating UnitIds: {}'
-                     .format(collection_name,
-                             ', '.join(map(str, unit_ids))))
         sql_cursor = sqlClient.execute(query, select_ids=True,
                                        unit_ids=unit_ids)
-
-        logging.info('Finished at {}'.format(get_now_str()))
 
         docs = []
         if sql_cursor:
             for row in sql_cursor:
                 doc = parse_doc(row, collection_name)
+                logger.info('{}:Updating UnitId: {}'
+                     .format(collection_name, doc['UnitId']))
                 update_row.delay(doc, collection_name)
                 # collect all the photos
                 try:
@@ -422,7 +420,6 @@ if __name__ == '__main__':
     # update photos
     # TODO: what the fuck?
     if len(photos_to_update) > 0:
-        logging.info('migrating photos...')
         photos_query = get_queries('photos')['photos']
         photos_cursor = sqlClient.execute(photos_query,
                                           select_ids=True,
@@ -431,6 +428,8 @@ if __name__ == '__main__':
         docs = []
         for row in photos_cursor:
             doc = parse_doc(row, 'photos')
+            logger.info('{}:Updating PictureId: {}'
+                    .format('photos', doc['PictureId']))
             update_row.delay(doc, 'photos')
 
     # TODO:

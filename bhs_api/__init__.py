@@ -54,6 +54,11 @@ def create_app(testing=False, live=False):
     app.config['MONGODB_DB'] = conf.user_db_name
     app.config['MONGODB_HOST'] = conf.user_db_host
     app.config['MONGODB_PORT'] = conf.user_db_port
+    # Redis
+    app.config['REDIS_HOST'] = conf.redis_host
+    app.config['REDIS_PORT'] = conf.redis_port
+    app.config['REDIS_PASSWORD'] = getattr(conf, 'redis_password', '')
+
     # CACHING
     app.config['CACHING_TTL'] = conf.caching_ttl
 

@@ -1,9 +1,29 @@
 import pymongo
 import logging
 from celery import Celery
-from bhs_api.utils import get_conf
+from bhs_api import create_app
 
-app = Celery('migration.tasks', broker='redis://guest@localhost//')
+def make_celery():
+    logging.info('before create_app')
+    app, conf = create_app()
+    redis_broker='redis://:{}@{}:{}/0'.format(
+					app.config['REDIS_PASSWORD'],
+					app.config['REDIS_HOST'],
+					app.config['REDIS_PORT'],
+				    )
+    logging.info('redis url: ' + redis_broker)
+    celery = Celery(app.import_name, broker=redis_broker)
+    celery.conf.update(app.config)
+    TaskBase = celery.Task
+    class ContextTask(TaskBase):
+        abstract = True
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return TaskBase.__call__(self, *args, **kwargs)
+    celery.Task = ContextTask
+    return celery
+celery = make_celery()
+
 
 def reslugify(collection, document):
     ''' append the document id to the slug to ensure uniquness '''
@@ -24,15 +44,11 @@ def get_collection_id_field(collection_name):
     return doc_id
 
 
-@app.task
+@celery.task
 def update_row(document, collection_name):
-    conf = get_conf(set(['data_db_host',
-                         'data_db_port',
-                         'data_db_name',
-                        ]))
-    target_db = pymongo.MongoClient(host=conf.data_db_host,
-                                    port=conf.data_db_port)[conf.data_db_name]
-    collection = target_db[collection_name]
+    mongo_client = pymongo.MongoClient(host=celery.conf['MONGODB_HOST'],
+                                    port=celery.conf['MONGODB_PORT'])
+    collection = mongo_client[celery.conf['MONGODB_DB']][collection_name]
     update_doc(collection, document)
 
 def update_doc(collection, document):
