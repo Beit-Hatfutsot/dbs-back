@@ -20,7 +20,7 @@ from bson.json_util import dumps
 from bson.binary import Binary, BINARY_SUBTYPE
 from werkzeug import Response
 
-DEFAULT_CONF_FILE = '/etc/bhs/config.yml'
+DEFAULT_CONF_FILE = '/etc/bhs/app_server.yaml'
 SEARCHABLE_COLLECTIONS = ('places',
                           'familyNames',
                           'photoUnits',
