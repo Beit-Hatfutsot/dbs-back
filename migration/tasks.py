@@ -1,19 +1,19 @@
 import pymongo
-import logging
 from celery import Celery
+from flask import current_app
 from bhs_api import create_app
 
 def make_celery():
-    logging.info('before create_app')
     app, conf = create_app()
     redis_broker='redis://:{}@{}:{}/0'.format(
-					app.config['REDIS_PASSWORD'],
-					app.config['REDIS_HOST'],
-					app.config['REDIS_PORT'],
-				    )
-    logging.info('redis url: ' + redis_broker)
+        app.config['REDIS_PASSWORD'],
+        app.config['REDIS_HOST'],
+        app.config['REDIS_PORT'],
+    )
+    app.logger.info('Broker at {}'.format(redis_broker))
     celery = Celery(app.import_name, broker=redis_broker)
     celery.conf.update(app.config)
+    # boiler plate to get our tasks running in the app context
     TaskBase = celery.Task
     class ContextTask(TaskBase):
         abstract = True
@@ -45,20 +45,23 @@ def get_collection_id_field(collection_name):
 
 
 @celery.task
-def update_row(document, collection_name):
+def update_row(doc, collection_name):
     mongo_client = pymongo.MongoClient(host=celery.conf['MONGODB_HOST'],
                                     port=celery.conf['MONGODB_PORT'])
     collection = mongo_client[celery.conf['MONGODB_DB']][collection_name]
-    update_doc(collection, document)
+    update_doc(collection, doc)
+    id_field = get_collection_id_field(collection_name)
+    current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
+        collection_name,
+        id_field, doc[id_field],
+        doc['Slug']['En']))
 
 def update_doc(collection, document):
     doc_id_field = get_collection_id_field(collection.name)
     doc_id = document[doc_id_field]
-    logging.info('updating {} in {}'.format(doc_id, collection.name))
     # family trees get special treatment
     if collection.name == 'genTreeIndividuals':
         tree_num = document['GTN']
-        logging.debug('updating {}.{}'.format(tree_num, document['II']))
         collection.update_one({'GTN': tree_num, 'II': document['II']},
                               {'$set': document},
                               upsert=True)

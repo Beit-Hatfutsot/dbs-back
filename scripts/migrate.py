@@ -15,7 +15,7 @@ from bson.code import Code
 from slugify import Slugify
 
 from migration.migration_sqlclient import MigrationSQLClient
-from migration.tasks import update_row
+from migration.tasks import update_row, get_collection_id_field
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
 
 slugify = Slugify(translate=None, safe_chars='_')
@@ -334,17 +334,6 @@ def parse_doc(doc, collection_name):
     return document
 
 
-def get_collection_id_field(collection_name):
-    doc_id = 'UnitId'
-    if collection_name == 'photos':
-        doc_id = 'PictureId'
-    elif collection_name == 'genTreeIndividuals':
-        doc_id = 'ID'
-    elif collection_name == 'synonyms':
-        doc_id = '_id'
-    return doc_id
-
-
 def get_touched_units(collection_name,  since, until):
     query = get_queries('audit')['audit']
     # genTreeIndividuals is a special case:
@@ -363,6 +352,16 @@ def get_touched_units(collection_name,  since, until):
     else:
         return None
 
+
+def parse_n_update(row, collection_name):
+    doc = parse_doc(row, collection_name)
+    id_field = get_collection_id_field(collection_name)
+    logger.info('{}:Updating {}: {}'.format(
+        collection_name, id_field, doc[id_field]))
+    update_row.delay(doc, collection_name)
+    return doc
+
+
 if __name__ == '__main__':
     args = parse_args()
     until = int(args.until)
@@ -380,12 +379,11 @@ if __name__ == '__main__':
                 since = since_file.read()
                 since = int(since)
             except IOError:
+                since_file = None
                 since = 0
     else:
         since = int(args.since)
 
-    if not since_file:
-        since_file = open('/var/run/bhs/last_update', 'w')
 	# connect to BHP SQL Server
     sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
 
@@ -405,10 +403,7 @@ if __name__ == '__main__':
         docs = []
         if sql_cursor:
             for row in sql_cursor:
-                doc = parse_doc(row, collection_name)
-                logger.info('{}:Updating UnitId: {}'
-                     .format(collection_name, doc['UnitId']))
-                update_row.delay(doc, collection_name)
+                doc = parse_n_update(row, collection_name)
                 # collect all the photos
                 try:
                     photos_to_update.extend(
@@ -425,18 +420,14 @@ if __name__ == '__main__':
                                           select_ids=True,
                                           unit_ids=photos_to_update,
                                           stringify=True)
-        docs = []
         for row in photos_cursor:
-            doc = parse_doc(row, 'photos')
-            logger.info('{}:Updating PictureId: {}'
-                    .format('photos', doc['PictureId']))
-            update_row.delay(doc, 'photos')
+            parse_n_update(row, 'photos')
 
     # TODO:
     # rsync_media()
 
     sqlClient.close_connections()
-    since_file.seek(0)
-    since_file.write(str(until))
-    since_file.close()
-
+    if since_file:
+        since_file.seek(0)
+        since_file.write(str(until))
+        since_file.close()
