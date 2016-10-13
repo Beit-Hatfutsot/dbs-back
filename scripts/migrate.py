@@ -426,8 +426,8 @@ if __name__ == '__main__':
     # TODO:
     # rsync_media()
 
-    sqlClient.close_connections()
     if since_file:
         since_file.seek(0)
         since_file.write(str(until))
         since_file.close()
+    sqlClient.close_connections()

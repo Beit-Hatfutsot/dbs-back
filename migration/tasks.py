@@ -51,10 +51,14 @@ def update_row(doc, collection_name):
     collection = mongo_client[celery.conf['MONGODB_DB']][collection_name]
     update_doc(collection, doc)
     id_field = get_collection_id_field(collection_name)
+    try:
+        slug = doc['Slug']['En']
+    except KeyError:
+        slug = 'None'
     current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
         collection_name,
         id_field, doc[id_field],
-        doc['Slug']['En']))
+        slug))
 
 def update_doc(collection, document):
     doc_id_field = get_collection_id_field(collection.name)
