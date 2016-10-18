@@ -25,6 +25,7 @@ def push_code():
             run('virtualenv env')
         with prefix('. env/bin/activate'):
             run('pip install -r requirements.txt')
+            run('pip install -r requirements.migrate.txt')
 
 def push_conf():
     with cd("api"):
