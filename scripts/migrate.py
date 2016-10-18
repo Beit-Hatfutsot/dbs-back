@@ -16,6 +16,7 @@ from slugify import Slugify
 
 from migration.migration_sqlclient import MigrationSQLClient
 from migration.tasks import update_row, get_collection_id_field
+from migration.files import upload_photo
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
 
 slugify = Slugify(translate=None, safe_chars='_')
@@ -411,6 +412,8 @@ if __name__ == '__main__':
 
                 except KeyError:
                     pass
+        # TODO:
+        # rsync_media(collection_name)
 
     # update photos
     # TODO: what the fuck?
@@ -421,10 +424,8 @@ if __name__ == '__main__':
                                           unit_ids=photos_to_update,
                                           stringify=True)
         for row in photos_cursor:
-            parse_n_update(row, 'photos')
-
-    # TODO:
-    # rsync_media()
+            doc = parse_n_update(row, 'photos')
+            upload_photo(doc, conf)
 
     if since_file:
         since_file.seek(0)
