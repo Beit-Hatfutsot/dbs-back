@@ -13,6 +13,7 @@ def make_celery():
     app.logger.info('Broker at {}'.format(redis_broker))
     celery = Celery(app.import_name, broker=redis_broker)
     celery.conf.update(app.config)
+    celery.data_db = app.data_db
     # boiler plate to get our tasks running in the app context
     TaskBase = celery.Task
     class ContextTask(TaskBase):
@@ -48,37 +49,44 @@ def get_collection_id_field(collection_name):
 def update_row(doc, collection_name):
     mongo_client = pymongo.MongoClient(host=celery.conf['MONGODB_HOST'],
                                     port=celery.conf['MONGODB_PORT'])
-    collection = mongo_client[celery.conf['MONGODB_DB']][collection_name]
+    collection = celery.data_db[collection_name]
+    # from celery.contrib import rdb; rdb.set_trace()
     update_doc(collection, doc)
-    id_field = get_collection_id_field(collection_name)
-    try:
-        slug = doc['Slug']['En']
-    except KeyError:
-        slug = 'None'
-    current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
-        collection_name,
-        id_field, doc[id_field],
-        slug))
+
 
 def update_doc(collection, document):
-    doc_id_field = get_collection_id_field(collection.name)
-    doc_id = document[doc_id_field]
     # family trees get special treatment
-    if collection.name == 'genTreeIndividuals':
-        tree_num = document['GTN']
-        collection.update_one({'GTN': tree_num, 'II': document['II']},
+    if collection.name == 'persons':
+        tree_num = document['tree']
+        id = document['id']
+        r = collection.update_one({'tree': tree_num, 'id': id},
                               {'$set': document},
                               upsert=True)
+        current_app.logger.info('Updated person: {}.{}'
+                                .format(tree_num, id))
     else:
+        doc_id_field = get_collection_id_field(collection.name)
+        doc_id = document[doc_id_field]
         # Set up collection specific document ids
         # Search updated collections for collection specific index field
         # and update it.  Save the _id of updated/inserted doc to
         # the 'migration_log' collection
         query = {doc_id_field: doc_id}
         try:
-            r = collection.update_one(query,
-                                      {'$set': document},
-                                      upsert=True)
+            collection.update_one(query,
+                                  {'$set': document},
+                                  upsert=True)
         except pymongo.errors.DuplicateKeyError:
             reslugify(collection, document)
             collection.insert(document)
+
+        try:
+            slug = doc['Slug']['En']
+        except KeyError:
+            slug = 'None'
+        current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
+            collection_name,
+            doc_id_field,
+            doc_id,
+            slug))
+

@@ -14,9 +14,11 @@ from pymongo.errors import BulkWriteError
 from bson.code import Code
 from slugify import Slugify
 
+from gedcom import Gedcom
 from migration.migration_sqlclient import MigrationSQLClient
 from migration.tasks import update_row, get_collection_id_field
 from migration.files import upload_photo
+from migration.family_trees import Gedcom2Persons
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
 
 slugify = Slugify(translate=None, safe_chars='_')
@@ -339,7 +341,7 @@ def get_touched_units(collection_name,  since, until):
     query = get_queries('audit')['audit']
     # genTreeIndividuals is a special case:
     # we need to return a cursor to all updated/inserted tree units
-    if collection_name == 'genTreeIndividuals':
+    if collection_name in ('genTreeIndividuals', 'genTrees'):
         unit_type = get_unit_type('familyTrees')
     else:
         unit_type = get_unit_type(collection_name)
@@ -361,6 +363,24 @@ def parse_n_update(row, collection_name):
         collection_name, id_field, doc[id_field]))
     update_row.delay(doc, collection_name)
     return doc
+
+
+def migrate_trees(cursor, since_timestamp, conf):
+    since = datetime.datetime.fromtimestamp(since_timestamp)
+    for row in sql_cursor:
+        if row['UpdateDate'] < since:
+            continue
+        filename = os.path.join(conf.gentree_mount_point, row['GenTreePath'])
+        gedcom_fd = open(filename)
+        try:
+            g = Gedcom(fd=gedcom_fd)
+        except SyntaxError as e:
+            logger.error('failed to parse tree number {}, path {}: {}'
+                         .format(row['GenTreeNumber'], filename, e))
+            continue
+        Gedcom2Persons(g, row['GenTreeNumber'])
+        logger.info('migrated tree {}, path {}'
+                    .format(row['GenTreeNumber'], filename))
 
 
 if __name__ == '__main__':
@@ -392,16 +412,21 @@ if __name__ == '__main__':
     queries = get_queries(args.collection)
     photos_to_update = []
     for collection_name, query in queries.items():
+        if collection_name == 'genTrees':
+            #TODO: `since` should be part of the sql query
+            sql_cursor = sqlClient.execute(query)
+            migrate_trees(sql_cursor, since, conf)
+            continue
+
         unit_cursor = get_touched_units(collection_name, since, until)
         if not unit_cursor:
             logger.info('{}:Skipping'.format(collection_name))
             continue
+
         units = list(unit_cursor)
         unit_ids = [unit['UnitId'] for unit in units]
         sql_cursor = sqlClient.execute(query, select_ids=True,
-                                       unit_ids=unit_ids)
-
-        docs = []
+                                    unit_ids=unit_ids)
         if sql_cursor:
             for row in sql_cursor:
                 doc = parse_n_update(row, collection_name)
