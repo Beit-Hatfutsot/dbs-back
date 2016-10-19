@@ -368,9 +368,13 @@ def parse_n_update(row, collection_name):
 def migrate_trees(cursor, since_timestamp, conf):
     since = datetime.datetime.fromtimestamp(since_timestamp)
     for row in sql_cursor:
+        if row['GenTreeNumber'] == 231:
+            import pdb; pdb.set_trace()
         if row['UpdateDate'] < since:
             continue
-        filename = os.path.join(conf.gentree_mount_point, row['GenTreePath'])
+        filename = os.path.join(conf.gentree_mount_point,
+                                os.path.dirname(row['GenTreePath']),
+                                str(row['GenTreeFileId'])+'.ged')
         gedcom_fd = open(filename)
         try:
             g = Gedcom(fd=gedcom_fd)
