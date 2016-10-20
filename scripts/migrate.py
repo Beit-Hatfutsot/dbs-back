@@ -54,12 +54,8 @@ def parse_args():
     parser.add_argument('-c', '--collection')
     parser.add_argument('--host', default='localhost')
     parser.add_argument('-p', '--port', default=27017)
-    parser.add_argument('-w', '--write_mode', default='update')
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.gmtime()))
-    parser.add_argument('--full', action="store_true",
-                        help="""migrate the entire database,
-                                otherwise just 100 items per collection""")
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -412,7 +408,6 @@ if __name__ == '__main__':
 	# connect to BHP SQL Server
     sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
 
-    write_mode = args.write_mode
     queries = get_queries(args.collection)
     photos_to_update = []
     for collection_name, query in queries.items():
