@@ -1,3 +1,4 @@
+import json
 import pymongo
 from celery import Celery
 from flask import current_app
@@ -42,13 +43,44 @@ def get_collection_id_field(collection_name):
         doc_id = 'ID'
     elif collection_name == 'synonyms':
         doc_id = '_id'
+    elif collection_name == 'trees':
+        doc_id = 'tree_num'
     return doc_id
 
 
 @celery.task
+def update_tree(data, collection=None):
+    if not collection:
+        collection = celery.data_db['trees']
+    tree_num = data['tree_num']
+    tree = collection.find_one({'tree_num': tree_num})
+    doc = data.copy()
+    file_id = doc.pop('file_id')
+    date = doc.pop('date')
+    persons = doc.pop('persons')
+    current_ver = {'file_id':file_id,
+                   'update_date': date,
+                   'persons': persons}
+    if tree:
+        # don't add the same version twice
+        for i in tree['versions']:
+            if i['file_id'] == file_id:
+                return
+        doc['versions'] = tree['versions']
+        doc['versions'].append(current_ver)
+        collection.update_one({'tree_num': tree_num},
+                     {'$set': doc})
+
+    else:
+        doc['versions'] = [current_ver]
+        collection.insert_one(doc)
+    current_app.redis.set('tree_vers_'+str(tree_num),
+                          json.dumps(doc['versions']),
+                          300)
+
+
+@celery.task
 def update_row(doc, collection_name):
-    mongo_client = pymongo.MongoClient(host=celery.conf['MONGODB_HOST'],
-                                    port=celery.conf['MONGODB_PORT'])
     collection = celery.data_db[collection_name]
     # from celery.contrib import rdb; rdb.set_trace()
     update_doc(collection, doc)
@@ -57,11 +89,32 @@ def update_row(doc, collection_name):
 def update_doc(collection, document):
     # family trees get special treatment
     if collection.name == 'persons':
-        tree_num = document['tree']
+        tree_num = document['tree']['tree_num']
         id = document['id']
-        r = collection.update_one({'tree': tree_num, 'id': id},
-                              {'$set': document},
-                              upsert=True)
+        tree_key = 'tree_vers_'+str(tree_num)
+        query = {'tree.tree_num': tree_num, 'id': id}
+        tree_vers = current_app.redis.get(tree_key)
+        if tree_vers:
+            tree_vers = json.loads(tree_vers)
+        else:
+            tree = current_app.data_db['trees'].find_one({'tree_num':tree_num})
+            if tree:
+                tree_vers = tree['versions']
+                current_app.redis.set(tree_key, json.dumps(tree_vers), 300)
+            else:
+                current_app.logger.error("didn't find tree number {} when trying to update {}"
+                                         .format(tree_num, id))
+                return
+
+        for i, ver in enumerate(tree_vers):
+            if ver['file_id'] == document['tree']['file_id']:
+                document['tree']['version'] = i
+                query['tree.version'] = i
+                break
+
+        r = collection.update_one(query,
+                                  {'$set': document},
+                                  upsert=True)
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
@@ -81,11 +134,11 @@ def update_doc(collection, document):
             collection.insert(document)
 
         try:
-            slug = doc['Slug']['En']
+            slug = document['Slug']['En']
         except KeyError:
             slug = 'None'
         current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
-            collection_name,
+            collection.name,
             doc_id_field,
             doc_id,
             slug))

@@ -7,7 +7,7 @@ from gedcom import Gedcom, GedcomParseError
 import boto
 from bson.code import Code
 
-from .tasks import update_row
+from .tasks import update_row, update_tree
 
 THIS_YEAR = datetime.now().year
 # google storage: OUTPUT_BUCKET = 'bhs-familytrees-json'
@@ -27,11 +27,12 @@ def add_children(elem, prefix, props):
 
 class Gedcom2Persons:
 
-    def __init__(self, gedcom, tree_num):
+    def __init__(self, gedcom, tree_num, file_id):
         ''' main import function, receieve a parsed gedcom '''
 
         self.gedcom = gedcom
         self.tree_num = tree_num
+        self.file_id = file_id
         form = ''
         ver = '?'
         date = 'Unknown'
@@ -69,8 +70,10 @@ class Gedcom2Persons:
                     gedc_ver=ver,
                     gedc_form=form,
                     tree_num=tree_num,
-                    num_nodes = count,
+                    persons = count,
+                    file_id = file_id,
                     )
+        update_tree.delay(self.meta)
         self.add_nodes()
 
     def save(self, data, name):
@@ -78,8 +81,8 @@ class Gedcom2Persons:
         uri = boto.storage_uri(self.dest_bucket_name+name+'.json', 'gs')
         uri.new_key().set_contents_from_string(json.dumps(data))
         '''
-        data['tree'] = self.tree_num
         data['id'] = name
+        data['tree'] = self.meta
         update_row.delay(data, 'persons')
 
     def flatten(self, nodes, full=False):
@@ -108,7 +111,7 @@ class Gedcom2Persons:
     def find_partners(self, node, depth=0, exclude_ids=None):
         ret = []
         if not node.is_individual:
-            return ret 
+            return ret
 
         if exclude_ids:
             eids = exclude_ids + [node.pointer]

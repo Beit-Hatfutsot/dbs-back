@@ -364,13 +364,12 @@ def parse_n_update(row, collection_name):
 def migrate_trees(cursor, since_timestamp, conf):
     since = datetime.datetime.fromtimestamp(since_timestamp)
     for row in sql_cursor:
-        if row['GenTreeNumber'] == 231:
-            import pdb; pdb.set_trace()
         if row['UpdateDate'] < since:
             continue
+        file_id = str(row['GenTreeFileId'])
         filename = os.path.join(conf.gentree_mount_point,
                                 os.path.dirname(row['GenTreePath']),
-                                str(row['GenTreeFileId'])+'.ged')
+                                file_id+'.ged')
         gedcom_fd = open(filename)
         try:
             g = Gedcom(fd=gedcom_fd)
@@ -378,7 +377,7 @@ def migrate_trees(cursor, since_timestamp, conf):
             logger.error('failed to parse tree number {}, path {}: {}'
                          .format(row['GenTreeNumber'], filename, e))
             continue
-        Gedcom2Persons(g, row['GenTreeNumber'])
+        Gedcom2Persons(g, row['GenTreeNumber'], file_id)
         logger.info('migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], filename))
 
