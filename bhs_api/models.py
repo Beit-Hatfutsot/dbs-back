@@ -45,15 +45,18 @@ class User(Document, UserMixin):
 
     def handle(self, request):
         method = request.method
-        data = request.data
         referrer = request.referrer
         if referrer:
             referrer_host_url = get_referrer_host_url(referrer)
         else:
             referrer_host_url = None
-        if data:
+
+        if method == 'GET':
+            r =  self.render()
+
+        elif method == 'PUT':
             try:
-                data = json.loads(data)
+                data = request.get_json();
                 if not isinstance(data, dict):
                     abort(
                         400,
@@ -63,10 +66,6 @@ class User(Document, UserMixin):
                 current_app.logger.debug(e_message)
                 abort(400, e_message)
 
-        if method == 'GET':
-            r =  self.render()
-
-        elif method == 'PUT':
             if not data:
                 abort(400, 'No data provided')
             r = self.update(data)
