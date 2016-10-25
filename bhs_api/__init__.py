@@ -57,7 +57,7 @@ def create_app(testing=False, live=False):
     # Redis
     app.config['REDIS_HOST'] = conf.redis_host
     app.config['REDIS_PORT'] = conf.redis_port
-    app.config['REDIS_PASSWORD'] = getattr(conf, 'redis_password', '')
+    app.config['REDIS_PASSWORD'] = getattr(conf, 'redis_password', None)
 
     # CACHING
     app.config['CACHING_TTL'] = conf.caching_ttl
@@ -97,7 +97,10 @@ def create_app(testing=False, live=False):
 
     # redis
     try:
-        app.redis = redis.StrictRedis(host=conf.redis_host, port=conf.redis_port, db=0)
+        app.redis = redis.StrictRedis(host=conf.redis_host,
+                                      port=conf.redis_port,
+                                      password = app.config['REDIS_PASSWORD'],
+                                      db=0)
     except AttributeError:
         app.redis = None
 
