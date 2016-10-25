@@ -36,14 +36,14 @@ def push_conf():
 def deploy():
     push_code()
     test()
-    restart_api()
+    restart()
 
 def test():
     with cd("api"):
         with prefix('. env/bin/activate'):
             run('py.test tests bhs_api/*.py')
 
-def restart_api():
+def restart():
     with cd("api"):
         '''
         run("cp conf/supervisord.conf ~")
@@ -52,6 +52,7 @@ def restart_api():
         '''
         # change the ini file to use the corrent uid for bhs
         sudo("supervisorctl restart uwsgi")
+        sudo("supervisorctl restart migration")
 
 @hosts('bhs-infra')
 def pull_mongo(dbname):
