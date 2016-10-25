@@ -41,19 +41,22 @@ def get_collection_id_field(collection_name):
         doc_id = 'PictureId'
     elif collection_name == 'genTreeIndividuals':
         doc_id = 'ID'
+    elif collection_name == 'persons':
+        doc_id = 'id'
     elif collection_name == 'synonyms':
         doc_id = '_id'
     elif collection_name == 'trees':
-        doc_id = 'tree_num'
+        doc_id = 'num'
     return doc_id
 
 
 @celery.task
 def update_tree(data, collection=None):
+    # from celery.contrib import rdb; rdb.set_trace()
     if not collection:
         collection = celery.data_db['trees']
-    tree_num = data['tree_num']
-    tree = collection.find_one({'tree_num': tree_num})
+    num = data['num']
+    tree = collection.find_one({'num': num})
     doc = data.copy()
     file_id = doc.pop('file_id')
     date = doc.pop('date')
@@ -68,15 +71,24 @@ def update_tree(data, collection=None):
                 return
         doc['versions'] = tree['versions']
         doc['versions'].append(current_ver)
-        collection.update_one({'tree_num': tree_num},
+        collection.update_one({'num': num},
                      {'$set': doc})
 
     else:
         doc['versions'] = [current_ver]
         collection.insert_one(doc)
-    current_app.redis.set('tree_vers_'+str(tree_num),
+    current_app.redis.set('tree_vers_'+str(num),
                           json.dumps(doc['versions']),
                           300)
+
+
+def find_version(tree_vers, file_id):
+    ''' finding the version index based on an array of version and a file id '''
+    for i, ver in enumerate(tree_vers):
+        if ver['file_id'] == file_id:
+            return i
+    # let's assume it's the next version
+    return i+1
 
 
 @celery.task
@@ -89,29 +101,32 @@ def update_row(doc, collection_name):
 def update_doc(collection, document):
     # family trees get special treatment
     if collection.name == 'persons':
-        tree_num = document['tree']['tree_num']
+        tree_num = document['tree_num']
         id = document['id']
         tree_key = 'tree_vers_'+str(tree_num)
-        query = {'tree.tree_num': tree_num, 'id': id}
+        query = {'tree_num': tree_num, 'id': id}
         tree_vers = current_app.redis.get(tree_key)
         if tree_vers:
             tree_vers = json.loads(tree_vers)
+            i = find_version(tree_vers, document['tree_file_id'])
         else:
-            tree = current_app.data_db['trees'].find_one({'tree_num':tree_num})
+            tree = current_app.data_db['trees'].find_one({'num':tree_num})
             if tree:
                 tree_vers = tree['versions']
                 current_app.redis.set(tree_key, json.dumps(tree_vers), 300)
+                i = find_version(tree_vers, document['tree_file_id'])
             else:
-                current_app.logger.error("didn't find tree number {} when trying to update {}"
+                current_app.logger.info("didn't find tree number {} using version 0 for {}"
                                          .format(tree_num, id))
-                return
+                i = 0;
 
-        for i, ver in enumerate(tree_vers):
-            if ver['file_id'] == document['tree']['file_id']:
-                document['tree']['version'] = i
-                query['tree.version'] = i
-                break
+        document['tree_version'] = i
+        query['tree_version'] = i
 
+        document['Slug'] = {'En': 'person_{};{}.{}'.format(
+                              tree_num,
+                              i,
+                              id)}
         r = collection.update_one(query,
                                   {'$set': document},
                                   upsert=True)

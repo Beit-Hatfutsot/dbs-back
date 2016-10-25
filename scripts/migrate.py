@@ -14,7 +14,7 @@ from pymongo.errors import BulkWriteError
 from bson.code import Code
 from slugify import Slugify
 
-from gedcom import Gedcom
+from gedcom import Gedcom, GedcomParseError
 from migration.migration_sqlclient import MigrationSQLClient
 from migration.tasks import update_row, get_collection_id_field
 from migration.files import upload_photo
@@ -56,6 +56,7 @@ def parse_args():
     parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.gmtime()))
+    parser.add_argument('-t', '--treenum', type=int)
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -235,7 +236,7 @@ def parse_image(doc):
     return image_doc
 
 
-def parse_gentree_individual(doc):
+def parse_person(doc):
     indi_doc = {}
 
     for key, val in doc.items():
@@ -318,7 +319,7 @@ def parse_doc(doc, collection_name):
         'lexicon':              parse_common,
         'photoUnits':           parse_image_unit,
         'photos':               parse_image,
-        'genTreeIndividuals':   parse_gentree_individual,
+        'persons':              parse_person,
         'synonyms':             parse_synonym,
         'personalities':        parse_common,
         'movies':               parse_common,
@@ -361,10 +362,14 @@ def parse_n_update(row, collection_name):
     return doc
 
 
-def migrate_trees(cursor, since_timestamp, conf):
+def migrate_trees(cursor, since_timestamp, conf, treenum):
     since = datetime.datetime.fromtimestamp(since_timestamp)
     for row in sql_cursor:
-        if row['UpdateDate'] < since:
+        # special case for a specific tree
+        if treenum:
+            if row['GenTreeNumber'] != treenum:
+                continue
+        elif row['UpdateDate'] < since:
             continue
         file_id = str(row['GenTreeFileId'])
         filename = os.path.join(conf.gentree_mount_point,
@@ -373,12 +378,14 @@ def migrate_trees(cursor, since_timestamp, conf):
         gedcom_fd = open(filename)
         try:
             g = Gedcom(fd=gedcom_fd)
-        except SyntaxError as e:
+        except (SyntaxError, GedcomParseError) as e:
             logger.error('failed to parse tree number {}, path {}: {}'
-                         .format(row['GenTreeNumber'], filename, e))
+                         .format(row['GenTreeNumber'], filename, str(e)))
             continue
-        Gedcom2Persons(g, row['GenTreeNumber'], file_id)
-        logger.info('migrated tree {}, path {}'
+        logger.info('>>> migrating tree {}, path {}'
+                    .format(row['GenTreeNumber'], filename))
+        Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update)
+        logger.info('<<< migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], filename))
 
 
@@ -407,13 +414,17 @@ if __name__ == '__main__':
 	# connect to BHP SQL Server
     sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
 
-    queries = get_queries(args.collection)
+    if args.treenum:
+        collection = 'genTrees'
+    else:
+        collection = args.collection
+    queries = get_queries(collection)
     photos_to_update = []
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
             #TODO: `since` should be part of the sql query
             sql_cursor = sqlClient.execute(query)
-            migrate_trees(sql_cursor, since, conf)
+            migrate_trees(sql_cursor, since, conf, args.treenum)
             continue
 
         unit_cursor = get_touched_units(collection_name, since, until)

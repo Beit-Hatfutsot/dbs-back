@@ -27,12 +27,14 @@ def add_children(elem, prefix, props):
 
 class Gedcom2Persons:
 
-    def __init__(self, gedcom, tree_num, file_id):
+    def __init__(self, gedcom, tree_num, file_id, onsave):
         ''' main import function, receieve a parsed gedcom '''
 
         self.gedcom = gedcom
         self.tree_num = tree_num
         self.file_id = file_id
+        self.onsave = onsave
+
         form = ''
         ver = '?'
         date = 'Unknown'
@@ -69,7 +71,7 @@ class Gedcom2Persons:
                     source=source,
                     gedc_ver=ver,
                     gedc_form=form,
-                    tree_num=tree_num,
+                    num=tree_num,
                     persons = count,
                     file_id = file_id,
                     )
@@ -82,8 +84,10 @@ class Gedcom2Persons:
         uri.new_key().set_contents_from_string(json.dumps(data))
         '''
         data['id'] = name
-        data['tree'] = self.meta
-        update_row.delay(data, 'persons')
+        data['tree_num'] = self.meta['num']
+        data['tree_size'] = self.meta['persons']
+        data['tree_file_id'] = self.meta['file_id']
+        self.onsave(data, 'persons')
 
     def flatten(self, nodes, full=False):
         ret = []
