@@ -30,8 +30,8 @@ class Slug:
         u"אישיות": "personalities",
         "place": "places",
         u"מקום": "places",
-        "person": "genTreeIndividuals",
-        u"אדם": "genTreeIndividuals",
+        "person": "persons",
+        u"אדם": "persons",
         "familyname": "familyNames",
         u"שםמשפחה": "familyNames",
         "video": "movies",
@@ -178,17 +178,11 @@ def get_item_query(slug):
     if isinstance(slug, basestring):
         slug = Slug(slug)
     first = slug.full[0]
-    if slug.full.startswith('person_'):
-        try:
-            tree, id = slug.local_slug.split('.')
-            return {'GTN': int(tree), 'II': id}
-        except ValueError:
-            raise NotFound, "Bad person slug - "+slug.local_slug
+    # import pdb; pdb.set_trace()
+    if first >= 'a' and first <='z':
+        return {'Slug.En': slug.full}
     else:
-        if first >= 'a' and first <='z':
-            return {'Slug.En': slug.full}
-        else:
-            return {'Slug.He': slug.full}
+        return {'Slug.He': slug.full}
 
 def get_item(slug, db=None):
     if not db:
@@ -206,7 +200,7 @@ def get_item(slug, db=None):
 
 def _filter_doc(query, collection, db):
     search_query = query.copy()
-    if collection != 'genTreeIndividuals':
+    if collection != 'persons':
         search_query.update(SHOW_FILTER)
     item = db[collection].find_one(search_query)
     if item:
