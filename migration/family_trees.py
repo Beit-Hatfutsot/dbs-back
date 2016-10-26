@@ -107,6 +107,7 @@ class Gedcom2Persons:
                 if full and node['deceased']:
                     node['birth_year'] = e.birth_year
                     node['death_year'] = e.death_year
+                    node['marriage_years'] = e.marriage_years
                     add_children(e, None, node)
             ret.append(node)
         return ret if isinstance(nodes, collections.Iterable) else node
