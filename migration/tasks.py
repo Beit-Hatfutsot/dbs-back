@@ -6,11 +6,17 @@ from bhs_api import create_app
 
 def make_celery():
     app, conf = create_app()
-    redis_broker='redis://:{}@{}:{}/0'.format(
-        app.config['REDIS_PASSWORD'],
-        app.config['REDIS_HOST'],
-        app.config['REDIS_PORT'],
-    )
+    if app.config['REDIS_PASSWORD']:
+        redis_broker='redis://:{}@{}:{}/0'.format(
+            app.config['REDIS_PASSWORD'],
+            app.config['REDIS_HOST'],
+            app.config['REDIS_PORT'],
+        )
+    else:
+        redis_broker='redis://{}:{}/0'.format(
+            app.config['REDIS_HOST'],
+            app.config['REDIS_PORT'],
+        )
     app.logger.info('Broker at {}'.format(redis_broker))
     celery = Celery(app.import_name, broker=redis_broker)
     celery.conf.update(app.config)
