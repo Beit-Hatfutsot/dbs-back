@@ -20,6 +20,7 @@ from migration.tasks import update_row, get_collection_id_field
 from migration.files import upload_photo
 from migration.family_trees import Gedcom2Persons
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
+from bhs_api import phonetic
 
 slugify = Slugify(translate=None, safe_chars='_')
 
@@ -238,9 +239,8 @@ def parse_image(doc):
 
 def parse_person(doc):
     indi_doc = {}
-
     for key, val in doc.items():
-        if key in ('FN', 'LN', 'BP', 'MP'):
+        if key in ('BIRT_PLAC', 'MARR_PLAC', 'DEAT_PLAC'):
             indi_doc[key] = val
             if val:
                 indi_doc[key + '_lc'] = val.lower()
@@ -248,8 +248,13 @@ def parse_person(doc):
                 indi_doc[key + '_lc'] = val
         elif key in ['MSD', 'MED']:
             indi_doc[key] = make_array(val, to_int=True)
+        elif key =='name':
+            indi_doc['name_lc'] = map(unicode.lower, val)
+            indi_doc['name_S'] = map(phonetic.get_bhp_soundex, val)
         else:
             indi_doc[key] = val
+        if key in ('BIRT_PLAC', 'MARR_PLAC', 'DEAT_PLAC'):
+             indi_doc[key + '_S'] = phonetic.get_bhp_soundex(val)
 
     return indi_doc
 
