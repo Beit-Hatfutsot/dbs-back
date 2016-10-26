@@ -438,15 +438,19 @@ if __name__ == '__main__':
             migrate_trees(sql_cursor, since, conf, args.treenum)
             continue
 
-        unit_cursor = get_touched_units(collection_name, since, until)
-        if not unit_cursor:
-            logger.info('{}:Skipping'.format(collection_name))
-            continue
+        if since:
+            unit_cursor = get_touched_units(collection_name, since, until)
+            if not unit_cursor:
+                logger.info('{}:Skipping'.format(collection_name))
+                continue
 
-        units = list(unit_cursor)
-        unit_ids = [unit['UnitId'] for unit in units]
-        sql_cursor = sqlClient.execute(query, select_ids=True,
-                                    unit_ids=unit_ids)
+            units = list(unit_cursor)
+            unit_ids = [unit['UnitId'] for unit in units]
+            sql_cursor = sqlClient.execute(query, select_ids=True,
+                                        unit_ids=unit_ids)
+        else:
+            sql_cursor = sqlClient.execute(query)
+
         if sql_cursor:
             for row in sql_cursor:
                 doc = parse_n_update(row, collection_name)
