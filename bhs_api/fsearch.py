@@ -5,32 +5,24 @@ from bhs_api import phonetic
 
 MAX_RESULTS=30 # aka chunk size
 
-ARGS_TO_INDEX = {'first_name':       'FN_lc',
-                 'last_name':        'LN_lc',
-                 'maiden_name':      'IBLN_lc',
-                 'sex':              'G',
-                 'birth_place':      'BP_lc',
-                 'marriage_place':   'MP_lc',
-                 'tree_number':      'GTN',
-                 'death_place':      'DP_lc',
+ARGS_TO_INDEX = {'first_name':       'name_lc.0',
+                 'last_name':        'name_lc.1',
+                 'sex':              'sex',
+                 'birth_place':      'BIRT_PLAC_lc',
+                 'marriage_place':   'MARR_PLAC_lc',
+                 'tree_number':      'tree_num',
+                 'death_place':      'DEAT_PLAC_lc',
                  'place':            'filler_lc', # a dummy field name
                  }
 
-PROJECTION = {'II': 1,   # Individual ID
-                'GTN': 1,  # GenTree Number
-                'LN': 1,   # Last name
-                'FN': 1,   # First Name
-                'IBLN': 1, # Maiden name
-                'BD': 1,   # Birth date
-                'BP': 1,   # Birth place
-                'DD': 1,   # Death date
-                'DP': 1,   # Death place
-                'G': 1,    # Gender
-                'MD': 1,   # Marriage dates as comma separated string
-                'MP': 1,   # Marriage places as comma separated string
-                'GTF': 1,  # Tree file UUID
-                'EditorRemarks': 1,
-                'tree': 1,  # get the tree
+PROJECTION = {'name': 1,
+              'parents': 1,
+              'partners': 1,
+              'siblings': 1,
+              'tree_num': 1,
+              'id': 1,
+              'sex': 1,
+              'tree_version': 1,
                 }
 
 def _generate_year_range(year, fudge_factor=0):
@@ -113,7 +105,7 @@ def build_query(search_dict):
                    'death_year': ['DSD', 'DED']}
 
     # Build gentree search query from all the subqueries
-    search_query = {'tree': {'$exists': True}}
+    search_query = {}
 
     for item in years:
         if item == 'marriage_year':
@@ -173,12 +165,9 @@ def fsearch(max_results=15, **kwargs):
             abort(400, "{} argument couldn't be empty".format(key))
 
 
-    collection = current_app.data_db['genTreeIndividuals']
+    collection = current_app.data_db['persons']
     search_query = build_query(search_dict)
     current_app.logger.debug('FSearch query:\n{}'.format(search_query))
-
-    if 'debug' in search_dict:
-        projection = None
 
     results = collection.find(search_query, PROJECTION)
     total = results.count()
