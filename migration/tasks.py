@@ -1,8 +1,11 @@
+import os
 import json
 import pymongo
 from celery import Celery
 from flask import current_app
 from bhs_api import create_app
+
+MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 
 def make_celery():
     app, conf = create_app()
@@ -78,7 +81,8 @@ def update_tree(data, collection=None):
         doc['versions'] = tree['versions']
         doc['versions'].append(current_ver)
         collection.update_one({'num': num},
-                     {'$set': doc})
+                              {'$set': doc},
+                              upsert=True)
 
     else:
         doc['versions'] = [current_ver]
@@ -103,6 +107,13 @@ def update_row(doc, collection_name):
     # from celery.contrib import rdb; rdb.set_trace()
     update_doc(collection, doc)
 
+def update_collection(collection, query, doc):
+    if MIGRATE_MODE  == 'i':
+        collection.insert(doc)
+    else:
+        collection.update_one(query,
+                        {'$set': doc},
+                        upsert=True)
 
 def update_doc(collection, document):
     # family trees get special treatment
@@ -133,9 +144,7 @@ def update_doc(collection, document):
                               tree_num,
                               i,
                               id)}
-        r = collection.update_one(query,
-                                  {'$set': document},
-                                  upsert=True)
+        update_collection(collection, query, document)
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
@@ -147,9 +156,7 @@ def update_doc(collection, document):
         # the 'migration_log' collection
         query = {doc_id_field: doc_id}
         try:
-            collection.update_one(query,
-                                  {'$set': document},
-                                  upsert=True)
+            update_collection(collection, query, document)
         except pymongo.errors.DuplicateKeyError:
             reslugify(collection, document)
             collection.insert(document)
