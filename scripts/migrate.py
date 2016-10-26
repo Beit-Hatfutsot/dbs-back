@@ -249,6 +249,7 @@ def parse_person(doc):
         elif key in ['MSD', 'MED']:
             indi_doc[key] = make_array(val, to_int=True)
         elif key =='name':
+            indi_doc[key] = val
             indi_doc['name_lc'] = map(unicode.lower, val)
             indi_doc['name_S'] = map(phonetic.get_bhp_soundex, val)
         else:
