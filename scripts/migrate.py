@@ -375,7 +375,13 @@ def migrate_trees(cursor, since_timestamp, conf, treenum):
         filename = os.path.join(conf.gentree_mount_point,
                                 os.path.dirname(row['GenTreePath']),
                                 file_id+'.ged')
-        gedcom_fd = open(filename)
+        try:
+            gedcom_fd = open(filename)
+        except IOError:
+            logger.error('failed to open gedocm file tree number {}, path {}: {}'
+                         .format(row['GenTreeNumber'], filename, str(e)))
+            continue
+
         try:
             g = Gedcom(fd=gedcom_fd)
         except (SyntaxError, GedcomParseError) as e:
