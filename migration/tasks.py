@@ -1,9 +1,11 @@
 import os
 import json
+import elasticsearch
 import pymongo
 from celery import Celery
 from flask import current_app
 from bhs_api import create_app
+from bhs_api.utils import uuids_to_str
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 
@@ -34,6 +36,28 @@ def make_celery():
     celery.Task = ContextTask
     return celery
 celery = make_celery()
+
+
+def update_es(collection, doc):
+    index_name = current_app.data_db.name
+    _id = doc['_id']
+    del doc['_id']
+    try:
+        current_app.es.index(index=index_name,
+                             doc_type=collection,
+                             id=_id,
+                             body=doc)
+    except elasticsearch.exceptions.SerializationError:
+        # UUID fields are causing es to crash, turn them to strings
+        uuids_to_str(doc)
+        try:
+            current_app.es.index(index=index_name,
+                                 doc_type=collection,
+                                 id=_id,
+                                 body=doc)
+        except elasticsearch.exceptions.SerializationError as e:
+            current_app.logger.error("Elastic search index failed for {}:{} with {}"
+                                     .format(collection, _id, e))
 
 
 def reslugify(collection, document):
@@ -161,13 +185,15 @@ def update_doc(collection, document):
             reslugify(collection, document)
             collection.insert(document)
 
+        update_es(collection.name, document)
+
         try:
             slug = document['Slug']['En']
         except KeyError:
             slug = 'None'
+
         current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
             collection.name,
             doc_id_field,
             doc_id,
             slug))
-

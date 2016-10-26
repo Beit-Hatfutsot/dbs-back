@@ -7,7 +7,8 @@ def test_update_doc(mock_db, app):
     with app.app_context():
         update_doc(collection, {
             'UnitId': '1',
-            'UnitText1.En': 'The Tester'
+            'UnitText1.En': 'The Tester',
+            '_id': 'some id',
         })
     doc =  collection.find_one({'UnitId':'1'})
     assert doc['UnitText1']['En'] == 'The Tester'
