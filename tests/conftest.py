@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+import elasticsearch
 import sys
 import os
 import json
 
 import pytest
+import mock
 from pytest_flask.plugin import client, config
 import mongomock
 
@@ -21,6 +23,7 @@ def get_auth_header(app, tester):
 
 @pytest.fixture(scope="session")
 def app():
+    mock.patch('elasticsearch.Elasticsearch')
     app, conf = create_app(testing=True)
     return app
 

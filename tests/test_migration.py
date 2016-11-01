@@ -1,8 +1,10 @@
 import boto
+import elasticsearch
 from migration.tasks import update_doc, update_tree
 from migration.files import upload_file
 
-def test_update_doc(mock_db, app):
+def test_update_doc(mocker, mock_db, app):
+    mocker.patch('elasticsearch.Elasticsearch.index')
     collection = mock_db['personalities']
     with app.app_context():
         update_doc(collection, {
@@ -12,6 +14,12 @@ def test_update_doc(mock_db, app):
         })
     doc =  collection.find_one({'UnitId':'1'})
     assert doc['UnitText1']['En'] == 'The Tester'
+    elasticsearch.Elasticsearch.index.assert_called_once_with(
+        body = {'UnitId': '1', 'UnitText1.En': 'The Tester', '_id': 'some id'},
+        doc_type = 'personalities',
+        id=None,
+        index = u'bhdata',
+       )
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')
