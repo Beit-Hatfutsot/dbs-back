@@ -22,7 +22,7 @@ def make_celery():
             app.config['REDIS_HOST'],
             app.config['REDIS_PORT'],
         )
-    app.logger.info('Broker at {}'.format(redis_broker))
+    app.logger.info('Broker at {}'.format(app.config['REDIS_PORT']))
     celery = Celery(app.import_name, broker=redis_broker)
     celery.conf.update(app.config)
     celery.data_db = app.data_db
