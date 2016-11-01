@@ -38,14 +38,12 @@ def make_celery():
 celery = make_celery()
 
 
-def update_es(collection, doc):
+def update_es(collection, doc, id):
     index_name = current_app.data_db.name
-    _id = doc['_id']
-    del doc['_id']
     try:
         current_app.es.index(index=index_name,
                              doc_type=collection,
-                             id=_id,
+                             id=id,
                              body=doc)
     except elasticsearch.exceptions.SerializationError:
         # UUID fields are causing es to crash, turn them to strings
@@ -53,7 +51,7 @@ def update_es(collection, doc):
         try:
             current_app.es.index(index=index_name,
                                  doc_type=collection,
-                                 id=_id,
+                                 id=id,
                                  body=doc)
         except elasticsearch.exceptions.SerializationError as e:
             current_app.logger.error("Elastic search index failed for {}:{} with {}"
@@ -133,9 +131,9 @@ def update_row(doc, collection_name):
 
 def update_collection(collection, query, doc):
     if MIGRATE_MODE  == 'i':
-        collection.insert(doc)
+        return collection.insert(doc)
     else:
-        collection.update_one(query,
+        return collection.update_one(query,
                         {'$set': doc},
                         upsert=True)
 
@@ -180,12 +178,19 @@ def update_doc(collection, document):
         # the 'migration_log' collection
         query = {doc_id_field: doc_id}
         try:
-            update_collection(collection, query, document)
+            result = update_collection(collection, query, document)
+            try:
+                id = result.upserted_id
+            except AttributeError:
+                result = collection.find_one(query)
+                id = result['_id']
+
         except pymongo.errors.DuplicateKeyError:
             reslugify(collection, document)
-            collection.insert(document)
+            result = collection.insert(document)
+            id = result.inserted_id
 
-        update_es(collection.name, document)
+        update_es(collection.name, document, id)
 
         try:
             slug = document['Slug']['En']
