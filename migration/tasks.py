@@ -55,7 +55,7 @@ def update_es(collection, doc, id):
                                  body=doc)
         except elasticsearch.exceptions.SerializationError as e:
             current_app.logger.error("Elastic search index failed for {}:{} with {}"
-                                     .format(collection, _id, e))
+                                     .format(collection, id, e))
 
 
 def reslugify(collection, document):
