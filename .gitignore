@@ -3,9 +3,5 @@ env
 *.pyc
 __pycache__
 bhs_api.log
-src
-mongo_river_config_files/places.json
-mongo_river_config_files/personalities.json
-mongo_river_config_files/movies.json
-mongo_river_config_files/photoUnits.json
-mongo_river_config_files/familyNames.json
+.rope_project/*
+dump/
