@@ -327,6 +327,9 @@ def binarize_image(image):
         image_buffer = StringIO()
         thumb.save(image_buffer, "JPEG")
         binary = Binary(image_buffer.getvalue(), BINARY_SUBTYPE)
+    except IOError as e:
+        logging.error("failed to binarize image: "+str(e))
+        return None
 
     # if image is a file object, rewind it
     finally:
