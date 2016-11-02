@@ -8,6 +8,7 @@ from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
+MIGRATE_ES = os.environ.get('MIGRATE_MODE', '1')
 
 def make_celery():
     app, conf = create_app()
@@ -39,6 +40,9 @@ celery = make_celery()
 
 
 def update_es(collection, doc, id):
+    if MIGRATE_ES != '1':
+        return
+
     index_name = current_app.data_db.name
     try:
         current_app.es.index(index=index_name,
