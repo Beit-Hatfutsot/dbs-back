@@ -9,6 +9,16 @@ from bhs_api.utils import uuids_to_str
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 MIGRATE_ES = os.environ.get('MIGRATE_MODE', '1')
+INDICES = {
+    'places' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
+    'familyNames' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
+    'lexicon' : ['UnitId'],
+    'photoUnits' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
+    'photos' : ['PictureId', 'PictureFileName', 'PicturePath'],
+    'persons' : ['name_lc.0', 'name_lc.1', 'sex', 'BIRT_PLAC_lc', 'MARR_PLAC_lc', 'tree_num', 'DEAT_PLAC_lc'],
+    'synonyms': ['s_group', 'str_lc'],
+    'personalities' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He']
+}
 
 def make_celery():
     app, conf = create_app()
@@ -38,6 +48,11 @@ def make_celery():
     return celery
 celery = make_celery()
 
+
+def ensure_indices(collection):
+    indices = INDICES.get(collection.name, set())
+    for index in indices:
+        collection.ensure_index(index)
 
 def update_es(collection, doc, id):
     if MIGRATE_ES != '1':
@@ -132,6 +147,7 @@ def update_row(doc, collection_name):
     collection = celery.data_db[collection_name]
     # from celery.contrib import rdb; rdb.set_trace()
     update_doc(collection, doc)
+    ensure_indices(collection)
 
 def update_collection(collection, query, doc):
     if MIGRATE_MODE  == 'i':
