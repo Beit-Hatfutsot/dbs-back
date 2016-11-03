@@ -127,9 +127,9 @@ def build_query(search_dict):
                     s = 'S'
                 else:
                     s = '_lc'
-                search_query['$or'] = [{'BP' + s: v},
-                                       {'MP' + s: v},
-                                       {'DP' + s: v}]
+                search_query['$or'] = [{'BIRT_PLAC' + s: v},
+                                       {'MARR_PLAC' + s: v},
+                                       {'DEAT_PLAC' + s: v}]
 
             else:
                 search_query[k] = v
