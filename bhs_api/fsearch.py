@@ -49,8 +49,6 @@ def build_query(search_dict):
         elif k == 'sex':
             if search_dict[k].lower() in ['m', 'f']:
                 sex = v.upper()
-            else:
-                abort(400, "Sex must be one of 'm', 'f'")
         elif k == 'individual_id':
             individual_id = v
 
@@ -117,7 +115,7 @@ def build_query(search_dict):
         search_query[end] = {'$lte': years[item]['max']}
 
     if sex:
-        search_query['G'] = sex
+        search_query['sex'] = sex
     
     for param, item in names_and_places.items():
         for k, v in item.items():
@@ -136,10 +134,10 @@ def build_query(search_dict):
 
     if 'tree_number' in search_dict:
         try:
-            search_query['GTN'] = int(search_dict['tree_number'])
+            search_query['tree_num'] = int(search_dict['tree_number'])
             # WARNING: Discarding all the other search qeuries if looking for GTN and II
             if individual_id:
-                search_query['II'] = individual_id
+                search_query['id'] = individual_id
         except ValueError:
             abort(400, 'Tree number must be an integer')
 
