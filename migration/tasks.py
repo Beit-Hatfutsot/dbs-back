@@ -8,7 +8,7 @@ from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
-MIGRATE_ES = os.environ.get('MIGRATE_MODE', '1')
+MIGRATE_ES = os.environ.get('MIGRATE_ES', '1')
 INDICES = {
     'places' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
     'familyNames' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
@@ -33,7 +33,8 @@ def make_celery():
             app.config['REDIS_HOST'],
             app.config['REDIS_PORT'],
         )
-    app.logger.info('Broker at {}'.format(app.config['REDIS_HOST']))
+        app.logger.info('MIGRATE_MODE: {}, MIGRATE_ES: {}, Broker at {}'
+                        .format(MIGRATE_MODE, MIGRATE_ES,app.config['REDIS_HOST']))
     celery = Celery(app.import_name, broker=redis_broker)
     celery.conf.update(app.config)
     celery.data_db = app.data_db
