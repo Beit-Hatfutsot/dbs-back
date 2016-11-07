@@ -481,4 +481,5 @@ if __name__ == '__main__':
         since_file.seek(0)
         since_file.write(str(until))
         since_file.close()
+    logger.info("closing sql connection...")
     sqlClient.close_connections()
