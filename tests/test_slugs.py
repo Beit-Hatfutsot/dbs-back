@@ -33,27 +33,12 @@ def test_single_collection(client, mock_db):
     res = fetch_items(['hello'], mock_db)
     assert res[0]['error_code'] == 404
 
-def test_person_collection(client):
+def test_person_collection(client, mock_db):
 
-    items = [{'GTN': 1,
-              'II': 'I2',
-              'StatusDesc': 'Completed',
-              'RightsDesc': 'Full',
-              'DisplayStatusDesc':  'free',
-              'Name': {'En': 'tester',
-                            'He': 'בודק',
-                      },
-              'tree': 'filler',
-             }]
-    db = mongomock.MongoClient().db
-    persons = db.create_collection('genTreeIndividuals')
-    for item in items:
-        item['_id'] = persons.insert(item)
+    res = fetch_items(['person_1;0.I2'], mock_db)
+    assert res[0]['name_lc'][0] == 'tester'
 
-    res = fetch_items(['person_1.I2'], db)
-    assert res[0]['Name']['En'] == 'tester'
-
-    res = fetch_items(['person_1'], db)
+    res = fetch_items(['person_1'], mock_db)
     assert res[0]['error_code'] == 404
 
 def test_multi_collections(client):

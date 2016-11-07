@@ -48,31 +48,48 @@ def tester_headers(client, get_auth_header):
 
 @pytest.fixture
 def mock_db():
-    items = [{'UnitId': '1',
-              'Slug': {'En': 'personality_tester',
-                       'He': u'אישיות_בודק',
-                      },
-              'StatusDesc': 'Completed',
-              'RightsDesc': 'Full',
-              'DisplayStatusDesc':  'free',
-              'UnitText1': {'En': 'tester',
-                            'He': 'בודק',
-                            }
-             },
-             {'UnitId': '2',
-              'Slug': {'En': 'personality_another-tester',
-                       'He': u'אישיות_עוד-בודק',
-                      },
-              'StatusDesc': 'Edit',
-              'RightsDesc': 'Full',
-              'DisplayStatusDesc':  'free',
-              'UnitText1': {'En': 'another tester',
-                            'He': 'עוד בודק',
-                            }
-             }]
     db = mongomock.MongoClient().db
-    persons = db.create_collection('personalities')
-    for item in items:
-        item['_id'] = persons.insert(item)
+    # add some personalities
+    personalities = db.create_collection('personalities')
+    for i in [{'UnitId': '1',
+            'Slug': {'En': 'personality_tester',
+                    'He': u'אישיות_בודק',
+                    },
+            'StatusDesc': 'Completed',
+            'RightsDesc': 'Full',
+            'DisplayStatusDesc':  'free',
+            'UnitText1': {'En': 'tester',
+                        'He': 'בודק',
+                        }
+            },
+            {'UnitId': '2',
+            'Slug': {'En': 'personality_another-tester',
+                    'He': u'אישיות_עוד-בודק',
+                    },
+            'StatusDesc': 'Edit',
+            'RightsDesc': 'Full',
+            'DisplayStatusDesc':  'free',
+            'UnitText1': {'En': 'another tester',
+                        'He': 'עוד בודק',
+                        }
+            },
+            ]:
+        personalities.insert(i)
+    persons = db.create_collection('persons')
+    for i in  [{
+            'name_lc': ['tester', 'de-tester'],
+            'tree_num': 1,
+            'tree_version': 0,
+            'id': 'I2',
+            'Slug': {'En': 'person_1;0.I2'},
+        }, {
+            'name_lc': ['albert', 'einstein'],
+            'tree_num': 2,
+            'tree_version': 0,
+            'id': 'I3',
+            'Slug': {'En': 'person_1;0.I2'},
+        },
+        ]:
+        persons.insert(i)
     return db
 
