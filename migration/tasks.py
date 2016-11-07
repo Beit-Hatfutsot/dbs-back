@@ -54,6 +54,16 @@ def ensure_indices(collection):
     indices = INDICES.get(collection.name, set())
     for index in indices:
         collection.ensure_index(index)
+    # add unique inxexes
+    if collection.name == 'persons':
+        collection.create_index([("tree_num", pymongo.ASCENDING),
+                ("tree_version", pymongo.ASCENDING),
+                ("id", pymongo.ASCENDING),
+            ],
+            unique=True, sparse=True)
+    else:
+        collection.create_index("Slug.He", unique=True, sparse=True)
+        collection.create_index("Slug.En", unique=True, sparse=True)
 
 def update_es(collection, doc, id):
     if MIGRATE_ES != '1':
@@ -208,8 +218,7 @@ def update_doc(collection, document):
 
         except pymongo.errors.DuplicateKeyError:
             reslugify(collection, document)
-            result = collection.insert(document)
-            id = result.inserted_id
+            id = collection.insert(document)
 
         update_es(collection.name, document, id)
 
