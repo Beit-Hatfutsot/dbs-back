@@ -16,11 +16,12 @@ from slugify import Slugify
 
 from gedcom import Gedcom, GedcomParseError
 from migration.migration_sqlclient import MigrationSQLClient
-from migration.tasks import update_row, get_collection_id_field
+from migration.tasks import update_row
 from migration.files import upload_photo
 from migration.family_trees import Gedcom2Persons
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
 from bhs_api import phonetic
+from bhs_api.item import get_collection_id_field
 
 slugify = Slugify(translate=None, safe_chars='_')
 

@@ -6,6 +6,7 @@ from celery import Celery
 from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
+from bhs_api.item import get_collection_id_field
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 MIGRATE_ES = os.environ.get('MIGRATE_ES', '1')
@@ -94,21 +95,6 @@ def reslugify(collection, document):
         if val:
             doc_id = get_collection_id_field(collection.name)
             document['Slug'][lang] += '-' + str(document[doc_id])
-
-
-def get_collection_id_field(collection_name):
-    doc_id = 'UnitId'
-    if collection_name == 'photos':
-        doc_id = 'PictureId'
-    elif collection_name == 'genTreeIndividuals':
-        doc_id = 'ID'
-    elif collection_name == 'persons':
-        doc_id = 'id'
-    elif collection_name == 'synonyms':
-        doc_id = '_id'
-    elif collection_name == 'trees':
-        doc_id = 'num'
-    return doc_id
 
 
 @celery.task

@@ -299,3 +299,18 @@ def get_image_url(image_id):
     else:
         current_app.logger.debug('photo with UUID {} was not found'.format(image_id))
         return None
+
+
+def get_collection_id_field(collection_name):
+    doc_id = 'UnitId'
+    if collection_name == 'photos':
+        doc_id = 'PictureId'
+    elif collection_name == 'genTreeIndividuals':
+        doc_id = 'ID'
+    elif collection_name == 'persons':
+        doc_id = 'id'
+    elif collection_name == 'synonyms':
+        doc_id = '_id'
+    elif collection_name == 'trees':
+        doc_id = 'num'
+    return doc_id
