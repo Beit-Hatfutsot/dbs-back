@@ -147,23 +147,25 @@ def enrich_item(item, db=None):
     if not db:
         db = current_app.data_db
     ''' and the media urls to the item '''
-    if 'Pictures' in item:
+    pictures = item.get('Pictures', None)
+    if pictures:
         main_image_id = None
-        for image in item['Pictures']:
+        for image in pictures:
             is_preview = image.get('IsPreview', False)
             if is_preview == '1':
                 main_image_id = image['PictureId']
 
         if not main_image_id:
-            for image in item['Pictures']:
+            for image in pictures:
                 picture_id = image.get('PictureId', None)
                 if picture_id:
                     main_image_id = picture_id
 
-        item['main_image_url'] = get_image_url(main_image_id,
-                                            current_app.conf.image_bucket)
-        item['thumbnail_url'] = get_image_url(main_image_id,
-                                        current_app.conf.thumbnail_bucket)
+        if main_image_id:
+            item['main_image_url'] = get_image_url(main_image_id,
+                                                current_app.conf.image_bucket)
+            item['thumbnail_url'] = get_image_url(main_image_id,
+                                            current_app.conf.thumbnail_bucket)
     video_id_key = 'MovieFileId'
     if video_id_key in item:
         # Try to fetch the video URL
