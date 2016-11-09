@@ -57,7 +57,7 @@ def parse_args():
     parser.add_argument('--host', default='localhost')
     parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
-    parser.add_argument('-u', '--until', default=calendar.timegm(time.gmtime()))
+    parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
     parser.add_argument('-t', '--treenum', type=int)
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
