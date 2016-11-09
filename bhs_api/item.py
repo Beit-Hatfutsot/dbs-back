@@ -176,11 +176,12 @@ def enrich_item(item, db):
     return item
 
 
-def get_item_by_id(id, collection, db=None):
+def get_item_by_id(id, collection_name, db=None):
     if not db:
         db = current_app.data_db
-    query = {"_id": id}
-    return _filter_doc(query, collection, db)
+    id_field = get_collection_id_field(collection_name)
+    query = {id_field: id}
+    return _filter_doc(query, collection_name, db)
 
 def get_item_query(slug):
     if isinstance(slug, basestring):
