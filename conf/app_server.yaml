@@ -24,7 +24,8 @@ email_password: 19782013
 email_from: info@bh.org.il
 
 # Bucket urls
-image_bucket_url: https://storage.googleapis.com/bhs-flat-pics
+image_bucket: bhs-flat-pics
+thumbnail_bucket: bhs-thumbnails
 ftree_bucket_url: https://storage.googleapis.com/bhs-familytrees
 video_bucket_url: https://storage.googleapis.com/bhs-videos
 # elastic search
