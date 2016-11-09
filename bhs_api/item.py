@@ -144,14 +144,22 @@ def fetch_item(slug, db=None):
         return item
 
 def enrich_item(item, db):
-    if not 'thumbnail' in item.keys():
-        item['thumbnail'] = _get_thumbnail(item)
-    if not 'main_image_url' in item.keys():
-        try:
-            main_image_id = [image['PictureId'] for image in item['Pictures'] if image['IsPreview'] == '1'][0]
-            item['main_image_url'] = get_image_url(main_image_id)
-        except (KeyError, IndexError):
-            item['main_image_url'] = None
+    ''' and the media urls to the item '''
+    if 'Pictures' in item:
+        main_image_id = None
+        for image in item['Pictures']:
+            if image['IsPreview'] == '1':
+                main_image_id = image['PictureId']
+
+        if not main_image_id:
+            for image in item['Pictures']:
+                if image['PictureId']:
+                    main_image_id = image['PictureId']
+
+        item['main_image_url'] = get_image_url(main_image_id,
+                                            current_app.conf.image_bucket)
+        item['thumbnail_url'] = get_image_url(main_image_id,
+                                        current_app.conf.thumbnail_bucket)
     video_id_key = 'MovieFileId'
     if video_id_key in item:
         # Try to fetch the video URL
@@ -282,23 +290,8 @@ def search_by_header(string, collection, starts_with=True, db=None):
     else:
         return {}
 
-def get_image_url(image_id):
-    image_bucket_url = current_app.config['IMAGE_BUCKET_URL']
-    collection = current_app.data_db['photos']
-
-    photo = collection.find_one({'PictureId': image_id})
-    if photo:
-        photo_path = photo['PicturePath']
-        photo_fn = photo['PictureFileName']
-        if not (photo_path and photo_fn):
-            current_app.logger.debug('Bad picture path or filename - {}'.format(image_id))
-            return None
-        extension = photo_path.split('.')[-1].lower()
-        url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
-        return url
-    else:
-        current_app.logger.debug('photo with UUID {} was not found'.format(image_id))
-        return None
+def get_image_url(image_id, bucket):
+    return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
 
 
 def get_collection_id_field(collection_name):
