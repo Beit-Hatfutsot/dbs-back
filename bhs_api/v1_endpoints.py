@@ -24,7 +24,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          SHOW_FILTER)
+                          enrich_item, SHOW_FILTER)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -417,6 +417,8 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
+        for item in rv['hits']['hits']:
+            enrich_item(item['_source'])
         if not rv:
             abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)

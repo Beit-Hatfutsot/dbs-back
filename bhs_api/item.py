@@ -143,18 +143,22 @@ def fetch_item(slug, db=None):
         return _make_serializable(item)
         return item
 
-def enrich_item(item, db):
+def enrich_item(item, db=None):
+    if not db:
+        db = current_app.data_db
     ''' and the media urls to the item '''
     if 'Pictures' in item:
         main_image_id = None
         for image in item['Pictures']:
-            if image['IsPreview'] == '1':
+            is_preview = image.get('IsPreview', False)
+            if is_preview == '1':
                 main_image_id = image['PictureId']
 
         if not main_image_id:
             for image in item['Pictures']:
-                if image['PictureId']:
-                    main_image_id = image['PictureId']
+                picture_id = image.get('PictureId', None)
+                if picture_id:
+                    main_image_id = picture_id
 
         item['main_image_url'] = get_image_url(main_image_id,
                                             current_app.conf.image_bucket)
