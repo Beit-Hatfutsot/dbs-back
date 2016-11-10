@@ -76,20 +76,12 @@ def mock_db():
             ]:
         personalities.insert(i)
     persons = db.create_collection('persons')
-    for i in  [{
+    persons.insert([{
             'name_lc': ['tester', 'de-tester'],
             'tree_num': 1,
             'tree_version': 0,
             'id': 'I2',
             'Slug': {'En': 'person_1;0.I2'},
-        }, {
-            'name_lc': ['albert', 'einstein'],
-            'tree_num': 2,
-            'tree_version': 0,
-            'id': 'I3',
-            'Slug': {'En': 'person_1;0.I2'},
-        },
-        ]:
-        persons.insert(i)
+        }])
     return db
 

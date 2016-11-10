@@ -1,3 +1,4 @@
+import logging
 import re
 
 from flask import abort, current_app
@@ -103,7 +104,7 @@ def build_query(search_dict):
                    'death_year': ['DSD', 'DED']}
 
     # Build gentree search query from all the subqueries
-    search_query = {}
+    search_query = {'archived': {'$exists': False}}
 
     for item in years:
         if item == 'marriage_year':
@@ -144,7 +145,7 @@ def build_query(search_dict):
     return search_query
 
 
-def fsearch(max_results=15, **kwargs):
+def fsearch(max_results=15, db=None, **kwargs):
     '''
     Search in the genTreeIindividuals table.
     Names and places could be matched exactly, by the prefix match
@@ -156,6 +157,10 @@ def fsearch(max_results=15, **kwargs):
     If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `MAX_RESULTS` starting with the `start` argument
     '''
+    if db:
+        collection = db['persons']
+    else:
+        collection = current_app.data_db['persons']
     search_dict = {}
     for key, value in kwargs.items():
         search_dict[key] = value[0]
@@ -163,9 +168,7 @@ def fsearch(max_results=15, **kwargs):
             abort(400, "{} argument couldn't be empty".format(key))
 
 
-    collection = current_app.data_db['persons']
     search_query = build_query(search_dict)
-    current_app.logger.debug('FSearch query:\n{}'.format(search_query))
 
     results = collection.find(search_query, PROJECTION)
     total = results.count()
@@ -173,7 +176,7 @@ def fsearch(max_results=15, **kwargs):
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
     results = results.limit(MAX_RESULTS)
-    current_app.logger.debug('FSearch query:\n{} returning {} results'.format(
+    logging.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
     return total, map(clean_person, results)
 
