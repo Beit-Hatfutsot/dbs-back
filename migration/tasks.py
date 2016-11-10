@@ -98,19 +98,24 @@ def reslugify(collection, document):
 
 
 @celery.task
-def update_tree(data, collection=None):
-    # from celery.contrib import rdb; rdb.set_trace()
-    if not collection:
-        collection = celery.data_db['trees']
+def update_tree(data, db=None):
+    '''  acelery task to update or create a tree '''
+    if not db:
+        trees = celery.data_db['trees']
+        persons = celery.data_db['trees']
+    else:
+        trees = db['trees']
+        persons = db['persons']
+
     num = data['num']
-    tree = collection.find_one({'num': num})
+    tree = trees.find_one({'num': num})
     doc = data.copy()
     file_id = doc.pop('file_id')
     date = doc.pop('date')
-    persons = doc.pop('persons')
+    persons_count = doc.pop('persons')
     current_ver = {'file_id':file_id,
                    'update_date': date,
-                   'persons': persons}
+                   'persons': persons_count}
     if tree:
         # don't add the same version twice
         for i in tree['versions']:
@@ -118,13 +123,18 @@ def update_tree(data, collection=None):
                 return
         doc['versions'] = tree['versions']
         doc['versions'].append(current_ver)
-        collection.update_one({'num': num},
+        trees.update_one({'num': num},
                               {'$set': doc},
                               upsert=True)
+        persons.update_many(
+            {'tree_num': num,
+             'tree_version': {'$lt': len(tree['versions'])}},
+            {'$set': {'archived': True}}
+        )
 
     else:
         doc['versions'] = [current_ver]
-        collection.insert_one(doc)
+        trees.insert_one(doc)
     current_app.redis.set('tree_vers_'+str(num),
                           json.dumps(doc['versions']),
                           300)
