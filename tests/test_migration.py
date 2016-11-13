@@ -36,6 +36,7 @@ def test_update_doc(mocker, app):
         index = 'db',
        )
     assert doc['related'] == ['place_some']
+    collection.remove({'UnitId':'1000'})
 
 def test_updated_doc(mocker, app):
     mocker.patch('elasticsearch.Elasticsearch.index')
@@ -47,6 +48,7 @@ def test_updated_doc(mocker, app):
         update_doc(collection, updated_tester)
 
     assert collection.count({'UnitId':'1000'}) == 1
+    collection.remove({'UnitId':'1000'})
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')
