@@ -29,14 +29,14 @@ def test_update_doc(mocker, app):
         r=update_doc(collection, the_tester)
     doc =  collection.find_one({'UnitId':'1000'})
     assert doc['UnitText1']['En'] == 'The Tester'
+    assert doc['_id'] == '1000'
     elasticsearch.Elasticsearch.index.assert_called_once_with(
         body = the_tester,
         doc_type = 'personalities',
-        id=doc["_id"],
+        id=doc['_id'],
         index = 'db',
        )
     assert doc['related'] == ['place_some']
-    collection.remove({'UnitId':'1000'})
 
 def test_updated_doc(mocker, app):
     mocker.patch('elasticsearch.Elasticsearch.index')
@@ -48,7 +48,6 @@ def test_updated_doc(mocker, app):
         update_doc(collection, updated_tester)
 
     assert collection.count({'UnitId':'1000'}) == 1
-    collection.remove({'UnitId':'1000'})
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')

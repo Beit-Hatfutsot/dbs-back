@@ -201,7 +201,13 @@ def update_doc(collection, document):
     else:
         # post parsing: add _id and Slug
         doc_id_field = get_collection_id_field(collection.name)
-        doc_id = getattr(document, doc_id_field, False)
+        try:
+            doc_id = document[doc_id_field]
+        except KeyError:
+            current_app.logger.error('update failed because of id {} {}'
+                                     .format(collection.name,
+                                             doc_id_field,
+                                             ))
         if doc_id:
             document['_id'] = doc_id
 
@@ -215,10 +221,6 @@ def update_doc(collection, document):
             return
         document['related'] = get_bhp_related(document, max_items=6, bhp_only=True)
 
-        # Set up collection specific document ids
-        # Search updated collections for collection specific index field
-        # and update it.  Save the _id of updated/inserted doc to
-        # the 'migration_log' collection
         query = {doc_id_field: doc_id}
         try:
             result = update_collection(collection, query, document)
@@ -226,13 +228,12 @@ def update_doc(collection, document):
                 id = result.upserted_id
             except AttributeError:
                 result = collection.find_one(query)
-                id = result['_id']
 
         except pymongo.errors.DuplicateKeyError:
             reslugify(collection, document)
-            id = collection.insert(document)
+            collection.insert(document)
 
-        update_es(collection.name, document, id)
+        update_es(collection.name, document, doc_id)
 
         try:
             slug = document['Slug']['En']

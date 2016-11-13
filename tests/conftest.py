@@ -22,7 +22,7 @@ def get_auth_header(app, tester):
 
 
 # TODO: refactor tests the use both app & mock_db and remove the other guy
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def app(mock_db):
     mock.patch('elasticsearch.Elasticsearch')
     app, conf = create_app(testing=True)
@@ -31,7 +31,7 @@ def app(mock_db):
     return app
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def tester(app):
     user = app.user_datastore.get_user("tester@example.com")
     if user:
@@ -42,14 +42,14 @@ def tester(app):
     return user
 
 
-@pytest.fixture
-def tester_headers(client, get_auth_header):
+@pytest.fixture(scope="function")
+def tester_headers(get_auth_header):
     headers = {'Content-Type': 'application/json'}
     headers.update(get_auth_header)
     return headers
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def mock_db():
     ''' UnitId 1 & 2 are the tester personalities and 3 is `place_some` '''
     db = mongomock.MongoClient().db
