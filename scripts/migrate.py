@@ -12,7 +12,6 @@ import time
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
 from bson.code import Code
-from slugify import Slugify
 
 from gedcom import Gedcom, GedcomParseError
 from migration.migration_sqlclient import MigrationSQLClient
@@ -22,8 +21,6 @@ from migration.family_trees import Gedcom2Persons
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
 from bhs_api import phonetic
 from bhs_api.item import get_collection_id_field
-
-slugify = Slugify(translate=None, safe_chars='_')
 
 
 conf = get_conf(set(['queries_repo_path',
@@ -276,49 +273,6 @@ def parse_synonym(doc):
 
     return parsed
 
-def add_slug(document, collection_name):
-    collection_slug_map = {
-        'places': {'En': 'place',
-                   'He': u'מקום',
-                  },
-        'familyNames': {'En': 'familyname',
-                        'He': u'שםמשפחה',
-                       },
-        'lexicon': {'En': 'lexicon',
-                    'He': u'מלון',
-                   },
-        'photoUnits': {'En': 'image',
-                       'He': u'תמונה',
-                      },
-        'photos': {'En': 'image',
-                   'He': u'תמונה',
-                  },
-        'genTreeIndividuals': {'En': 'person',
-                               'He': u'אדם',
-                              },
-        'synonyms': {'En': 'synonym',
-                     'He': u'שם נרדף',
-                    },
-        'personalities': {'En': 'luminary',
-                          'He': u'אישיות',
-                          },
-        'movies': {'En': 'video',
-                   'He': u'וידאו',
-                  },
-    }
-    try:
-        headers = document['Header'].items()
-    except KeyError:
-        return
-
-    document['Slug'] = {}
-    for lang, val in headers:
-        if val:
-            collection_slug = collection_slug_map[collection_name][lang]
-            slug = slugify('_'.join([collection_slug, val.lower()]))
-            document['Slug'][lang] = slug.encode('utf8')
-
-
 def parse_doc(doc, collection_name):
     collection_procedure_map = {
         'places':               parse_common,
@@ -331,14 +285,7 @@ def parse_doc(doc, collection_name):
         'personalities':        parse_common,
         'movies':               parse_common,
     }
-    document = collection_procedure_map[collection_name](doc)
-    if document:
-        # post parsing: add _id and Slug
-        if getattr(document, 'UnitId', False):
-            document['_id'] = document['UnitId']
-        if not hasattr(document, 'Slug'):
-            add_slug(document, collection_name)
-    return document
+    return collection_procedure_map[collection_name](doc)
 
 
 def get_touched_units(collection_name,  since, until):

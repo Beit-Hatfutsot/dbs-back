@@ -6,7 +6,7 @@ from celery import Celery
 from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
-from bhs_api.item import get_collection_id_field
+from bhs_api.item import get_collection_id_field, create_slug
 from scripts.batch_related import get_bhp_related
 
 
@@ -199,10 +199,22 @@ def update_doc(collection, document):
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
+        # post parsing: add _id and Slug
+        doc_id_field = get_collection_id_field(collection.name)
+        doc_id = getattr(document, doc_id_field, False)
+        if doc_id:
+            document['_id'] = doc_id
+
+        document['Slug'] = create_slug(document, collection.name)
+
+        if not document['Slug']:
+            current_app.logger.error('update failed because of slug {} {} {}'
+                                     .format(collection.name,
+                                             doc_id_field,
+                                             doc_id))
+            return
         document['related'] = get_bhp_related(document, max_items=6, bhp_only=True)
 
-        doc_id_field = get_collection_id_field(collection.name)
-        doc_id = document[doc_id_field]
         # Set up collection specific document ids
         # Search updated collections for collection specific index field
         # and update it.  Save the _id of updated/inserted doc to

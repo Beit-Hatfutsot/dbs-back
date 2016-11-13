@@ -5,6 +5,7 @@ import urllib
 import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 from flask import current_app
+from slugify import Slugify
 
 from bhs_api import phonetic
 
@@ -314,3 +315,49 @@ def get_collection_id_field(collection_name):
     elif collection_name == 'trees':
         doc_id = 'num'
     return doc_id
+
+def create_slug(document, collection_name):
+    collection_slug_map = {
+        'places': {'En': 'place',
+                   'He': u'מקום',
+                  },
+        'familyNames': {'En': 'familyname',
+                        'He': u'שםמשפחה',
+                       },
+        'lexicon': {'En': 'lexicon',
+                    'He': u'מלון',
+                   },
+        'photoUnits': {'En': 'image',
+                       'He': u'תמונה',
+                      },
+        'photos': {'En': 'image',
+                   'He': u'תמונה',
+                  },
+        'genTreeIndividuals': {'En': 'person',
+                               'He': u'אדם',
+                              },
+        'synonyms': {'En': 'synonym',
+                     'He': u'שם נרדף',
+                    },
+        'personalities': {'En': 'luminary',
+                          'He': u'אישיות',
+                          },
+        'movies': {'En': 'video',
+                   'He': u'וידאו',
+                  },
+    }
+    try:
+        headers = document['Header'].items()
+    except KeyError:
+        return
+
+    ret = {}
+    slugify = Slugify(translate=None, safe_chars='_')
+    for lang, val in headers:
+        if val:
+            collection_slug = collection_slug_map[collection_name][lang]
+            slug = slugify('_'.join([collection_slug, val.lower()]))
+            ret[lang] = slug.encode('utf8')
+    return ret
+
+

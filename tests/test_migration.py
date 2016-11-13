@@ -14,8 +14,8 @@ second_tree = dict(num=100,
 
 the_tester = {
     'UnitId': '1000',
-    'UnitText1.En': 'The Tester',
-    'Slug': {'En': 'luminary_the-tester'},
+    'UnitText1': {'En': 'The Tester'},
+    'Header': {'En': 'Nik Nikos'},
     'UnitPlaces': [{'PlaceIds': 3}],
             'StatusDesc': 'Completed',
             'RightsDesc': 'Full',
@@ -36,6 +36,17 @@ def test_update_doc(mocker, app):
         index = 'db',
        )
     assert doc['related'] == ['place_some']
+
+def test_updated_doc(mocker, app):
+    mocker.patch('elasticsearch.Elasticsearch.index')
+    collection = app.data_db['personalities']
+    with app.app_context():
+        update_doc(collection, the_tester)
+        updated_tester = the_tester.copy()
+        updated_tester['UnitText1']['En'] = 'The Great Tester'
+        update_doc(collection, updated_tester)
+
+    assert collection.count({'UnitId':'1000'}) == 1
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')
