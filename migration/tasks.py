@@ -12,6 +12,7 @@ from scripts.batch_related import get_bhp_related
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 MIGRATE_ES = os.environ.get('MIGRATE_ES', '1')
+MIGRATE_RELATED = os.environ.get('MIGRATE_RELATED', True)
 INDICES = {
     'places' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
     'familyNames' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
@@ -219,7 +220,11 @@ def update_doc(collection, document):
                                              doc_id_field,
                                              doc_id))
             return
-        document['related'] = get_bhp_related(document, max_items=6, bhp_only=True)
+
+        if MIGRATE_RELATED != '0':
+            document['related'] = get_bhp_related(document,
+                                                  max_items=6,
+                                                  bhp_only=True)
 
         query = {doc_id_field: doc_id}
         try:
