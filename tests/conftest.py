@@ -79,6 +79,14 @@ def mock_db():
             },
             ]:
         personalities.insert(i)
+    trees = db.create_collection('trees')
+    trees.insert({
+        'num': 1,
+        'versions': [{'file_id': 'initial',
+                      'persons': 1,
+                       'update_date': 'now',
+                      }]
+    })
     persons = db.create_collection('persons')
     persons.insert({
             'name_lc': ['tester', 'de-tester'],
