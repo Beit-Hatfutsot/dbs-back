@@ -7,6 +7,8 @@ from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
 from bhs_api.item import get_collection_id_field
+from scripts.batch_related import get_bhp_related
+
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 MIGRATE_ES = os.environ.get('MIGRATE_ES', '1')
@@ -197,6 +199,8 @@ def update_doc(collection, document):
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
+        document['related'] = get_bhp_related(document, max_items=6, bhp_only=True)
+
         doc_id_field = get_collection_id_field(collection.name)
         doc_id = document[doc_id_field]
         # Set up collection specific document ids

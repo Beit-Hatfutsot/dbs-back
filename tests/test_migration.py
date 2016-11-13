@@ -12,24 +12,30 @@ second_tree = dict(num=1,
                     persons=16,
                     date='right now')
 
+the_tester = {
+    'UnitId': '1000',
+    'UnitText1.En': 'The Tester',
+    'Slug': {'En': 'luminary_the-tester'},
+    'UnitPlaces': [{'PlaceIds': 3}],
+            'StatusDesc': 'Completed',
+            'RightsDesc': 'Full',
+            'DisplayStatusDesc':  'free',
+}
 
-def test_update_doc(mocker, mock_db, app):
+def test_update_doc(mocker, app):
     mocker.patch('elasticsearch.Elasticsearch.index')
-    collection = mock_db['personalities']
+    collection = app.data_db['personalities']
     with app.app_context():
-        update_doc(collection, {
-            'UnitId': '1',
-            'UnitText1.En': 'The Tester',
-            '_id': 'some id',
-        })
-    doc =  collection.find_one({'UnitId':'1'})
+        r=update_doc(collection, the_tester)
+    doc =  collection.find_one({'UnitId':'1000'})
     assert doc['UnitText1']['En'] == 'The Tester'
     elasticsearch.Elasticsearch.index.assert_called_once_with(
-        body = {'UnitId': '1', 'UnitText1.En': 'The Tester', '_id': 'some id'},
+        body = the_tester,
         doc_type = 'personalities',
-        id=None,
-        index = u'bhdata',
+        id=doc["_id"],
+        index = 'db',
        )
+    assert doc['related'] == ['place_some']
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')

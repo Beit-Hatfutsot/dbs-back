@@ -21,10 +21,13 @@ def get_auth_header(app, tester):
 
 
 
+# TODO: refactor tests the use both app & mock_db and remove the other guy
 @pytest.fixture(scope="session")
-def app():
+def app(mock_db):
     mock.patch('elasticsearch.Elasticsearch')
     app, conf = create_app(testing=True)
+    # there should one and only one data db
+    app.data_db = mock_db
     return app
 
 
@@ -46,12 +49,13 @@ def tester_headers(client, get_auth_header):
     return headers
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def mock_db():
+    ''' UnitId 1 & 2 are the tester personalities and 3 is `place_some` '''
     db = mongomock.MongoClient().db
     # add some personalities
     personalities = db.create_collection('personalities')
-    for i in [{'UnitId': '1',
+    for i in [{'UnitId': 1,
             'Slug': {'En': 'personality_tester',
                     'He': u'אישיות_בודק',
                     },
@@ -62,7 +66,7 @@ def mock_db():
                         'He': 'בודק',
                         }
             },
-            {'UnitId': '2',
+            {'UnitId': 2,
             'Slug': {'En': 'personality_another-tester',
                     'He': u'אישיות_עוד-בודק',
                     },
@@ -76,12 +80,22 @@ def mock_db():
             ]:
         personalities.insert(i)
     persons = db.create_collection('persons')
-    persons.insert([{
+    persons.insert({
             'name_lc': ['tester', 'de-tester'],
             'tree_num': 1,
             'tree_version': 0,
             'id': 'I2',
+            'StatusDesc': 'Completed',
+            'RightsDesc': 'Full',
+            'DisplayStatusDesc':  'free',
             'Slug': {'En': 'person_1;0.I2'},
-        }])
+        })
+    places = db.create_collection('places')
+    places.insert({'Slug': {'En': 'place_some'},
+                   'UnitId': 3,
+            'StatusDesc': 'Completed',
+            'RightsDesc': 'Full',
+            'DisplayStatusDesc':  'free',
+            'UnitText1': {'En': 'just a place' }})
     return db
 
