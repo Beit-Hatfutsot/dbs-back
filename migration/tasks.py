@@ -129,9 +129,12 @@ def update_tree(data, db=None):
         trees.update_one({'num': num},
                               {'$set': doc},
                               upsert=True)
+        last_version = len(tree['versions'])
+        current_app.logger.info('archiving persons w/ versions<={} in tree {}'
+                                .format(last_version, doc['num']))
         persons.update_many(
             {'tree_num': num,
-             'tree_version': {'$lt': len(tree['versions'])}},
+             'tree_version': {'$lte': last_version}},
             {'$set': {'archived': True}}
         )
 
