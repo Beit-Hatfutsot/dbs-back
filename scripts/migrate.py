@@ -38,6 +38,8 @@ conf = get_conf(set(['queries_repo_path',
                     os.path.join('/etc/bhs/'
                              'migrate_config.yaml'))
 
+sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
+
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)-15s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
@@ -357,14 +359,14 @@ if __name__ == '__main__':
     if not args.since:
         if args.lasthours:
 
-            past = datetime.datetime.utcnow() -\
+            past = datetime.datetime.now() -\
                     datetime.timedelta(hours=int(args.lasthours))
             since = calendar.timegm(past.timetuple())
         else:
             try:
                 since_file = open('/var/run/bhs/last_update', 'r+')
                 since = since_file.read()
-                since = int(since)
+                since = int(since) + 1
             except IOError:
                 since_file = None
                 since = 0
@@ -372,7 +374,6 @@ if __name__ == '__main__':
         since = int(args.since)
 
 	# connect to BHP SQL Server
-    sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
 
     if args.treenum:
         collection = 'genTrees'
@@ -390,11 +391,12 @@ if __name__ == '__main__':
 
         if since:
             unit_cursor = get_touched_units(collection_name, since, until)
-            if not unit_cursor:
+            units = list(unit_cursor)
+
+            if not units:
                 logger.info('{}:Skipping'.format(collection_name))
                 continue
 
-            units = list(unit_cursor)
             unit_ids = [unit['UnitId'] for unit in units]
             sql_cursor = sqlClient.execute(query, select_ids=True,
                                         unit_ids=unit_ids)
@@ -411,6 +413,10 @@ if __name__ == '__main__':
 
                 except KeyError:
                     pass
+        else:
+            logger.warn('failed getting updated units {}:{}'
+                        .format(collection_name, ','.join(units)))
+
         # TODO:
         # rsync_media(collection_name)
 
