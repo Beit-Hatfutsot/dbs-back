@@ -379,6 +379,7 @@ if __name__ == '__main__':
     else:
         collection = args.collection
     queries = get_queries(collection)
+    logger.info('looking for changed items in {}-{}'.format(since, until))
     photos_to_update = []
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
