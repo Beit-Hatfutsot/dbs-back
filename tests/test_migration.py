@@ -13,7 +13,7 @@ second_tree = dict(num=100,
                     date='right now')
 
 the_tester = {
-    'UnitId': '1000',
+    'UnitId': 1000,
     'UnitText1': {'En': 'The Tester'},
     'Header': {'En': 'Nik Nikos'},
     'UnitPlaces': [{'PlaceIds': 3}],
@@ -27,11 +27,13 @@ def test_update_doc(mocker, app):
     collection = app.data_db['personalities']
     with app.app_context():
         r=update_doc(collection, the_tester)
-    doc =  collection.find_one({'UnitId':'1000'})
+    doc =  collection.find_one({'UnitId':1000})
     assert doc['UnitText1']['En'] == 'The Tester'
-    assert doc['_id'] == '1000'
+    assert doc['_id'] == 1000
+    body = the_tester.copy()
+    del body["_id"]
     elasticsearch.Elasticsearch.index.assert_called_once_with(
-        body = the_tester,
+        body = body,
         doc_type = 'personalities',
         id=doc['_id'],
         index = 'db',
@@ -47,7 +49,7 @@ def test_updated_doc(mocker, app):
         updated_tester['UnitText1']['En'] = 'The Great Tester'
         update_doc(collection, updated_tester)
 
-    assert collection.count({'UnitId':'1000'}) == 1
+    assert collection.count({'UnitId':1000}) == 1
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')

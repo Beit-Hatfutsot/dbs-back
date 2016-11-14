@@ -74,11 +74,13 @@ def update_es(collection, doc, id):
         return
 
     index_name = current_app.data_db.name
+    body = doc.copy()
+    del body['_id']
     try:
         current_app.es.index(index=index_name,
                              doc_type=collection,
                              id=id,
-                             body=doc)
+                             body=body)
     except elasticsearch.exceptions.SerializationError:
         # UUID fields are causing es to crash, turn them to strings
         uuids_to_str(doc)
