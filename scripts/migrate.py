@@ -318,14 +318,15 @@ def parse_n_update(row, collection_name):
     return doc
 
 
-def migrate_trees(cursor, since_timestamp, conf, treenum):
+def migrate_trees(cursor, since_timestamp, until_timestamp, treenum):
     since = datetime.datetime.fromtimestamp(since_timestamp)
+    until = datetime.datetime.fromtimestamp(until_timestamp)
     for row in sql_cursor:
         # special case for a specific tree
         if treenum:
             if row['GenTreeNumber'] != treenum:
                 continue
-        elif row['UpdateDate'] < since:
+        elif row['UpdateDate'] < since or row['UpdateDate'] > until:
             continue
         file_id = str(row['GenTreeFileId'])
         filename = os.path.join(conf.gentree_mount_point,
@@ -386,7 +387,7 @@ if __name__ == '__main__':
         if collection_name == 'genTrees':
             #TODO: `since` should be part of the sql query
             sql_cursor = sqlClient.execute(query)
-            migrate_trees(sql_cursor, since, conf, args.treenum)
+            migrate_trees(sql_cursor, since, until, args.treenum)
             continue
 
         if since:
