@@ -107,7 +107,7 @@ def update_tree(data, db=None):
     '''  acelery task to update or create a tree '''
     if not db:
         trees = celery.data_db['trees']
-        persons = celery.data_db['trees']
+        persons = celery.data_db['persons']
     else:
         trees = db['trees']
         persons = db['persons']
@@ -131,12 +131,12 @@ def update_tree(data, db=None):
         trees.update_one({'num': num},
                               {'$set': doc},
                               upsert=True)
-        last_version = len(tree['versions'])
-        current_app.logger.info('archiving persons w/ versions<={} in tree {}'
+        last_version = len(tree['versions'])-1
+        current_app.logger.info('archiving persons w/ versions<{} in tree {}'
                                 .format(last_version, doc['num']))
         persons.update_many(
             {'tree_num': num,
-             'tree_version': {'$lte': last_version}},
+             'tree_version': {'$lt': last_version}},
             {'$set': {'archived': True}}
         )
 
