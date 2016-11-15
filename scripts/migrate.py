@@ -408,12 +408,11 @@ if __name__ == '__main__':
             for row in sql_cursor:
                 doc = parse_n_update(row, collection_name)
                 # collect all the photos
-                try:
-                    photos_to_update.extend(
-                        [photo['PictureId'] for photo in doc['Pictures']])
-
-                except KeyError:
-                    pass
+                pictures = doc.get('Pictures', None)
+                if pictures:
+                    for pic in pictures:
+                        if 'PictureId' in pic:
+                            photos_to_update.append(pic['PictureId'])
         else:
             logger.warn('failed getting updated units {}:{}'
                         .format(collection_name, ','.join(units)))
@@ -422,7 +421,6 @@ if __name__ == '__main__':
         # rsync_media(collection_name)
 
     # update photos
-    # TODO: what the fuck?
     if len(photos_to_update) > 0:
         photos_query = get_queries('photos')['photos']
         photos_cursor = sqlClient.execute(photos_query,
@@ -430,8 +428,7 @@ if __name__ == '__main__':
                                           unit_ids=photos_to_update,
                                           stringify=True)
         for row in photos_cursor:
-            doc = parse_n_update(row, 'photos')
-            upload_photo(doc, conf)
+            upload_photo(row, conf)
 
     if since_file:
         since_file.seek(0)
