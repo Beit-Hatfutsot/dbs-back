@@ -120,6 +120,7 @@ def es_search(q, size, collection=None, from_=0):
     body = es_show_filter
     query_body = body['query']['filtered']['query']['query_string']
     query_body['query'] = q
+    query_body['default_operator'] = "AND"
     # Boost the header by  2:
     # https://www.elastic.co/guide/en/elasticsearch/reference/1.7/query-dsl-query-string-query.html
     query_body['fields'] = ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He']
