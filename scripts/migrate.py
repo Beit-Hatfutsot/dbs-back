@@ -321,6 +321,7 @@ def parse_n_update(row, collection_name):
 def migrate_trees(cursor, since_timestamp, until_timestamp, treenum):
     since = datetime.datetime.fromtimestamp(since_timestamp)
     until = datetime.datetime.fromtimestamp(until_timestamp)
+    count = 0
     for row in sql_cursor:
         # special case for a specific tree
         if treenum:
@@ -350,6 +351,8 @@ def migrate_trees(cursor, since_timestamp, until_timestamp, treenum):
         Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update)
         logger.info('<<< migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], filename))
+        count += 1
+    return count
 
 
 if __name__ == '__main__':
@@ -387,7 +390,10 @@ if __name__ == '__main__':
         if collection_name == 'genTrees':
             #TODO: `since` should be part of the sql query
             sql_cursor = sqlClient.execute(query)
-            migrate_trees(sql_cursor, since, until, args.treenum)
+            count = migrate_trees(sql_cursor, since, until, args.treenum)
+            if not count:
+                logger.info('{}:Skipping'.format(collection_name))
+
             continue
 
         if since:
