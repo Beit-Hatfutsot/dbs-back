@@ -25,8 +25,9 @@ def push_code():
             run('virtualenv env')
         with prefix('. env/bin/activate'):
             run('pip install -r requirements.txt')
+            run('pip install -r requirements.migrate.txt')
 
-def update_conf():
+def push_conf():
     with cd("api"):
         sudo("cp conf/api-uwsgi.ini /etc/bhs/")
         sudo("rsync -rv conf/supervisor/ /etc/supervisor/")
@@ -34,16 +35,15 @@ def update_conf():
 
 def deploy():
     push_code()
-    update_conf()
     test()
-    restart_api()
+    restart()
 
 def test():
     with cd("api"):
         with prefix('. env/bin/activate'):
             run('py.test tests bhs_api/*.py')
 
-def restart_api():
+def restart():
     with cd("api"):
         '''
         run("cp conf/supervisord.conf ~")
@@ -52,6 +52,7 @@ def restart_api():
         '''
         # change the ini file to use the corrent uid for bhs
         sudo("supervisorctl restart uwsgi")
+        sudo("supervisorctl restart migration")
 
 @hosts('bhs-infra')
 def pull_mongo(dbname):

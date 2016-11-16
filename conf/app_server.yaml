@@ -1,27 +1,36 @@
 # App config - Development version
 secret_key: glpjht9dPBXQe8mBS9XxDMGLIoHukbpvSNU0FpnZ
-security_password_hash: pbkdf2_sha512
-#security_password_salt: pjht9dPBXQe8mB
-security_password_salt: 68XDri7fdCi1dCkN2Prs
+frontend_server: 'localhost:3000'
+
+# Mail server
+mail_server: 'localhost'
+mail_port: 25
+# mail_username: 'user'
+# mail_password: 'sss'
 
 # Data DB
 data_db_host: localhost
 data_db_port: 27017
-data_db_name: bhp1
+data_db_name: bhdata
 
 # User DB config
 user_db_host: localhost
 user_db_port: 27017
-user_db_name: bh
+user_db_name: bhuser
 
 # Email config
 email_username: bhatfutsot@gmail.com
 email_password: 19782013
-email_from: dev@bh.org.il
+email_from: info@bh.org.il
 
 # Bucket urls
-image_bucket_url: https://storage.googleapis.com/bhs-flat-pics
+image_bucket: bhs-flat-pics
+thumbnail_bucket: bhs-thumbnails
 ftree_bucket_url: https://storage.googleapis.com/bhs-familytrees
 video_bucket_url: https://storage.googleapis.com/bhs-videos
-
-elasticsearch_host: localhost
+# elastic search
+elasticsearch_host: bhs-infra
+# redis
+redis_host: localhost
+redis_port: 6379
+caching_ttl: 3600

@@ -22,14 +22,17 @@ def test_login_scenario(client, app):
         assert len(outbox) == 1
         urls = re.findall('http\S+', outbox[0].body)
     assert len(urls) == 1
-    res = client.get(urls[0], headers={'Accept': 'application/json'})
+    login_url = urls[0]
+    res = client.get(login_url, headers={'Accept': 'application/json'})
     assert res.status_code == 200
     assert res.json['meta']['code'] == 200
+    # test the token we got
     token = res.json['response']['user']['authentication_token']
     res = client.get('/', headers={'Authentication-Token': token})
     assert "private" in res.data
     # now get the user
-    res = client.get('/user', headers={'Authentication-Token': token})
+    res = client.get('/user', headers={'Authentication-Token': token,
+                                       'Referer': login_url})
     assert res.status_code == 200
     assert res.json['email'] == 'ster@example.com'
     hash = res.json['hash']

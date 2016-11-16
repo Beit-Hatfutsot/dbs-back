@@ -6,7 +6,6 @@ from datetime import timedelta, datetime
 import re
 import urllib
 import mimetypes
-import magic
 from uuid import UUID
 
 from flask import Flask, Blueprint, request, abort, url_for, current_app
@@ -21,19 +20,15 @@ import jinja2
 import requests
 
 from bhs_api import SEARCH_CHUNK_SIZE
-from bhs_common.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                              get_unit_type, SEARCHABLE_COLLECTIONS)
-from utils import (upload_file, send_gmail, humanify,
-                   get_referrer_host_url, dictify)
-from bhs_api.user import (get_user_or_error, clean_user, send_activation_email,
-            user_handler, is_admin, get_mjs, add_to_my_story, set_item_in_branch,
-            remove_item_from_story, collect_editors_items)
+from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
+                           upload_file, send_gmail, humanify)
+from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          SHOW_FILTER)
+                          enrich_item, SHOW_FILTER)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
-import phonetic
+from bhs_api import phonetic
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -277,6 +272,8 @@ def get_phonetic(collection, string, limit=5):
 @v1_endpoints.route('/upload', methods=['POST'])
 @auth_token_required
 def save_user_content():
+    import magic
+
     if not request.files:
         abort(400, 'No files present!')
 
@@ -384,7 +381,7 @@ def save_user_content():
     if saved_uri:
         console_uri = 'https://console.developers.google.com/m/cloudstorage/b/{}/o/{}'
         http_uri = console_uri.format(bucket, file_oid)
-        mjs = get_mjs(user_oid)['mjs']
+        mjs = current_user.get_mjs()['mjs']
         if mjs == {}:
             current_app.logger.debug('Creating mjs for user {}'.format(user_email))
         # Add main_image_url for images (UnitType 1)
@@ -394,7 +391,7 @@ def save_user_content():
             new_ugc.save()
         # Send an email to editor
         subject = 'New UGC submission'
-        with open('editors_email_template') as fh:
+        with open('templates/editors_email_template') as fh:
             template = jinja2.Template(fh.read())
         body = template.render({'uri': http_uri,
                                 'metadata': clean_md,
@@ -420,6 +417,8 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
+        for item in rv['hits']['hits']:
+            enrich_item(item['_source'])
         if not rv:
             abort(500, 'Sorry, the search cluster appears to be down')
         return humanify(rv)

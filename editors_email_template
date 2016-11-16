@@ -1,9 +1,0 @@
-Hello, there is a new file at {{ uri }}.
-The metadata is as follows:
-
-{% for item in metadata -%}
-{{ item }}: {{ metadata[item] }}
-{% endfor %}
-It was uploaded by {{ user_name }} - their email is {{ user_email }}.
-Thanks,
-Beit HaTfutsot Online team.

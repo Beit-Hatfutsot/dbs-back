@@ -1,36 +1,29 @@
+import logging
 import re
 
 from flask import abort, current_app
-import phonetic
+from bhs_api import phonetic
 
 MAX_RESULTS=30 # aka chunk size
 
-ARGS_TO_INDEX = {'first_name':       'FN_lc',
-                 'last_name':        'LN_lc',
-                 'maiden_name':      'IBLN_lc',
-                 'sex':              'G',
-                 'birth_place':      'BP_lc',
-                 'marriage_place':   'MP_lc',
-                 'tree_number':      'GTN',
-                 'death_place':      'DP_lc',
+ARGS_TO_INDEX = {'first_name':       'name_lc.0',
+                 'last_name':        'name_lc.1',
+                 'sex':              'sex',
+                 'birth_place':      'BIRT_PLAC_lc',
+                 'marriage_place':   'MARR_PLAC_lc',
+                 'tree_number':      'tree_num',
+                 'death_place':      'DEAT_PLAC_lc',
                  'place':            'filler_lc', # a dummy field name
                  }
 
-PROJECTION = {'II': 1,   # Individual ID
-                'GTN': 1,  # GenTree Number
-                'LN': 1,   # Last name
-                'FN': 1,   # First Name
-                'IBLN': 1, # Maiden name
-                'BD': 1,   # Birth date
-                'BP': 1,   # Birth place
-                'DD': 1,   # Death date
-                'DP': 1,   # Death place
-                'G': 1,    # Gender
-                'MD': 1,   # Marriage dates as comma separated string
-                'MP': 1,   # Marriage places as comma separated string
-                'GTF': 1,  # Tree file UUID
-                'EditorRemarks': 1,
-                'tree': 1,  # get the tree
+PROJECTION = {'name': 1,
+              'parents': 1,
+              'partners': 1,
+              'siblings': 1,
+              'tree_num': 1,
+              'id': 1,
+              'sex': 1,
+              'tree_version': 1,
                 }
 
 def _generate_year_range(year, fudge_factor=0):
@@ -57,8 +50,6 @@ def build_query(search_dict):
         elif k == 'sex':
             if search_dict[k].lower() in ['m', 'f']:
                 sex = v.upper()
-            else:
-                abort(400, "Sex must be one of 'm', 'f'")
         elif k == 'individual_id':
             individual_id = v
 
@@ -113,7 +104,7 @@ def build_query(search_dict):
                    'death_year': ['DSD', 'DED']}
 
     # Build gentree search query from all the subqueries
-    search_query = {'tree': {'$exists': True}}
+    search_query = {'archived': {'$exists': False}}
 
     for item in years:
         if item == 'marriage_year':
@@ -125,7 +116,7 @@ def build_query(search_dict):
         search_query[end] = {'$lte': years[item]['max']}
 
     if sex:
-        search_query['G'] = sex
+        search_query['sex'] = sex
     
     for param, item in names_and_places.items():
         for k, v in item.items():
@@ -135,26 +126,26 @@ def build_query(search_dict):
                     s = 'S'
                 else:
                     s = '_lc'
-                search_query['$or'] = [{'BP' + s: v},
-                                       {'MP' + s: v},
-                                       {'DP' + s: v}]
+                search_query['$or'] = [{'BIRT_PLAC' + s: v},
+                                       {'MARR_PLAC' + s: v},
+                                       {'DEAT_PLAC' + s: v}]
 
             else:
                 search_query[k] = v
 
     if 'tree_number' in search_dict:
         try:
-            search_query['GTN'] = int(search_dict['tree_number'])
+            search_query['tree_num'] = int(search_dict['tree_number'])
             # WARNING: Discarding all the other search qeuries if looking for GTN and II
             if individual_id:
-                search_query['II'] = individual_id
+                search_query['id'] = individual_id
         except ValueError:
             abort(400, 'Tree number must be an integer')
 
     return search_query
 
 
-def fsearch(max_results=15, **kwargs):
+def fsearch(max_results=15, db=None, **kwargs):
     '''
     Search in the genTreeIindividuals table.
     Names and places could be matched exactly, by the prefix match
@@ -166,6 +157,10 @@ def fsearch(max_results=15, **kwargs):
     If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `MAX_RESULTS` starting with the `start` argument
     '''
+    if db:
+        collection = db['persons']
+    else:
+        collection = current_app.data_db['persons']
     search_dict = {}
     for key, value in kwargs.items():
         search_dict[key] = value[0]
@@ -173,12 +168,7 @@ def fsearch(max_results=15, **kwargs):
             abort(400, "{} argument couldn't be empty".format(key))
 
 
-    collection = current_app.data_db['genTreeIndividuals']
     search_query = build_query(search_dict)
-    current_app.logger.debug('FSearch query:\n{}'.format(search_query))
-
-    if 'debug' in search_dict:
-        projection = None
 
     results = collection.find(search_query, PROJECTION)
     total = results.count()
@@ -186,7 +176,7 @@ def fsearch(max_results=15, **kwargs):
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
     results = results.limit(MAX_RESULTS)
-    current_app.logger.debug('FSearch query:\n{} returning {} results'.format(
+    logging.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
     return total, map(clean_person, results)
 

@@ -9,11 +9,10 @@ from flask.ext.security.utils import encrypt_password, verify_password
 from flask.ext.security.passwordless import send_login_instructions
 from flask.ext.security.decorators import _check_token
 
-from utils import get_referrer_host_url, humanify, dictify, send_gmail
+from utils import humanify, dictify, send_gmail
 from .models import StoryLine, UserName 
 from .item import fetch_item
 
-SAFE_KEYS = ('email', 'name', 'confirmed_at', 'next', 'hash')
 
 user_endpoints = Blueprint('user', __name__)
 
@@ -24,8 +23,8 @@ def home():
     else:
         return humanify({'access': 'public'})
 
-@user_endpoints.route('/user', methods=['GET', 'PUT', 'DELETE'])
-@user_endpoints.route('/user/<user_id>', methods=['GET', 'PUT', 'DELETE'])
+@user_endpoints.route('/user', methods=['GET', 'PUT'])
+@user_endpoints.route('/user/<user_id>', methods=['GET', 'PUT'])
 @auth_token_required
 def manage_user(user_id=None):
     '''
@@ -35,27 +34,26 @@ def manage_user(user_id=None):
     '''
     if user_id:
         # admin access_mode
-        if is_admin(current_user):
-            return user_handler(user_id, request)
+        if current_user.is_admin():
+            user = get_user_or_error(user_id)
+            return humanify(user.handle(request))
         else:
             current_app.logger.debug('Non-admin user {} tried to access user id {}'.format(
                                                   current_user.email, user_id))
             abort(403)
     else:
-        # user access_mode
-        user_id = str(current_user.id)
         # Deny POSTing to logged in non-admin users to avoid confusion with PUT
         if request.method == 'POST':
             abort(400, 'POST method is not supported for logged in users.')
-        return user_handler(user_id, request)
+        return humanify(current_user.handle(request))
 
 
 @user_endpoints.route('/mjs/<item_id>', methods=['DELETE'])
 @auth_token_required
 def delete_item_from_story(item_id):
     remove_item_from_story(item_id)
-    return humanify(get_mjs())
-    
+    return humanify(current_user.get_mjs())
+
 @user_endpoints.route('/mjs/<branch_num>/<item_id>', methods=['DELETE'])
 @auth_token_required
 def remove_item_from_branch(item_id, branch_num=None):
@@ -65,7 +63,7 @@ def remove_item_from_branch(item_id, branch_num=None):
         raise BadRequest("branch number must be an integer")
 
     set_item_in_branch(item_id, branch_num-1, False)
-    return humanify(get_mjs())
+    return humanify(current_user.get_mjs())
 
 
 @user_endpoints.route('/mjs/<branch_num>', methods=['POST'])
@@ -77,7 +75,7 @@ def add_to_story_branch(branch_num):
     except ValueError:
         raise BadRequest("branch number must be an integer")
     set_item_in_branch(item_id, branch_num-1, True)
-    return humanify(get_mjs())
+    return humanify(current_user.get_mjs())
 
 
 @user_endpoints.route('/mjs/<branch_num>/name', methods=['POST'])
@@ -87,7 +85,7 @@ def set_story_branch_name(branch_num):
     name = request.data
     current_user.story_branches[int(branch_num)-1] = name
     current_user.save()
-    return humanify(get_mjs())
+    return humanify(current_user.get_mjs())
 
 
 @user_endpoints.route('/mjs', methods=['GET', 'POST'])
@@ -100,7 +98,7 @@ def manage_jewish_story():
     POST requests should be sent with a string in form of "collection_name.id".
     '''
     if request.method == 'GET':
-        return humanify(get_mjs(current_user))
+        return humanify(current_user.get_mjs())
 
     elif request.method == 'POST':
         try:
@@ -115,7 +113,7 @@ def manage_jewish_story():
             abort(400, e_message)
 
         add_to_my_story(data)
-        return humanify(get_mjs())
+        return humanify(current_user.get_mjs())
 
 # Ensure we have a user to test with
 '''
@@ -137,44 +135,6 @@ def setup_users():
                                 roles=[user_role])
 '''
 
-def is_admin(flask_user_obj):
-    if flask_user_obj.has_role('admin'):
-        return True
-    else:
-        return False
-
-
-def user_handler(user_id, request):
-    method = request.method
-    data = request.data
-    referrer = request.referrer
-    if referrer:
-        referrer_host_url = get_referrer_host_url(referrer)
-    else:
-        referrer_host_url = None
-    if data:
-        try:
-            data = json.loads(data)
-            if not isinstance(data, dict):
-                abort(
-                    400,
-                    'Only dict like objects are supported for user management')
-        except ValueError:
-            e_message = 'Could not decode JSON from data'
-            current_app.logger.debug(e_message)
-            abort(400, e_message)
-
-    if method == 'GET':
-        return humanify(get_user(user_id))
-
-    elif method == 'PUT':
-        if not data:
-            abort(400, 'No data provided')
-        return humanify(update_user(user_id, data))
-
-    elif method == 'DELETE':
-        return humanify(delete_user(user_id))
-
 
 def get_user_or_error(user_id):
     user = current_app.user_datastore.get_user(user_id)
@@ -184,95 +144,15 @@ def get_user_or_error(user_id):
         raise abort(404, 'User not found')
 
 
-def clean_user(user_obj):
-
-    # some old users might not have a hash, saving will generate one
-    if not user_obj.hash:
-        user_obj.save()
-
-    user_dict = dictify(user_obj)
-    ret = {}
-    for key in SAFE_KEYS:
-        ret[key] = user_dict.get(key, None)
-    ret.update(get_mjs(user_obj))
-
-    return ret
-
-
 def get_user(user_id):
-    user_obj = get_user_or_error(user_id)
-    return clean_user(user_obj)
-
-
-def delete_user(user_id):
     user = get_user_or_error(user_id)
-    if is_admin(user):
-        return {'error': 'God Mode!'}
-    else:
-        user.delete()
-        return {}
+    return user.render()
 
-
-def update_user(user_id, user_dict):
-    user_obj = get_user_or_error(user_id)
-    if 'email' in user_dict:
-        user_obj.email = user_dict['email']
-    if 'name' in user_dict:
-        if not user_obj.name:
-            user_obj.name = UserName()
-        for k,v in user_dict['name'].items():
-            setattr(user_obj.name, k, v)
-    user_obj.save()
-    return clean_user(user_obj)
-
-
-def get_frontend_activation_link(user_id, referrer_host_url):
-    s = URLSafeSerializer(current_app.secret_key)
-    payload = s.dumps(user_id)
-    return '{}/verify_email/{}'.format(referrer_host_url, payload)
-
-
-def send_activation_email(user_id, referrer_host_url):
-    user = get_user_or_error(user_id)
-    email = user.email
-    name = user.name
-    activation_link = get_frontend_activation_link(user_id, referrer_host_url)
-    body = _generate_confirmation_body('email_verfication_template.html',
-                                       name, activation_link)
-    subject = 'My Jewish Story: please confirm your email address'
-    sent = send_gmail(subject, body, email, message_mode='html')
-    if not sent:
-        e_message = 'There was an error sending an email to {}'.format(email)
-        current_app.logger.error(e_message)
-        abort(500, e_message)
-    return humanify({'sent': email})
-
-
-def _generate_confirmation_body(template_fn, name, activation_link):
-    try:
-        fh = open(template_fn)
-        template = fh.read()
-        fh.close()
-        return template.format(name, activation_link)
-    except:
-        current_app.logger.debug("Couldn't open template file {}".format(template_fn))
-        abort(500, "Couldn't open template file")
-
-    body = '''Hello {}!
-    Please click on <a href="{}">activation link</a> to activate your user at My Jewish Story web site.
-    If you received this email by mistake, simply delete it.
-
-    Thanks, Beit HaTfutsot Online team.'''
-    return body.format(name, activation_link)
 
 def add_to_my_story(item_id):
     current_user.story_items.append(StoryLine(id=item_id,
                                               in_branch=4*[False]))
     current_user.save()
-
-def get_mjs(user=current_user):
-    return {'story_items': [{'id': o.id, 'in_branch': o.in_branch} for o in user.story_items],
-            'story_branches': user.story_branches}
 
 def set_item_in_branch(item_id, branch_num, value):
     line = None

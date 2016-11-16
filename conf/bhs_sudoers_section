@@ -1,4 +1,0 @@
-# Cmnd alias specification
-Cmnd_Alias SERVICE_CMDS = /usr/sbin/service
-
-bhs ALL=NOPASSWD: SERVICE_CMDS

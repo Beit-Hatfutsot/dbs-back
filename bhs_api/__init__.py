@@ -10,10 +10,9 @@ from flask.ext.mongoengine import MongoEngine
 from flask.ext.cors import CORS
 from flask.ext.mail import Mail
 from flask.ext.security import Security, MongoEngineUserDatastore
-from bhs_common.utils import get_conf
+from bhs_api.utils import get_conf
 
 SEARCH_CHUNK_SIZE = 15
-CONF_FILE = '/etc/bhs/config.yml'
 # Create app
 def create_app(testing=False, live=False):
     from bhs_api.models import User, Role
@@ -22,35 +21,9 @@ def create_app(testing=False, live=False):
     app = Flask(__name__)
     app.testing = testing
 
-    # Get configuration from file
-    must_have_keys = set(['secret_key',
-                        'mail_server',
-                        'mail_port',
-                        'user_db_host',
-                        'user_db_port',
-                        'elasticsearch_host',
-                        'user_db_name',
-                        'data_db_host',
-                        'data_db_port',
-                        'data_db_name',
-                        'image_bucket_url',
-                        'video_bucket_url',
-                        'redis_host',
-                        'redis_port',
-                        'caching_ttl',
-                        ])
-
-    # load the conf file. use local copy if nothing in the system
-    if os.path.exists(CONF_FILE):
-        conf = get_conf(CONF_FILE, must_have_keys)
-    else:
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                            os.pardir,
-                            'conf',
-                            'bhs_config.yaml')
-        conf = get_conf(path,
-                        must_have_keys)
-
+    # load the config file
+    conf = get_conf()
+    app.conf = conf
     # Our config - need to move everything here
     app.config['VIDEO_BUCKET_URL'] = "https://storage.googleapis.com/bhs-movies"
     app.config['IMAGE_BUCKET_URL'] = "https://storage.googleapis.com/bhs-flat-pics"
@@ -82,6 +55,11 @@ def create_app(testing=False, live=False):
     app.config['MONGODB_DB'] = conf.user_db_name
     app.config['MONGODB_HOST'] = conf.user_db_host
     app.config['MONGODB_PORT'] = conf.user_db_port
+    # Redis
+    app.config['REDIS_HOST'] = conf.redis_host
+    app.config['REDIS_PORT'] = conf.redis_port
+    app.config['REDIS_PASSWORD'] = getattr(conf, 'redis_password', None)
+
     # CACHING
     app.config['CACHING_TTL'] = conf.caching_ttl
 
@@ -120,11 +98,12 @@ def create_app(testing=False, live=False):
 
     # redis
     try:
-        app.redis = redis.StrictRedis(host=conf.redis_host, port=conf.redis_port, db=0)
+        app.redis = redis.StrictRedis(host=conf.redis_host,
+                                      port=conf.redis_port,
+                                      password = app.config['REDIS_PASSWORD'],
+                                      db=0)
     except AttributeError:
         app.redis = None
-
-    app.logger.debug("Hellow world")
 
     return app, conf
 

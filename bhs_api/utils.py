@@ -3,24 +3,47 @@ import json
 import datetime
 import os
 import getpass
-from bson.json_util import dumps
-
+from StringIO import StringIO
 from uuid import UUID
 
 import yaml
 import boto
-import gcs_oauth2_boto_plugin
+# TODO: can we access google clopud storage without the next line?
+# import gcs_oauth2_boto_plugin
 import bson
 import soundcloud
 import gmail
 import pymongo
 from bson.objectid import ObjectId
 from bson import json_util
+from bson.json_util import dumps
+from bson.binary import Binary, BINARY_SUBTYPE
 from werkzeug import Response
 
-CONF_FILE = '/etc/bhs/config.yml'
-DEFAULT_CONF_FILE = 'conf/dev.yaml'
-
+DEFAULT_CONF_FILE = '/etc/bhs/app_server.yaml'
+SEARCHABLE_COLLECTIONS = ('places',
+                          'familyNames',
+                          'photoUnits',
+                          'personalities',
+                          'movies')
+DEAFULT_CONF_REQUIRED_KEYS = set([
+    'secret_key',
+    'mail_server',
+    'mail_port',
+    'user_db_host',
+    'user_db_port',
+    'elasticsearch_host',
+    'user_db_name',
+    'data_db_host',
+    'data_db_port',
+    'data_db_name',
+    'image_bucket',
+    'thumbnail_bucket',
+    'video_bucket_url',
+    'redis_host',
+    'redis_port',
+    'caching_ttl',
+    ])
 # TODO: delete the next 3 lines
 # Set default GCE project id
 project_id = 'bh-org-01'
@@ -57,15 +80,25 @@ def get_oid(id_str):
     except bson.errors.InvalidId:
         return None
 
-def get_conf(config_file=CONF_FILE, must_have_keys=set()):
-    ''' Read the configuration file and return config dict.  Check that all
-        the necessary options are present. If the configuration file is
-        missing, use the one in `conf/dev.yaml`.
+
+def get_conf(must_have_keys=DEAFULT_CONF_REQUIRED_KEYS,
+             config_file=DEFAULT_CONF_FILE):
+    ''' Read a configuration file, ensure all the `must_have_keys` are present
+        and return a config dict.
+        The file is read from `config_file` and if it's not there and it's a
+        default request, `conf/app_server.yaml` is used.
     '''
     try:
         fh = open(config_file)
-    except IOError:
-        fh = open(DEFAULT_CONF_FILE)
+    except IOError as e:
+        if config_file == DEFAULT_CONF_FILE:
+            fh = open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                os.pardir,
+                                                'conf',
+                                                'app_server.yaml'))
+        else:
+            raise e
+
 
     conf = yaml.load(fh)
     if not conf:
@@ -214,31 +247,30 @@ def get_referrer_host_url(referrer):
 # Utility functions
 def humanify(obj, status_code=200):
     """ Gets an obj and possibly a status code and returns a flask Resonse
-        with a jsonified obj, with newlines.
+        with a jsonified obj, not suitable for humans
     >>> humanify({"a": 1})
-    <Response 13 bytes [200 OK]>
+    <Response 8 bytes [200 OK]>
     >>> humanify({"a": 1}, 404)
-    <Response 13 bytes [404 NOT FOUND]>
+    <Response 8 bytes [404 NOT FOUND]>
     >>> humanify({"a": 1}).get_data()
-    '{\\n  "a": 1\\n}\\n'
+    '{"a": 1}'
     >>> humanify([1,2,3]).get_data()
-    '[\\n  1, \\n  2, \\n  3\\n]\\n'
+    '[1, 2, 3]'
     """
+    # TODO: refactor the name to `response`
     # jsonify function doesn't work with lists
     if type(obj) == list:
-        data = json.dumps(obj, default=json_util.default, indent=2) + '\n'
+        data = json.dumps(obj, default=json_util.default)
     elif type(obj) == pymongo.cursor.Cursor:
         rv = []
         for doc in obj:
             doc['_id'] = str(doc['_id'])
-            rv.append(dumps(doc, indent=2))
+            rv.append(dumps(doc))
         data = '[' + ',\n'.join(rv) + ']' + '\n'
     else:
         data = dumps(obj,
                           default=json_util.default,
-                          indent=2,
                           cls=MongoJsonEncoder)
-        data += '\n'
     resp = Response(data, mimetype='application/json')
     resp.status_code = status_code
     return resp
@@ -283,3 +315,68 @@ def collection_to_csv(coll, f):
             line = ','.join([line, '', ''])
         line += '\n'
         f.write(line.encode('utf8'))
+
+def binarize_image(image):
+    from PIL import Image
+
+    binary = None
+
+    try:
+        im = Image.open(image)
+        thumb = im.copy()
+        thumb.thumbnail((260, 260))
+        image_buffer = StringIO()
+        thumb.save(image_buffer, "JPEG")
+        binary = Binary(image_buffer.getvalue(), BINARY_SUBTYPE)
+    except IOError as e:
+        logging.error("failed to binarize image: "+str(e))
+        return None
+
+    # if image is a file object, rewind it
+    finally:
+        try:
+            image.seek(0)
+        except AttributeError:
+            pass
+
+    return binary
+
+
+def create_thumb(image_doc, photo_mount_path):
+    filename = image_doc['PicturePath']
+    if filename:
+        # try:
+        filename = filename.replace(u'\\', '/')
+        image_path = photo_mount_path + '/' + filename 
+        binary = binarize_image(image_path)
+    else:
+        binary = None
+        print '%s: has no file name' % image_doc['PictureId']
+
+    return binary
+
+
+def get_unit_type(collection_identifier):
+    """
+    returns unit type description if input is an integer, 
+    or unit type code if input is a string
+    """
+    type_map = {
+        0: 'synonyms',
+        1: 'photoUnits',
+        4: 'familyTrees',
+        5: 'places',
+        6: 'familyNames',
+        8: 'personalities',
+        9: 'movies',
+        10: 'lexicon'
+    }
+
+    if type(collection_identifier) == str:
+        type_map = {v: k for k, v in type_map.items()}
+    try:
+        map_output = type_map[collection_identifier]
+    except KeyError:
+        map_output = None
+    return map_output
+
