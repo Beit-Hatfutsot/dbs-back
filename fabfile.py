@@ -14,8 +14,8 @@ env.now = datetime.now().strftime('%Y%m%d-%H%M')
 def dev():
     env.hosts = ['bhs-dev']
 
-def push_code():
-    local('git archive -o /tmp/api.tar.gz HEAD')
+def push_code(rev='HEAD'):
+    local('git archive -o /tmp/api.tar.gz '+rev)
     put('/tmp/api.tar.gz', '/tmp')
     run('mv api /tmp/api-`date +%d.%m.%y-%H:%M:%S`')
     run('mkdir api')
