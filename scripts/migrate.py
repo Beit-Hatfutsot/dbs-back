@@ -329,10 +329,8 @@ def migrate_trees(cursor, since_timestamp, until_timestamp, treenum):
                 continue
         elif row['UpdateDate'] < since or row['UpdateDate'] > until:
             continue
-        file_id = str(row['GenTreeFileId'])
         filename = os.path.join(conf.gentree_mount_point,
-                                os.path.dirname(row['GenTreePath']),
-                                file_id+'.ged')
+                                row['GenTreePath'])
         try:
             gedcom_fd = open(filename)
         except IOError:
