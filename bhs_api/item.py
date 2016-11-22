@@ -42,6 +42,14 @@ class Slug:
         self.full = slug
         collection, self.local_slug = slug.split('_')
         self.collection = self.slugs_collection_map[collection]
+        # handle the special case of old person slugs that are missing a
+        # version
+        if self.collection == 'persons':
+            if ';' not in self.local_slug:
+                t = self.local_slug.split('.')
+                if len(t) == 2:
+                    self.local_slug = "{};0.{}".format(*t)
+                    self.full = "_".join((collection, self.local_slug))
 
     def __unicode__(self):
         return self.full
