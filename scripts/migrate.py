@@ -57,7 +57,7 @@ def parse_args():
     parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
-    parser.add_argument('-t', '--treenum', type=int)
+    parser.add_argument('-t', '--treenum')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -318,37 +318,57 @@ def parse_n_update(row, collection_name):
     return doc
 
 
-def migrate_trees(cursor, since_timestamp, until_timestamp, treenum):
+def get_file_descriptors(tree):
+    ''' there are two file paths in the dbs, return the one that points to the
+        latest file based on creation time.
+        returns both the file_id and the full file name
+    '''
+    file_id1 = str(tree['GenTreeFileId'])
+    file_name1 = os.path.join(conf.gentree_mount_point,
+                              os.path.dirname(tree['GenTreePath']),
+                              file_id1+'.ged')
+    file_id2 = os.path.split(tree['GenTreePath'])[-1].split('.')[0]
+    file_name2 = os.path.join(conf.gentree_mount_point,
+                              tree['GenTreePath'])
+
+    if os.path.getctime(file_name1) > os.path.getctime(file_name2):
+        return file_id1, file_name1
+    else:
+        return file_id2, file_name2
+
+
+def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
     since = datetime.datetime.fromtimestamp(since_timestamp)
     until = datetime.datetime.fromtimestamp(until_timestamp)
     count = 0
+    treenums = treenums.split(',') if treenums else None
+        
     for row in sql_cursor:
         # special case for a specific tree
-        if treenum:
-            if row['GenTreeNumber'] != treenum:
+        if treenums:
+            if str(row['GenTreeNumber']) not in treenums:
                 continue
         elif row['UpdateDate'] < since or row['UpdateDate'] > until:
             continue
-        filename = os.path.join(conf.gentree_mount_point,
-                                row['GenTreePath'])
+        file_id, file_name = get_file_descriptors(row)
         try:
-            gedcom_fd = open(filename)
+            gedcom_fd = open(file_name)
         except IOError:
             logger.error('failed to open gedocm file tree number {}, path {}: {}'
-                         .format(row['GenTreeNumber'], filename, str(e)))
+                         .format(row['GenTreeNumber'], file_name, str(e)))
             continue
 
         try:
             g = Gedcom(fd=gedcom_fd)
         except (SyntaxError, GedcomParseError) as e:
             logger.error('failed to parse tree number {}, path {}: {}'
-                         .format(row['GenTreeNumber'], filename, str(e)))
+                         .format(row['GenTreeNumber'], file_name, str(e)))
             continue
         logger.info('>>> migrating tree {}, path {}'
-                    .format(row['GenTreeNumber'], filename))
+                    .format(row['GenTreeNumber'], file_name))
         Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update)
         logger.info('<<< migrated tree {}, path {}'
-                    .format(row['GenTreeNumber'], filename))
+                    .format(row['GenTreeNumber'], file_name))
         count += 1
     return count
 
