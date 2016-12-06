@@ -33,6 +33,10 @@ if __name__ == '__main__':
         for doc in db[collection].find(SHOW_FILTER):
             _id = doc['_id']
             del doc['_id']
+            if not doc['Header']['En']:
+                doc['Header']['En'] = '1234567890'
+            if not doc['Header']['He']:
+                doc['Header']['He'] = '1234567890'
             try:
                 res = app.es.index(index=index_name, doc_type=collection, id=_id, body=doc)
             except elasticsearch.exceptions.SerializationError:
@@ -42,5 +46,7 @@ if __name__ == '__main__':
                     res = app.es.index(index=index_name, doc_type=collection, id=_id, body=doc)
                 except elasticsearch.exceptions.SerializationError as e:
                     import pdb; pdb.set_trace()
+            except elasticsearch.exceptions.RequestError:
+                import pdb; pdb.set_trace()
         finished = datetime.datetime.now()
         print 'Collection {} took {}'.format(collection, finished-started)
