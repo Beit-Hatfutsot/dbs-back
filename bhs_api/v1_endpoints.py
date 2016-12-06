@@ -230,39 +230,40 @@ def _validate_filetype(file_info_str):
 
     return False
 
-def get_completion(collection, string, search_prefix=True, max_res=5):
+def get_completion(collection, string, size=7):
     '''Search in the headers of bhp6 compatible db documents.
     If `search_prefix` flag is set, search only in the beginning of headers,
     otherwise search everywhere in the header.
     Return only `max_res` results.
     '''
-    collection = current_app.data_db[collection]
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
         lang = 'En'
 
-    if search_prefix:
-        regex = re.compile('^'+re.escape(string), re.IGNORECASE)
-    else:
-        regex = re.compile(re.escape(string), re.IGNORECASE)
+    q = {
+        "_source": ["Slug", "Header"],
+        "suggest": {
+            "header" : {
+                "prefix" : string,
+                "completion" : {
+                    "field" : "Header.{}.suggest".format(lang),
+                    "size": size,
+                }
+            }
+        }
+    }
+    results = current_app.es.search(index=current_app.data_db.name,
+                                body=q,
+                                size=0,
+                                doc_type=collection)
+    try:
+        options = results['suggest']['header'][0]['options']
+    except KeyError:
+        return []
 
-    found = []
-    header = 'Header.{}'.format(lang)
-    unit_text = 'UnitText1.{}'.format(lang)
-    # Search only for non empty docs with right status
-    show_filter = SHOW_FILTER.copy()
-    show_filter[unit_text] = {"$nin": [None, '']}
-    header_search_ex = {header: regex}
-    header_search_ex.update(show_filter)
-    projection = {'_id': 0, header: 1}
-    cursor = collection.find(header_search_ex ,projection).limit(max_res)
-    for doc in cursor:
-        header_content = doc['Header'][lang]
-        if header_content:
-            found.append(header_content.lower())
+    return  [i['_source']['Header'][lang] for i in options]
 
-    return found
 
 def get_phonetic(collection, string, limit=5):
     collection = current_app.data_db[collection]
@@ -482,8 +483,9 @@ def get_suggestions(collection,string):
     Each field holds a list of up to 5 strings.
     '''
     rv = {}
+
     rv['starts_with'] = get_completion(collection, string)
-    rv['contains'] = get_completion(collection, string, False)
+    rv['contains'] = []
     rv['phonetic'] = get_phonetic(collection, string)
 
     # make all the words in the suggestion start with a capital letter
