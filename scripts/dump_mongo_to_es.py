@@ -27,16 +27,67 @@ if __name__ == '__main__':
         db = app.data_db
 
     index_name = db.name
+    # start with a clean index
+    if app.es.indices.exists(index_name):
+        app.es.indices.delete(index_name)
+    app.es.indices.create(index_name, body={
+    # set the mapping to support completion fields
+    # app.es.indices.put_mapping(index_name, update_all_types=True, body={
+        "mappings": {
+            "places": { "properties": {
+            "Header": {
+                "properties": {
+                    "En": {
+                        "type": "text",
+                        "fields": {
+                            "suggest": {
+                                "type": "completion"
+                            }
+                        }
+                    },
+                    "He": {
+                        "type": "text",
+                        "fields": {
+                            "suggest": {
+                                "type": "completion"
+                            }
+                        }
+                    }
+                }
+            },
+            "UnitHeaderDMSoundex": {
+                "properties": {
+                    "En": {
+                        "type": "text",
+                        "fields": {
+                            "suggest": {
+                                "type": "completion"
+                            }
+                        }
+                    },
+                    "He": {
+                        "type": "text",
+                        "fields": {
+                            "suggest": {
+                                "type": "completion"
+                            }
+                        }
+                    }
+                }
+            }}}
+        }
+    })
 
     for collection in SEARCHABLE_COLLECTIONS:
         started = datetime.datetime.now()
         for doc in db[collection].find(SHOW_FILTER):
             _id = doc['_id']
             del doc['_id']
-            if not doc['Header']['En']:
-                doc['Header']['En'] = '1234567890'
-            if not doc['Header']['He']:
-                doc['Header']['He'] = '1234567890'
+            # un null the fields that are used for completion
+            for key in ('Header', 'UnitHeaderDMSoundex'):
+                for lang in ('En', 'He'):
+                    if not doc[key][lang]:
+                        doc[key][lang] = '1234567890'
             try:
                 res = app.es.index(index=index_name, doc_type=collection, id=_id, body=doc)
             except elasticsearch.exceptions.SerializationError:
@@ -46,7 +97,7 @@ if __name__ == '__main__':
                     res = app.es.index(index=index_name, doc_type=collection, id=_id, body=doc)
                 except elasticsearch.exceptions.SerializationError as e:
                     import pdb; pdb.set_trace()
-            except elasticsearch.exceptions.RequestError:
+            except elasticsearch.exceptions.RequestError as e:
                 import pdb; pdb.set_trace()
         finished = datetime.datetime.now()
         print 'Collection {} took {}'.format(collection, finished-started)

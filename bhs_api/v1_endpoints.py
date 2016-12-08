@@ -37,73 +37,6 @@ def get_activation_link(user_id):
     payload = s.dumps(user_id)
     return url_for('activate_user', payload=payload, _external=True)
 
-# While searching for docs, we always need to filter results by their work
-# status and rights.
-# We also filter docs that don't have any text in the 'UnitText1' field.
-es_show_filter = {
-  'query': {
-    'filtered': {
-      'filter': {
-        'bool': {
-          'should': [
-            {
-              'and': [
-                {
-                  'exists': {
-                    'field': 'UnitText1.En'
-                  }
-                },
-                {
-                  'script': {
-                    'script': "doc['UnitText1.En'].empty == false"
-                  }
-                }
-              ]
-            },
-            {
-              'and': [
-                {
-                  'exists': {
-                    'field': 'UnitText1.He'
-                  }
-                },
-                {
-                  'script': {
-                    'script': "doc['UnitText1.He'].empty == false"
-                  }
-                }
-              ]
-            }
-          ],
-          'must_not': [
-            {
-              'regexp': {
-                'DisplayStatusDesc': 'internal'
-              }
-            }
-          ],
-          'must': [
-            {
-              'term': {
-                'StatusDesc': 'completed'
-              }
-            },
-            {
-              'term': {
-                'RightsDesc': 'full'
-              }
-            }
-          ]
-        }
-      },
-      'query': {
-        'query_string': {
-          'query': '*'
-        }
-      }
-    }
-  }
-}
 
 '''
 class Ugc(db.Document):
@@ -117,13 +50,12 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 
 
 def es_search(q, size, collection=None, from_=0):
-    body = es_show_filter
-    query_body = body['query']['filtered']['query']['query_string']
-    query_body['query'] = q
-    query_body['default_operator'] = "AND"
-    # Boost the header by  2:
-    # https://www.elastic.co/guide/en/elasticsearch/reference/1.7/query-dsl-query-string-query.html
-    query_body['fields'] = ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He']
+    # body = {"query": { "match" : { "_all": {"query": q, "operator": "and"} }}}
+    body = {"query": { "query_string" : {
+        "fields": ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He'],
+        "query": q,
+        "default_operator": "and"
+    }}}
     try:
         try:
             collection = collection.split(',')
