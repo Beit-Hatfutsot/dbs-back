@@ -10,9 +10,54 @@ from bhs_api import create_app
 from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
 
+completion_mapping = {
+        "Header": {
+            "properties": {
+                "En": {
+                    "type": "text",
+                    "fields": {
+                        "suggest": {
+                            "type": "completion"
+                        }
+                    }
+                },
+                "He": {
+                    "type": "text",
+                    "fields": {
+                        "suggest": {
+                            "type": "completion"
+                        }
+                    }
+                }
+            }
+        },
+        "UnitHeaderDMSoundex": {
+            "properties": {
+                "En": {
+                    "type": "text",
+                    "fields": {
+                        "suggest": {
+                            "type": "completion"
+                        }
+                    }
+                },
+                "He": {
+                    "type": "text",
+                    "fields": {
+                        "suggest": {
+                            "type": "completion"
+                        }
+                    }
+                }
+            }
+        }}
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--collection',
+                        help='run only on collection')
+    parser.add_argument('-r', '--remove',
+                        help='remove the current index')
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')
     return parser.parse_args()
@@ -28,57 +73,23 @@ if __name__ == '__main__':
 
     index_name = db.name
     # start with a clean index
-    if app.es.indices.exists(index_name):
-        app.es.indices.delete(index_name)
-    app.es.indices.create(index_name, body={
-    # set the mapping to support completion fields
-    # app.es.indices.put_mapping(index_name, update_all_types=True, body={
-        "mappings": {
-            "places": { "properties": {
-            "Header": {
-                "properties": {
-                    "En": {
-                        "type": "text",
-                        "fields": {
-                            "suggest": {
-                                "type": "completion"
-                            }
-                        }
-                    },
-                    "He": {
-                        "type": "text",
-                        "fields": {
-                            "suggest": {
-                                "type": "completion"
-                            }
-                        }
-                    }
-                }
-            },
-            "UnitHeaderDMSoundex": {
-                "properties": {
-                    "En": {
-                        "type": "text",
-                        "fields": {
-                            "suggest": {
-                                "type": "completion"
-                            }
-                        }
-                    },
-                    "He": {
-                        "type": "text",
-                        "fields": {
-                            "suggest": {
-                                "type": "completion"
-                            }
-                        }
-                    }
-                }
-            }}}
-        }
-    })
+    if args.remove:
+        if app.es.indices.exists(index_name):
+            app.es.indices.delete(index_name)
+        # set the mapping to support completion fields
+        app.es.indices.create(index_name, body={
+            "mappings": {
+                "places": { "properties": completion_mapping },
+                "familyNames": { "properties": completion_mapping },
+            }
+        })
 
-    for collection in SEARCHABLE_COLLECTIONS:
+    if args.collection:
+        collections = [args.collection]
+    else:
+        collections = SEARCHABLE_COLLECTIONS
+
+    for collection in collections:
         started = datetime.datetime.now()
         for doc in db[collection].find(SHOW_FILTER):
             _id = doc['_id']
