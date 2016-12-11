@@ -10,45 +10,31 @@ from bhs_api import create_app
 from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
 
+completion_field = {
+                    "type": "text",
+                    "fields": {
+                        "suggest": {
+                            "type": "completion",
+                            "max_input_length": 20,
+                            "contexts": [{
+                                "name": "collection",
+                                "type": "category",
+                                "path": "_type"
+                            }]
+                        }
+                    },
+                }
 completion_mapping = {
         "Header": {
             "properties": {
-                "En": {
-                    "type": "text",
-                    "fields": {
-                        "suggest": {
-                            "type": "completion"
-                        }
-                    }
-                },
-                "He": {
-                    "type": "text",
-                    "fields": {
-                        "suggest": {
-                            "type": "completion"
-                        }
-                    }
-                }
+                "En": completion_field,
+                "He": completion_field,
             }
         },
         "UnitHeaderDMSoundex": {
             "properties": {
-                "En": {
-                    "type": "text",
-                    "fields": {
-                        "suggest": {
-                            "type": "completion"
-                        }
-                    }
-                },
-                "He": {
-                    "type": "text",
-                    "fields": {
-                        "suggest": {
-                            "type": "completion"
-                        }
-                    }
-                }
+                "En": completion_field,
+                "He": completion_field,
             }
         }}
 
@@ -56,7 +42,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--collection',
                         help='run only on collection')
-    parser.add_argument('-r', '--remove',
+    parser.add_argument('-r', '--remove', action = "store_true",
                         help='remove the current index')
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')

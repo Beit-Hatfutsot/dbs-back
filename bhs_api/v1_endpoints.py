@@ -181,14 +181,16 @@ def get_completion(collection, string, size=7):
                 "completion" : {
                     "field" : "Header.{}.suggest".format(lang),
                     "size": size,
+                    "contexts": {
+                        "collection": collection,
+                    }
                 }
             }
         }
     }
     results = current_app.es.search(index=current_app.data_db.name,
                                 body=q,
-                                size=0,
-                                doc_type=collection)
+                                size=0)
     try:
         options = results['suggest']['header'][0]['options']
     except KeyError:
