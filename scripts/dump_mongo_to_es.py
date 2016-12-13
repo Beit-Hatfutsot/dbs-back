@@ -12,7 +12,7 @@ from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
 
 completion_field = {
-                    "type": "keyword",
+                    "type": "text",
                     "fields": {
                         "suggest": {
                             "type": "completion",
