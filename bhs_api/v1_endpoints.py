@@ -163,15 +163,23 @@ def _validate_filetype(file_info_str):
     return False
 
 def get_completion(collection, string, size=7):
-    '''Search in the headers of bhp6 compatible db documents.
-    If `search_prefix` flag is set, search only in the beginning of headers,
-    otherwise search everywhere in the header.
-    Return only `max_res` results.
+    '''Search in the elastic search index for completion options.
+    Returns to array each with up to `size` results. The first array contains
+    the text completion and the second the phonetic suggestions.
     '''
+
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
         lang = 'En'
+
+    ''' TODO: fix pohonetics search or remove this code
+    dms_soundex = phonetic.get_dms(string)
+    if " " in dms_soundex:
+        dms_completion = {"regex":"[{}]".format(dms_soundex.replace(' ', '|'))}
+        dms_completion = {"prefix": dms_soundex.split(' ')[0]}
+    else:
+        dms_completion = {"prefix": dms_soundex}
 
     q = {
         "_source": ["Slug", "Header"],
@@ -185,18 +193,53 @@ def get_completion(collection, string, size=7):
                         "collection": collection,
                     }
                 }
+            },
+            "phonetic" : {
+                "completion" : {
+                    "field" : "dm_soundex",
+                    "size": size,
+                    "contexts": {
+                        "collection": collection,
+                    }
+                }
             }
         }
     }
+    q["suggest"]["phonetic"].update(dms_completion)
+    '''
+
+    # no phonetics query
+    q = {
+        "_source": ["Slug", "Header"],
+        "suggest": {
+            "header" : {
+                "prefix": string,
+                "completion": {
+                    "field": "Header.{}.suggest".format(lang),
+                    "size": size,
+                    "contexts": {
+                        "collection": collection,
+                    }
+                }
+            },
+        }
+    }
+
     results = current_app.es.search(index=current_app.data_db.name,
                                 body=q,
                                 size=0)
     try:
-        options = results['suggest']['header'][0]['options']
+        header_options = results['suggest']['header'][0]['options']
     except KeyError:
-        return []
+        header_options = []
 
-    return  [i['_source']['Header'][lang] for i in options]
+    try:
+        phonetic_options = results['suggest']['phonetic'][0]['options']
+    except KeyError:
+        phonetic_options = []
+
+    return  [i['_source']['Header'][lang] for i in header_options],\
+            [i['_source']['Header'][lang] for i in phonetic_options]
 
 
 def get_phonetic(collection, string, limit=5):
@@ -418,9 +461,8 @@ def get_suggestions(collection,string):
     '''
     rv = {}
 
-    rv['starts_with'] = get_completion(collection, string)
+    rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
     rv['contains'] = []
-    rv['phonetic'] = get_phonetic(collection, string)
 
     # make all the words in the suggestion start with a capital letter
     for k,v in rv.items():

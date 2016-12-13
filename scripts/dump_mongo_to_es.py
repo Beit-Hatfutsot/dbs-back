@@ -7,11 +7,12 @@ import argparse
 import elasticsearch
 
 from bhs_api import create_app
+from bhs_api import phonetic
 from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
 
 completion_field = {
-                    "type": "text",
+                    "type": "keyword",
                     "fields": {
                         "suggest": {
                             "type": "completion",
@@ -24,19 +25,14 @@ completion_field = {
                         }
                     },
                 }
-completion_mapping = {
-        "Header": {
-            "properties": {
-                "En": completion_field,
-                "He": completion_field,
-            }
-        },
-        "UnitHeaderDMSoundex": {
-            "properties": {
-                "En": completion_field,
-                "He": completion_field,
-            }
-        }}
+
+header_mapping = {
+                    "properties": {
+                        "En": completion_field,
+                        "He": completion_field,
+                    }
+                 }
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -47,6 +43,16 @@ def parse_args():
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')
     return parser.parse_args()
+
+def add_phonetics(doc):
+    if doc['Header']['En']:
+        s = phonetic.get_english_dms(doc['Header']['En'])
+    elif doc['Header']['He']:
+        s = phonetic.get_hebrew_dms(doc['Header']['He'])
+    else:
+        s = 'BADWOLF'
+    options = s.split(' ')
+    doc['dm_soundex'] = options
 
 if __name__ == '__main__':
 
@@ -65,8 +71,21 @@ if __name__ == '__main__':
         # set the mapping to support completion fields
         app.es.indices.create(index_name, body={
             "mappings": {
-                "places": { "properties": completion_mapping },
-                "familyNames": { "properties": completion_mapping },
+                "places": { "properties": {
+                    "Header": header_mapping,
+                }},
+                "familyNames": { "properties": {
+                    "Header": header_mapping,
+                    "dm_soundex": {
+                        "type": "completion",
+                        "max_input_length": 20,
+                        "contexts": [{
+                            "name": "collection",
+                            "type": "category",
+                            "path": "_type"
+                        }]
+                    }
+                }},
             }
         })
 
@@ -80,11 +99,15 @@ if __name__ == '__main__':
         for doc in db[collection].find(SHOW_FILTER):
             _id = doc['_id']
             del doc['_id']
+            del doc['UnitHeaderDMSoundex']
             # un null the fields that are used for completion
-            for key in ('Header', 'UnitHeaderDMSoundex'):
-                for lang in ('En', 'He'):
-                    if not doc[key][lang]:
-                        doc[key][lang] = '1234567890'
+            if collection in ('places', 'familyNames'):
+                add_phonetics(doc)
+            # fill empty headers as es completion fails on null values
+            header = doc['Header']
+            for lang in ('En', 'He'):
+                if not header[lang]:
+                    header[lang] = '1234567890'
             try:
                 res = app.es.index(index=index_name, doc_type=collection, id=_id, body=doc)
             except elasticsearch.exceptions.SerializationError:
