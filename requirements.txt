@@ -22,4 +22,4 @@ pytest-mock==1.2
 gcs-oauth2-boto-plugin==1.14
 awesome-slugify==1.6.5
 Pillow==3.3.1
--e git+https://github.com/daonb/python-zeep.git@master#egg=zeep
+-e git+https://github.com/daonb/python-zeep.git@bh#egg=zeep
