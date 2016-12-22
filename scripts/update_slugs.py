@@ -7,6 +7,7 @@ import pymongo
 import requests
 from zeep import Client, xsd
 from zeep.helpers import serialize_object
+from html2text import html2text
 
 from bhs_api import create_app
 from bhs_api.utils import SEARCHABLE_COLLECTIONS
@@ -35,7 +36,6 @@ logging.config.dictConfig({
     }
 })
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description=
                     'update the slugs from the app db to clearmash items')
@@ -62,23 +62,17 @@ if __name__ == '__main__':
     row = serialize_object(r['Entity']['Document'])
     doc = {}
     for k, v in row.items():
-        if not k.startswith('Fields_'):
+        if not v or not k.startswith('Fields_'):
             continue
         for j in v.values()[0]:
-            print j
-            doc[j['Id']] = doc[j['Value']]
-    print doc
+            try:
+                doc[j['Id']] = j['Value']
+            except KeyError:
+                doc[j['Id']] = j['DatasourceItemsIds']
+
+    doc['description'] = {}
+    for v in doc['_c6_beit_hatfutsot_bh_base_template_description']['LocalizedString']:
+        doc['description'][v['ISO6391']] = html2text(v['Value'])
 
     import pdb; pdb.set_trace()
 
-    HTTPConnection.debuglevel = 1
-
-    logging.basicConfig()
-    logging.getLogger().setLevel(logging.DEBUG)
-    requests_log = logging.getLogger("requests.packages.urllib3")
-    requests_log.setLevel(logging.DEBUG)
-    requests_log.propagate = True
-    r = requests.post("{}/API/V5/Services/WebContentManagement.svc/Document/Get"
-                    .format(conf.clearmash_url),
-                      params={'entityId': 15841},
-                      headers={"ClientToken": conf.clearmash_token})
