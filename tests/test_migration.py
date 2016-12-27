@@ -45,10 +45,13 @@ def test_updated_doc(mocker, app):
     collection = app.data_db['personalities']
     with app.app_context():
         update_doc(collection, the_tester)
+        original_slug = collection.find_one({'UnitId':1000})['Slug']['En']
         updated_tester = the_tester.copy()
+        updated_tester['Header']['En'] = 'Nikos Nikolveich'
         updated_tester['UnitText1']['En'] = 'The Great Tester'
         update_doc(collection, updated_tester)
 
+    assert original_slug ==  collection.find_one({'UnitId':1000})['Slug']['En']
     assert collection.count({'UnitId':1000}) == 1
 
 def test_update_photo(mocker):
