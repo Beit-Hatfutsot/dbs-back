@@ -75,7 +75,8 @@ def update_es(collection, doc, id):
 
     index_name = current_app.data_db.name
     body = doc.copy()
-    del body['_id']
+    if '_id' in body:
+        del body['_id']
     try:
         current_app.es.index(index=index_name,
                              doc_type=collection,
