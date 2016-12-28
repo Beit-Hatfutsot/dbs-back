@@ -58,6 +58,8 @@ def parse_args():
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
     parser.add_argument('-t', '--treenum')
+    parser.add_argument('-i', '--unitid', type=int,
+                        help='migrate a specifc unit id')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -425,6 +427,10 @@ if __name__ == '__main__':
             unit_ids = [unit['UnitId'] for unit in units]
             sql_cursor = sqlClient.execute(query, select_ids=True,
                                         unit_ids=unit_ids)
+        elif args.unitid:
+            sql_cursor = sqlClient.execute(query, select_ids=True,
+                                        unit_ids=[args.unitid])
+
         else:
             sql_cursor = sqlClient.execute(query)
 
