@@ -170,7 +170,22 @@ def fsearch(max_results=15, db=None, **kwargs):
 
     search_query = build_query(search_dict)
 
-    results = collection.find(search_query, PROJECTION)
+    results = collection.find(search_query, {
+              'name': 1,
+              'parents': 1,
+              'partners': 1,
+              'siblings': 1,
+              'tree_num': 1,
+              'id': 1,
+              'sex': 1,
+              'tree_version': 1,
+              'Slug': 1,
+              'birth_year': 1,
+              'death_year': 1,
+              'BIRT_PLAC': 1,
+              'DEAT_PLAC': 1,
+              'deceased': 1,
+                })
     total = results.count()
 
     if 'start' in search_dict:
@@ -182,15 +197,29 @@ def fsearch(max_results=15, db=None, **kwargs):
 
 
 def clean_person(person):
-    private_key = re.compile(
-        "[BD|BP|MD|MP]")
-    private_dict = re.compile(
-        '[BIRT_PLAC|BIRT_DATE|MARR_PLAC|MARR_DATE|OCCU|NOTE]')
-    if 'tree' in person and not person['tree']['deceased']:
-        for key in person.keys():
-            if private_key.match(key):
-                person[key] = ''
-            if private_dict.match(key):
-                person['tree'][key] = {}
-    return person
 
+    # mongo's id
+    del person['_id']
+
+    # translating gedcom names
+    for db_key, api_key in (('BIRT_PLAC', 'birth_place'),
+                     ('DEAT_PLAC', 'death_place'),
+                     ('MARR_PLAC', 'marriage_place'),
+                     ('MARR_DATE', 'marriage_date'),
+                     ('OCCU', 'occupation'),
+                     ('NOTE', 'bio'),
+                     ):
+        try:
+            person[api_key] = person.pop(db_key)
+        except KeyError:
+            pass
+
+    # remove the details of the living
+    if not person['deceased']:
+        for key in person.keys():
+            if key in ['birth_year', 'death_year', 'birth_place',
+                       'death_place', 'marriage_place', 'marriage_date',
+                       'occupation', 'bio',
+                      ]:
+                del person[key]
+    return person
