@@ -8,6 +8,7 @@ from flask.ext.security import current_user, auth_token_required
 from flask.ext.security.utils import encrypt_password, verify_password
 from flask.ext.security.passwordless import send_login_instructions
 from flask.ext.security.decorators import _check_token
+from werkzeug.exceptions import NotFound, Forbidden
 
 from utils import humanify, dictify, send_gmail
 from .models import StoryLine, UserName 
@@ -187,7 +188,15 @@ def collect_editors_items(name):
         i = user.story_branches.index(name)
         for j in user.story_items:
             if j.in_branch[i]:
-                items.append(fetch_item(j.id))
+                try:
+                    items.append(fetch_item(j.id))
+                except Forbidden:
+                    current_app.logger.warn("collection : {} includes forbidden {}"
+                                .format(name, j.id))
+                except NotFound:
+                    current_app.logger.warn("collection : {} includes missing {}"
+                                .format(name, j.id))
+
     current_app.redis.set(redis_key,
                           cPickle.dumps(items),
                           ex=current_app.config['CACHING_TTL'])

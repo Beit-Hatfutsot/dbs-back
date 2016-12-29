@@ -108,8 +108,6 @@ def create_app(testing=False, live=False):
     except AttributeError:
         app.redis = None
 
-    app.logger.debug("Hellow world")
-
     return app, conf
 
 # Specify the bucket name for user generated content

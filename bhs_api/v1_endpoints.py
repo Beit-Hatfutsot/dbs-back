@@ -37,73 +37,6 @@ def get_activation_link(user_id):
     payload = s.dumps(user_id)
     return url_for('activate_user', payload=payload, _external=True)
 
-# While searching for docs, we always need to filter results by their work
-# status and rights.
-# We also filter docs that don't have any text in the 'UnitText1' field.
-es_show_filter = {
-  'query': {
-    'filtered': {
-      'filter': {
-        'bool': {
-          'should': [
-            {
-              'and': [
-                {
-                  'exists': {
-                    'field': 'UnitText1.En'
-                  }
-                },
-                {
-                  'script': {
-                    'script': "doc['UnitText1.En'].empty == false"
-                  }
-                }
-              ]
-            },
-            {
-              'and': [
-                {
-                  'exists': {
-                    'field': 'UnitText1.He'
-                  }
-                },
-                {
-                  'script': {
-                    'script': "doc['UnitText1.He'].empty == false"
-                  }
-                }
-              ]
-            }
-          ],
-          'must_not': [
-            {
-              'regexp': {
-                'DisplayStatusDesc': 'internal'
-              }
-            }
-          ],
-          'must': [
-            {
-              'term': {
-                'StatusDesc': 'completed'
-              }
-            },
-            {
-              'term': {
-                'RightsDesc': 'full'
-              }
-            }
-          ]
-        }
-      },
-      'query': {
-        'query_string': {
-          'query': '*'
-        }
-      }
-    }
-  }
-}
 
 '''
 class Ugc(db.Document):
@@ -117,12 +50,12 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 
 
 def es_search(q, size, collection=None, from_=0):
-    body = es_show_filter
-    query_body = body['query']['filtered']['query']['query_string']
-    query_body['query'] = q
-    # Boost the header by  2:
-    # https://www.elastic.co/guide/en/elasticsearch/reference/1.7/query-dsl-query-string-query.html
-    query_body['fields'] = ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He']
+    # body = {"query": { "match" : { "_all": {"query": q, "operator": "and"} }}}
+    body = {"query": { "query_string" : {
+        "fields": ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He'],
+        "query": q,
+        "default_operator": "and"
+    }}}
     try:
         try:
             collection = collection.split(',')
@@ -229,39 +162,85 @@ def _validate_filetype(file_info_str):
 
     return False
 
-def get_completion(collection, string, search_prefix=True, max_res=5):
-    '''Search in the headers of bhp6 compatible db documents.
-    If `search_prefix` flag is set, search only in the beginning of headers,
-    otherwise search everywhere in the header.
-    Return only `max_res` results.
+def get_completion(collection, string, size=7):
+    '''Search in the elastic search index for completion options.
+    Returns to array each with up to `size` results. The first array contains
+    the text completion and the second the phonetic suggestions.
     '''
-    collection = current_app.data_db[collection]
+
     if phonetic.is_hebrew(string):
         lang = 'He'
     else:
         lang = 'En'
 
-    if search_prefix:
-        regex = re.compile('^'+re.escape(string), re.IGNORECASE)
+    ''' TODO: fix pohonetics search or remove this code
+    dms_soundex = phonetic.get_dms(string)
+    if " " in dms_soundex:
+        dms_completion = {"regex":"[{}]".format(dms_soundex.replace(' ', '|'))}
+        dms_completion = {"prefix": dms_soundex.split(' ')[0]}
     else:
-        regex = re.compile(re.escape(string), re.IGNORECASE)
+        dms_completion = {"prefix": dms_soundex}
 
-    found = []
-    header = 'Header.{}'.format(lang)
-    unit_text = 'UnitText1.{}'.format(lang)
-    # Search only for non empty docs with right status
-    show_filter = SHOW_FILTER.copy()
-    show_filter[unit_text] = {"$nin": [None, '']}
-    header_search_ex = {header: regex}
-    header_search_ex.update(show_filter)
-    projection = {'_id': 0, header: 1}
-    cursor = collection.find(header_search_ex ,projection).limit(max_res)
-    for doc in cursor:
-        header_content = doc['Header'][lang]
-        if header_content:
-            found.append(header_content.lower())
+    q = {
+        "_source": ["Slug", "Header"],
+        "suggest": {
+            "header" : {
+                "prefix" : string,
+                "completion" : {
+                    "field" : "Header.{}.suggest".format(lang),
+                    "size": size,
+                    "contexts": {
+                        "collection": collection,
+                    }
+                }
+            },
+            "phonetic" : {
+                "completion" : {
+                    "field" : "dm_soundex",
+                    "size": size,
+                    "contexts": {
+                        "collection": collection,
+                    }
+                }
+            }
+        }
+    }
+    q["suggest"]["phonetic"].update(dms_completion)
+    '''
 
-    return found
+    # no phonetics query
+    q = {
+        "_source": ["Slug", "Header"],
+        "suggest": {
+            "header" : {
+                "prefix": string,
+                "completion": {
+                    "field": "Header.{}.suggest".format(lang),
+                    "size": size,
+                    "contexts": {
+                        "collection": collection,
+                    }
+                }
+            },
+        }
+    }
+
+    results = current_app.es.search(index=current_app.data_db.name,
+                                body=q,
+                                size=0)
+    try:
+        header_options = results['suggest']['header'][0]['options']
+    except KeyError:
+        header_options = []
+
+    try:
+        phonetic_options = results['suggest']['phonetic'][0]['options']
+    except KeyError:
+        phonetic_options = []
+
+    return  [i['_source']['Header'][lang] for i in header_options],\
+            [i['_source']['Header'][lang] for i in phonetic_options]
+
 
 def get_phonetic(collection, string, limit=5):
     collection = current_app.data_db[collection]
@@ -481,9 +460,9 @@ def get_suggestions(collection,string):
     Each field holds a list of up to 5 strings.
     '''
     rv = {}
-    rv['starts_with'] = get_completion(collection, string)
-    rv['contains'] = get_completion(collection, string, False)
-    rv['phonetic'] = get_phonetic(collection, string)
+
+    rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
+    rv['contains'] = []
 
     # make all the words in the suggestion start with a capital letter
     for k,v in rv.items():

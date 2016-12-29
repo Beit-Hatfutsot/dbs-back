@@ -3,12 +3,6 @@ import json
 import pytest
 from pytest_flask.plugin import client
 
-@pytest.fixture
-def tester_headers(client, get_auth_header):
-    headers = {'Content-Type': 'application/json'}
-    headers.update(get_auth_header)
-    return headers
-
 def test_mjs_in_user_data(client, request, tester_headers):
     res = client.get('/user',
                      headers=tester_headers)
@@ -38,6 +32,10 @@ def test_illegal_add_to_branch(client, request, tester_headers):
     assert res.status_code == 400
 
 def test_add_to_branch(client, request, tester_headers):
+    res = client.post('/mjs',
+                headers = tester_headers,
+                data = 'photoUnits.123')
+    assert res.status_code == 200
     res = client.post('/mjs/1', headers=tester_headers,
                      data = 'photoUnits.123')
     assert res.status_code == 200
@@ -47,6 +45,13 @@ def test_add_to_branch(client, request, tester_headers):
     assert item['in_branch'] == [True, False, False, False]
 
 def test_delete_from_branch(client, request, tester_headers):
+    res = client.post('/mjs',
+                headers = tester_headers,
+                data = 'photoUnits.123')
+    assert res.status_code == 200
+    res = client.post('/mjs/1', headers=tester_headers,
+                     data = 'photoUnits.123')
+    assert res.status_code == 200
     res = client.delete('/mjs/1/photoUnits.123', headers=tester_headers)
     assert res.status_code == 200
     assert len(res.json['story_items']) == 1

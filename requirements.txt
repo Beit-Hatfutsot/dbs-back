@@ -1,3 +1,4 @@
+six==1.10.0
 Flask==0.10.1
 Flask-Cors==1.9.0
 -e git+https://github.com/Beit-Hatfutsot/flask-security.git@develop#egg=Flask-Security
@@ -18,3 +19,6 @@ elasticsearch==1.4.0
 redis==2.10.5
 celery==3.1.23
 pytest-mock==1.2
+gcs-oauth2-boto-plugin==1.14
+awesome-slugify==1.6.5
+Pillow==3.3.1

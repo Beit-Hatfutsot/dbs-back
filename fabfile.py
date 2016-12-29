@@ -14,8 +14,8 @@ env.now = datetime.now().strftime('%Y%m%d-%H%M')
 def dev():
     env.hosts = ['bhs-dev']
 
-def push_code():
-    local('git archive -o /tmp/api.tar.gz HEAD')
+def push_code(rev='HEAD'):
+    local('git archive -o /tmp/api.tar.gz '+rev)
     put('/tmp/api.tar.gz', '/tmp')
     run('mv api /tmp/api-`date +%d.%m.%y-%H:%M:%S`')
     run('mkdir api')
@@ -25,7 +25,6 @@ def push_code():
             run('virtualenv env')
         with prefix('. env/bin/activate'):
             run('pip install -r requirements.txt')
-            run('pip install -r requirements.migrate.txt')
 
 def push_conf():
     with cd("api"):

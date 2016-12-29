@@ -6,11 +6,14 @@ from celery import Celery
 from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
-from bhs_api.item import get_collection_id_field
-from bhs_api.add_coordinates_to_places import get_geo(doc)
+from bhs_api.item import get_collection_id_field, create_slug
+from bhs_api.add_coordinates_to_places import get_geo
+from scripts.batch_related import get_bhp_related
+
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
 MIGRATE_ES = os.environ.get('MIGRATE_ES', '1')
+MIGRATE_RELATED = os.environ.get('MIGRATE_RELATED', True)
 INDICES = {
     'places' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
     'familyNames' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
@@ -72,11 +75,14 @@ def update_es(collection, doc, id):
         return
 
     index_name = current_app.data_db.name
+    body = doc.copy()
+    if '_id' in body:
+        del body['_id']
     try:
         current_app.es.index(index=index_name,
                              doc_type=collection,
                              id=id,
-                             body=doc)
+                             body=body)
     except elasticsearch.exceptions.SerializationError:
         # UUID fields are causing es to crash, turn them to strings
         uuids_to_str(doc)
@@ -99,19 +105,24 @@ def reslugify(collection, document):
 
 
 @celery.task
-def update_tree(data, collection=None):
-    # from celery.contrib import rdb; rdb.set_trace()
-    if not collection:
-        collection = celery.data_db['trees']
+def update_tree(data, db=None):
+    '''  acelery task to update or create a tree '''
+    if not db:
+        trees = celery.data_db['trees']
+        persons = celery.data_db['persons']
+    else:
+        trees = db['trees']
+        persons = db['persons']
+
     num = data['num']
-    tree = collection.find_one({'num': num})
+    tree = trees.find_one({'num': num})
     doc = data.copy()
     file_id = doc.pop('file_id')
     date = doc.pop('date')
-    persons = doc.pop('persons')
+    persons_count = doc.pop('persons')
     current_ver = {'file_id':file_id,
                    'update_date': date,
-                   'persons': persons}
+                   'persons': persons_count}
     if tree:
         # don't add the same version twice
         for i in tree['versions']:
@@ -119,13 +130,21 @@ def update_tree(data, collection=None):
                 return
         doc['versions'] = tree['versions']
         doc['versions'].append(current_ver)
-        collection.update_one({'num': num},
+        trees.update_one({'num': num},
                               {'$set': doc},
                               upsert=True)
+        last_version = len(tree['versions'])-1
+        current_app.logger.info('archiving persons w/ versions<{} in tree {}'
+                                .format(last_version, doc['num']))
+        persons.update_many(
+            {'tree_num': num,
+             'tree_version': {'$lt': last_version}},
+            {'$set': {'archived': True}}
+        )
 
     else:
         doc['versions'] = [current_ver]
-        collection.insert_one(doc)
+        trees.insert_one(doc)
     current_app.redis.set('tree_vers_'+str(num),
                           json.dumps(doc['versions']),
                           300)
@@ -148,12 +167,28 @@ def update_row(doc, collection_name):
     ensure_indices(collection)
 
 def update_collection(collection, query, doc):
+    if MIGRATE_RELATED != '0':
+        doc['related'] = get_bhp_related(doc, collection.name,
+                                                max_items=6,
+                                                bhp_only=True)
+
     if MIGRATE_MODE  == 'i':
+        doc['Slug'] = create_slug(doc, collection.name)
         return collection.insert(doc)
     else:
-        return collection.update_one(query,
-                        {'$set': doc},
-                        upsert=True)
+        r = collection.update_one(query,
+                                  {'$set': doc},
+                                  upsert=False)
+        # check if update failed and if it did, create a slug
+        if r.modified_count == 0:
+            doc['Slug'] = create_slug(doc, collection.name)
+            try:
+                return collection.insert(doc)
+            except pymongo.errors.DuplicateKeyError:
+                # oops - seems like we need to add the id to the slug
+                reslugify(collection, doc)
+                collection.insert(doc)
+
 
 def update_doc(collection, document):
     # update place items with geojson
@@ -192,26 +227,23 @@ def update_doc(collection, document):
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
+        # post parsing: add _id and Slug
         doc_id_field = get_collection_id_field(collection.name)
-        doc_id = document[doc_id_field]
-        # Set up collection specific document ids
-        # Search updated collections for collection specific index field
-        # and update it.  Save the _id of updated/inserted doc to
-        # the 'migration_log' collection
-        query = {doc_id_field: doc_id}
         try:
-            result = update_collection(collection, query, document)
-            try:
-                id = result.upserted_id
-            except AttributeError:
-                result = collection.find_one(query)
-                id = result['_id']
+            doc_id = document[doc_id_field]
+        except KeyError:
+            current_app.logger.error('update failed because of id {} {}'
+                                     .format(collection.name,
+                                             doc_id_field,
+                                             ))
+        if doc_id:
+            document['_id'] = doc_id
 
-        except pymongo.errors.DuplicateKeyError:
-            reslugify(collection, document)
-            id = collection.insert(document)
 
-        update_es(collection.name, document, id)
+        query = {doc_id_field: doc_id}
+        result = update_collection(collection, query, document)
+
+        update_es(collection.name, document, doc_id)
 
         try:
             slug = document['Slug']['En']

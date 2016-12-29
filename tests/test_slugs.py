@@ -12,7 +12,7 @@ import mongomock
 
 from pytest_flask.plugin import client, config
 
-from bhs_api.item import fetch_items
+from bhs_api.item import fetch_items, Slug
 
 def test_single_collection(client, mock_db):
     res = fetch_items(['personality_tester'], mock_db)
@@ -43,3 +43,8 @@ def test_person_collection(client, mock_db):
 
 def test_multi_collections(client):
     pass
+
+def test_old_person_slug():
+    s = Slug("person_8888.I1")
+    assert s.local_slug == "8888;0.I1"
+    assert s.full == "person_8888;0.I1"

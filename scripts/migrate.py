@@ -12,7 +12,6 @@ import time
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
 from bson.code import Code
-from slugify import Slugify
 
 from gedcom import Gedcom, GedcomParseError
 from migration.migration_sqlclient import MigrationSQLClient
@@ -22,8 +21,6 @@ from migration.family_trees import Gedcom2Persons
 from bhs_api.utils import get_conf, create_thumb, get_unit_type
 from bhs_api import phonetic
 from bhs_api.item import get_collection_id_field
-
-slugify = Slugify(translate=None, safe_chars='_')
 
 
 conf = get_conf(set(['queries_repo_path',
@@ -41,6 +38,8 @@ conf = get_conf(set(['queries_repo_path',
                     os.path.join('/etc/bhs/'
                              'migrate_config.yaml'))
 
+sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
+
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)-15s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
@@ -57,8 +56,10 @@ def parse_args():
     parser.add_argument('--host', default='localhost')
     parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
-    parser.add_argument('-u', '--until', default=calendar.timegm(time.gmtime()))
-    parser.add_argument('-t', '--treenum', type=int)
+    parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
+    parser.add_argument('-t', '--treenum')
+    parser.add_argument('-i', '--unitid', type=int,
+                        help='migrate a specifc unit id')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -276,49 +277,6 @@ def parse_synonym(doc):
 
     return parsed
 
-def add_slug(document, collection_name):
-    collection_slug_map = {
-        'places': {'En': 'place',
-                   'He': u'מקום',
-                  },
-        'familyNames': {'En': 'familyname',
-                        'He': u'שםמשפחה',
-                       },
-        'lexicon': {'En': 'lexicon',
-                    'He': u'מלון',
-                   },
-        'photoUnits': {'En': 'image',
-                       'He': u'תמונה',
-                      },
-        'photos': {'En': 'image',
-                   'He': u'תמונה',
-                  },
-        'genTreeIndividuals': {'En': 'person',
-                               'He': u'אדם',
-                              },
-        'synonyms': {'En': 'synonym',
-                     'He': u'שם נרדף',
-                    },
-        'personalities': {'En': 'luminary',
-                          'He': u'אישיות',
-                          },
-        'movies': {'En': 'video',
-                   'He': u'וידאו',
-                  },
-    }
-    try:
-        headers = document['Header'].items()
-    except KeyError:
-        return
-
-    document['Slug'] = {}
-    for lang, val in headers:
-        if val:
-            collection_slug = collection_slug_map[collection_name][lang]
-            slug = slugify('_'.join([collection_slug, val.lower()]))
-            document['Slug'][lang] = slug.encode('utf8')
-
-
 def parse_doc(doc, collection_name):
     collection_procedure_map = {
         'places':               parse_common,
@@ -331,14 +289,7 @@ def parse_doc(doc, collection_name):
         'personalities':        parse_common,
         'movies':               parse_common,
     }
-    document = collection_procedure_map[collection_name](doc)
-    if document:
-        # post parsing: add _id and Slug
-        if getattr(document, 'UnitId', False):
-            document['_id'] = document['UnitId']
-        if not hasattr(document, 'Slug'):
-            add_slug(document, collection_name)
-    return document
+    return collection_procedure_map[collection_name](doc)
 
 
 def get_touched_units(collection_name,  since, until):
@@ -369,37 +320,59 @@ def parse_n_update(row, collection_name):
     return doc
 
 
-def migrate_trees(cursor, since_timestamp, conf, treenum):
+def get_file_descriptors(tree):
+    ''' there are two file paths in the dbs, return the one that points to the
+        latest file based on creation time.
+        returns both the file_id and the full file name
+    '''
+    file_id1 = str(tree['GenTreeFileId'])
+    file_name1 = os.path.join(conf.gentree_mount_point,
+                              os.path.dirname(tree['GenTreePath']),
+                              file_id1+'.ged')
+    file_id2 = os.path.split(tree['GenTreePath'])[-1].split('.')[0]
+    file_name2 = os.path.join(conf.gentree_mount_point,
+                              tree['GenTreePath'])
+
+    if os.path.getctime(file_name1) > os.path.getctime(file_name2):
+        return file_id1, file_name1
+    else:
+        return file_id2, file_name2
+
+
+def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
     since = datetime.datetime.fromtimestamp(since_timestamp)
+    until = datetime.datetime.fromtimestamp(until_timestamp)
+    count = 0
+    treenums = treenums.split(',') if treenums else None
+        
     for row in sql_cursor:
         # special case for a specific tree
-        if treenum:
-            if row['GenTreeNumber'] != treenum:
+        if treenums:
+            if str(row['GenTreeNumber']) not in treenums:
                 continue
-        elif row['UpdateDate'] < since:
+        elif row['UpdateDate'] < since or row['UpdateDate'] > until:
             continue
-        file_id = str(row['GenTreeFileId'])
-        filename = os.path.join(conf.gentree_mount_point,
-                                os.path.dirname(row['GenTreePath']),
-                                file_id+'.ged')
+        file_id, file_name = get_file_descriptors(row)
         try:
-            gedcom_fd = open(filename)
+            gedcom_fd = open(file_name)
         except IOError:
             logger.error('failed to open gedocm file tree number {}, path {}: {}'
-                         .format(row['GenTreeNumber'], filename, str(e)))
+                         .format(row['GenTreeNumber'], file_name, str(e)))
             continue
 
         try:
             g = Gedcom(fd=gedcom_fd)
         except (SyntaxError, GedcomParseError) as e:
             logger.error('failed to parse tree number {}, path {}: {}'
-                         .format(row['GenTreeNumber'], filename, str(e)))
+                         .format(row['GenTreeNumber'], file_name, str(e)))
             continue
         logger.info('>>> migrating tree {}, path {}'
-                    .format(row['GenTreeNumber'], filename))
+                    .format(row['GenTreeNumber'], file_name))
         Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update)
         logger.info('<<< migrated tree {}, path {}'
-                    .format(row['GenTreeNumber'], filename))
+                    .format(row['GenTreeNumber'], file_name))
+        count += 1
+    return count
 
 
 if __name__ == '__main__':
@@ -410,14 +383,14 @@ if __name__ == '__main__':
     if not args.since:
         if args.lasthours:
 
-            past = datetime.datetime.utcnow() -\
+            past = datetime.datetime.now() -\
                     datetime.timedelta(hours=int(args.lasthours))
             since = calendar.timegm(past.timetuple())
         else:
             try:
                 since_file = open('/var/run/bhs/last_update', 'r+')
                 since = since_file.read()
-                since = int(since)
+                since = int(since) + 1
             except IOError:
                 since_file = None
                 since = 0
@@ -425,31 +398,39 @@ if __name__ == '__main__':
         since = int(args.since)
 
 	# connect to BHP SQL Server
-    sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
 
     if args.treenum:
         collection = 'genTrees'
     else:
         collection = args.collection
     queries = get_queries(collection)
+    logger.info('looking for changed items in {}-{}'.format(since, until))
     photos_to_update = []
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
             #TODO: `since` should be part of the sql query
             sql_cursor = sqlClient.execute(query)
-            migrate_trees(sql_cursor, since, conf, args.treenum)
+            count = migrate_trees(sql_cursor, since, until, args.treenum)
+            if not count:
+                logger.info('{}:Skipping'.format(collection_name))
+
             continue
 
         if since:
             unit_cursor = get_touched_units(collection_name, since, until)
-            if not unit_cursor:
+            units = list(unit_cursor)
+
+            if not units:
                 logger.info('{}:Skipping'.format(collection_name))
                 continue
 
-            units = list(unit_cursor)
             unit_ids = [unit['UnitId'] for unit in units]
             sql_cursor = sqlClient.execute(query, select_ids=True,
                                         unit_ids=unit_ids)
+        elif args.unitid:
+            sql_cursor = sqlClient.execute(query, select_ids=True,
+                                        unit_ids=[args.unitid])
+
         else:
             sql_cursor = sqlClient.execute(query)
 
@@ -457,17 +438,19 @@ if __name__ == '__main__':
             for row in sql_cursor:
                 doc = parse_n_update(row, collection_name)
                 # collect all the photos
-                try:
-                    photos_to_update.extend(
-                        [photo['PictureId'] for photo in doc['Pictures']])
+                pictures = doc.get('Pictures', None)
+                if pictures:
+                    for pic in pictures:
+                        if 'PictureId' in pic:
+                            photos_to_update.append(pic['PictureId'])
+        else:
+            logger.warn('failed getting updated units {}:{}'
+                        .format(collection_name, ','.join(units)))
 
-                except KeyError:
-                    pass
         # TODO:
         # rsync_media(collection_name)
 
     # update photos
-    # TODO: what the fuck?
     if len(photos_to_update) > 0:
         photos_query = get_queries('photos')['photos']
         photos_cursor = sqlClient.execute(photos_query,
@@ -475,8 +458,7 @@ if __name__ == '__main__':
                                           unit_ids=photos_to_update,
                                           stringify=True)
         for row in photos_cursor:
-            doc = parse_n_update(row, 'photos')
-            upload_photo(doc, conf)
+            upload_photo(row, conf)
 
     if since_file:
         since_file.seek(0)
