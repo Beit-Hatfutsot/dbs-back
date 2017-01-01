@@ -68,7 +68,7 @@ if __name__ == '__main__':
                                         doc["UnitPlaces"]))
                     row = [doc["UnitId"],
                             doc["Header"]["En"],
-                            doc["PersonTypeCodesDesc"]["En"],
+                            doc["PersonTypeCodesDesc"]["He"],
                             doc["PeriodDesc"]["En"],
                             doc["UnitText1"]["En"],
                             places,
