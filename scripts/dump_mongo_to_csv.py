@@ -1,10 +1,11 @@
 #!/usr/bin/env python
-
-import datetime
+import os
+from datetime import datetime
 from uuid import UUID
 import argparse
 import urllib2
 from subprocess import call
+from ftplib import FTP
 
 import unicodecsv
 
@@ -16,10 +17,18 @@ from bhs_api.item import SHOW_FILTER
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--out',
-                        help='the directory to store the csvs in')
+    parser.add_argument('-o', '--out', default ='/tmp',
+                        help='the directory to store the csvs in. defaults to /tmp')
+    parser.add_argument('--debug', action='store_true',
+                        help='debug mode, dump only 100 records of each collection')
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')
+    parser.add_argument('--ftp_server',
+                        help='the address of the ftp server to push mojp-dump.tgz to')
+    parser.add_argument('--ftp_user', default='anonymous')
+    parser.add_argument('--ftp_password', default=None)
+    parser.add_argument('--ftp_dir', default='incoming',
+                        help='the ftp directory where to store the file')
     return parser.parse_args()
 
 def clean(row):
@@ -57,7 +66,11 @@ if __name__ == '__main__':
             header = ['URL', 'ID', 'Title', 'Period', 'Body', 'Places']
 
         writer.writerow(header)
-        started = datetime.datetime.now()
+        started = datetime.now()
+        cursor = db[collection].find(SHOW_FILTER)
+        if args.debug:
+            import pdb; pdb.set_trace()
+            cursor = cursor.limit(100)
         for doc in db[collection].find(SHOW_FILTER):
             if "En" not in doc["Slug"]:
                 continue
@@ -101,8 +114,19 @@ if __name__ == '__main__':
             row.insert(0, url)
             writer.writerow(clean(row))
         outfile.close()
-        finished = datetime.datetime.now()
+        finished = datetime.now()
         print 'Collection {} took {}'.format(collection, finished-started)
     fns = [i+'.csv' for i in collections]
+    tgz_fn = 'mojp-csv-dump.{}.tgz'.format(
+            datetime.now().strftime("%d.%m.%y-%H:%M:%S"))
+    tgz_path = os.path.join(args.out, tgz_fn)
     call(['tar','-C', args.out,
-          '-czf', '/'.join((args.out, 'mojp-dump.tgz'))] + fns)
+          '-czf', tgz_path] + fns)
+
+    if args.ftp_server:
+        ftp = FTP(args.ftp_server, args.ftp_user, args.ftp_password)
+        tgz = open(tgz_path)
+        ftp.cwd(args.ftp_dir)
+        ftp.storbinary('STOR '+ tgz_fn, tgz)
+        tgz.close()
+        ftp.quit()
