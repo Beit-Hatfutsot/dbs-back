@@ -43,12 +43,32 @@ def test_update_doc(mocker, app):
 def test_updated_doc(mocker, app):
     mocker.patch('elasticsearch.Elasticsearch.index')
     collection = app.data_db['personalities']
+    es_body = the_tester.copy()
+    del es_body["_id"]
     with app.app_context():
         update_doc(collection, the_tester)
+        original_slug = collection.find_one({'UnitId':1000})['Slug']['En']
+        id = collection.find_one({'UnitId':1000})['_id']
+        elasticsearch.Elasticsearch.index.assert_called_once_with(
+            body = es_body,
+            doc_type = 'personalities',
+            id=id,
+            index = 'db',
+        )
+        elasticsearch.Elasticsearch.index.reset_mock()
         updated_tester = the_tester.copy()
+        updated_tester['Header']['En'] = 'Nikos Nikolveich'
         updated_tester['UnitText1']['En'] = 'The Great Tester'
         update_doc(collection, updated_tester)
+        del updated_tester['_id']
+        elasticsearch.Elasticsearch.index.assert_called_once_with(
+            body = updated_tester,
+            doc_type = 'personalities',
+            id=id,
+            index = 'db',
+        )
 
+    assert original_slug ==  collection.find_one({'UnitId':1000})['Slug']['En']
     assert collection.count({'UnitId':1000}) == 1
 
 def test_update_photo(mocker):

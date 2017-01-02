@@ -11,6 +11,7 @@ from bhs_api.fsearch import fsearch
 def test_fsearch_api(client, mock_db):
     for i in  [{
             'name_lc': ['albert', 'einstein'],
+            'deceased': True,
             'tree_num': 2,
             'tree_version': 0,
             'id': 'I3',
@@ -18,6 +19,7 @@ def test_fsearch_api(client, mock_db):
             'Slug': {'En': 'person_1;0.I2'},
         },{
             'name_lc': ['albert', 'einstein'],
+            'deceased': True,
             'tree_num': 2,
             'tree_version': 1,
             'id': 'I7',

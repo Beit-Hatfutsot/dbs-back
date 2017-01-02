@@ -75,7 +75,8 @@ def update_es(collection, doc, id):
 
     index_name = current_app.data_db.name
     body = doc.copy()
-    del body['_id']
+    if '_id' in body:
+        del body['_id']
     try:
         current_app.es.index(index=index_name,
                              doc_type=collection,
@@ -165,12 +166,28 @@ def update_row(doc, collection_name):
     ensure_indices(collection)
 
 def update_collection(collection, query, doc):
+    if MIGRATE_RELATED != '0':
+        doc['related'] = get_bhp_related(doc, collection.name,
+                                                max_items=6,
+                                                bhp_only=True)
+
     if MIGRATE_MODE  == 'i':
+        doc['Slug'] = create_slug(doc, collection.name)
         return collection.insert(doc)
     else:
-        return collection.update_one(query,
-                        {'$set': doc},
-                        upsert=True)
+        r = collection.update_one(query,
+                                  {'$set': doc},
+                                  upsert=False)
+        # check if update failed and if it did, create a slug
+        if r.modified_count == 0:
+            doc['Slug'] = create_slug(doc, collection.name)
+            try:
+                return collection.insert(doc)
+            except pymongo.errors.DuplicateKeyError:
+                # oops - seems like we need to add the id to the slug
+                reslugify(collection, doc)
+                collection.insert(doc)
+
 
 def update_doc(collection, document):
     # family trees get special treatment
@@ -217,31 +234,9 @@ def update_doc(collection, document):
         if doc_id:
             document['_id'] = doc_id
 
-        document['Slug'] = create_slug(document, collection.name)
-
-        if not document['Slug']:
-            current_app.logger.error('update failed because of slug {} {} {}'
-                                     .format(collection.name,
-                                             doc_id_field,
-                                             doc_id))
-            return
-
-        if MIGRATE_RELATED != '0':
-            document['related'] = get_bhp_related(document,
-                                                  max_items=6,
-                                                  bhp_only=True)
 
         query = {doc_id_field: doc_id}
-        try:
-            result = update_collection(collection, query, document)
-            try:
-                id = result.upserted_id
-            except AttributeError:
-                result = collection.find_one(query)
-
-        except pymongo.errors.DuplicateKeyError:
-            reslugify(collection, document)
-            collection.insert(document)
+        result = update_collection(collection, query, document)
 
         update_es(collection.name, document, doc_id)
 

@@ -52,7 +52,7 @@ def sort_related(related_items):
                 rv.append(by_collection[c].pop())
     return rv
 
-def get_bhp_related(doc, max_items=6, bhp_only=False):
+def get_bhp_related(doc, collection_name, max_items=6, bhp_only=False):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -80,23 +80,21 @@ def get_bhp_related(doc, max_items=6, bhp_only=False):
     # Check what is the collection name for the current doc and what are the
     # related fields that we have to check for it
     rv = []
-    self_collection_name = get_collection_name(doc)
-
-    if not self_collection_name:
+    if not collection_name:
         logger.debug('Unknown collection for {}'.format(
             get_item_slug(doc).encode('utf8')))
         return get_es_text_related(doc)[:max_items]
-    elif self_collection_name not in related_fields:
+    elif collection_name not in related_fields:
         if not bhp_only:
             logger.debug(
                 'BHP related not supported for collection {}'.format(
-                self_collection_name))
+                collection_name))
             return get_es_text_related(doc)[:max_items]
         else:
             return []
 
     # Turn each related field into a list of BHP ids if it has content
-    fields = related_fields[self_collection_name]
+    fields = related_fields[collection_name]
     for field in fields:
         collection = collection_names[field]
         if field in doc and doc[field]:
@@ -249,7 +247,8 @@ if __name__ == '__main__':
         for collection in collections:
             for doc in data_db[collection].find(query,
                                                 modifiers={"$snapshot": "true"}):
-                related = get_bhp_related(doc, max_items=6, bhp_only=True)
+                related = get_bhp_related(doc, collection,
+                                          max_items=6, bhp_only=True)
                 if not related:
                     continue
                 else:
