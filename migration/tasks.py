@@ -7,7 +7,7 @@ from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
 from bhs_api.item import get_collection_id_field, create_slug
-from bhs_api.add_coordinates_to_places import get_geo
+from scripts.add_coordinates_to_places import get_geojson
 from scripts.batch_related import get_bhp_related
 
 
@@ -193,7 +193,7 @@ def update_collection(collection, query, doc):
 def update_doc(collection, document):
     # update place items with geojson
     if collection.name = 'places':
-        get_geo(document)
+        get_geojson(document)
 
     # family trees get special treatment
     if collection.name == 'persons':

@@ -17,7 +17,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_geo(doc):
+def get_geojson(doc):
     url = 'https://api.opencagedata.com/geocode/v1/geojson'
     query = doc['Header']['En']
     parameters = {}
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     filters['Header.En'] = {'$nin' : [None, '']}
 
     for doc in db['places'].find(filters):
-        geometry = get_geo(doc)
+        geometry = get_geojson(doc)
 
         if geometry:
             db[collection].update({"Header.En": query}, {"$set": {"geometry": geometry}}, multi=True)   

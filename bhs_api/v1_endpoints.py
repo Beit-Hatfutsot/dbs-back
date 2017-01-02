@@ -24,7 +24,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER)
+                          enrich_item, SHOW_FILTER, get_geojson)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -474,6 +474,7 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
+
 @v1_endpoints.route('/item/<slugs>')
 def get_items(slugs):
     if slugs:
@@ -602,3 +603,9 @@ def get_story(hash):
     user = get_user(hash)
     del user['email']
     return humanify (user)
+
+@v1_endpoints.route('/geo/places')
+def get_coordinates():
+    points = get_geojson()
+    return humanify(points)
+
