@@ -374,11 +374,5 @@ def get_geojson():
     filters['Header.En'] = {'$nin' : [None, '']}
     response = []
     data = {}
-
-    for doc in current_app.data_db['places'].find(filters):
-        data['Header'] = {'En' : doc['Header']['En'], 'He' : doc['Header']['He']}
-        data['Slug'] = {'En' : doc['Slug']['En'], 'He' : doc['Slug']['He']}
-        data['geometry'] = doc['geometry']
-        response.append(data) 
-    return response
-
+    return current_app.data_db['places'].find(filters, {'Header': True,
+        'Slug': True, 'geometry': True})

@@ -607,5 +607,5 @@ def get_story(hash):
 @v1_endpoints.route('/geo/places')
 def get_coordinates():
     points = get_geojson()
-    return humanify(points)
+    return humanify(list(points))
 
