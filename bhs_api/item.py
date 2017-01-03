@@ -375,4 +375,4 @@ def get_geojson():
     response = []
     data = {}
     return current_app.data_db['places'].find(filters, {'Header': True,
-        'Slug': True, 'geometry': True})
+        'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
