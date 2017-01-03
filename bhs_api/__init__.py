@@ -23,6 +23,7 @@ def create_app(testing=False, live=False):
 
     # load the config file
     conf = get_conf()
+    app.conf = conf
     # Our config - need to move everything here
     app.config['VIDEO_BUCKET_URL'] = "https://storage.googleapis.com/bhs-movies"
     app.config['IMAGE_BUCKET_URL'] = "https://storage.googleapis.com/bhs-flat-pics"
@@ -103,8 +104,6 @@ def create_app(testing=False, live=False):
                                       db=0)
     except AttributeError:
         app.redis = None
-
-    app.logger.debug("Hellow world")
 
     return app, conf
 

@@ -91,6 +91,11 @@ To activate the migration worker run:
 
     $ celery -A migration.tasks worker --loglevel info
 
+There are two enviornment variables for finer control over the worker:
+- MIGRATE_ES - set it to anything other than `1` to skip elastic search update
+- MIGRATE_MODE - set it to `i` to use mongo's insert command, otherwise
+`update_one` is used
+
 Once the worker is listening, run in a separate window:
 
     $ python scripts/migrate.py --lasthours 200

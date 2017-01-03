@@ -32,26 +32,6 @@ def reduce_related(related_list):
         rv.append({key: reduced[key]})
     return rv
 
-def unify_related_lists(l1, l2):
-    rv = l1[:]
-    rv.extend(l2)
-    return reduce_related(rv)
-
-def invert_related_vector(vector_dict):
-    rv = []
-    key = vector_dict.keys()[0]
-    for value in vector_dict.values()[0]:
-        rv.append({value: [key]})
-    return rv
-
-def reverse_related(direct_related):
-    rv = []
-    for vector in direct_related:
-        for r in invert_related_vector(vector):
-            rv.append(r)
-
-    return rv
-
 def sort_related(related_items):
     '''Put the more diverse items in the beginning'''
     # Sort the related ids by collection names...
@@ -72,7 +52,7 @@ def sort_related(related_items):
                 rv.append(by_collection[c].pop())
     return rv
 
-def get_bhp_related(doc, max_items=6, bhp_only=False):
+def get_bhp_related(doc, collection_name, max_items=6, bhp_only=False):
     """
     Bring the documents that were manually marked as related to the current doc
     by an editor.
@@ -100,23 +80,21 @@ def get_bhp_related(doc, max_items=6, bhp_only=False):
     # Check what is the collection name for the current doc and what are the
     # related fields that we have to check for it
     rv = []
-    self_collection_name = get_collection_name(doc)
-
-    if not self_collection_name:
+    if not collection_name:
         logger.debug('Unknown collection for {}'.format(
             get_item_slug(doc).encode('utf8')))
         return get_es_text_related(doc)[:max_items]
-    elif self_collection_name not in related_fields:
+    elif collection_name not in related_fields:
         if not bhp_only:
             logger.debug(
                 'BHP related not supported for collection {}'.format(
-                self_collection_name))
+                collection_name))
             return get_es_text_related(doc)[:max_items]
         else:
             return []
 
     # Turn each related field into a list of BHP ids if it has content
-    fields = related_fields[self_collection_name]
+    fields = related_fields[collection_name]
     for field in fields:
         collection = collection_names[field]
         if field in doc and doc[field]:
@@ -237,6 +215,8 @@ def parse_args():
                         help='limit the run to a specifc slug')
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')
+    parser.add_argument('--mlt',
+                        help='switch to run elastic search more like this algorithem')
 
     return parser.parse_args()
 
@@ -267,30 +247,25 @@ if __name__ == '__main__':
         for collection in collections:
             for doc in data_db[collection].find(query,
                                                 modifiers={"$snapshot": "true"}):
-                related = get_bhp_related(doc, max_items=6, bhp_only=True)
+                related = get_bhp_related(doc, collection,
+                                          max_items=6, bhp_only=True)
                 if not related:
                     continue
                 else:
                     item_slug = get_item_slug(doc)
                     direct_related_list.append({item_slug: related})
-
         logger.info('Pass 1 finished')
-
-        # Inverting the direction of related structures and adding the result
-        # to original
-        reverse_related_list = reverse_related(direct_related_list)
-        unified_related_list = unify_related_lists(direct_related_list,
-                                                   reverse_related_list)
 
         # Save the related info for debug
         if args.debug:
             with open(args.filename, 'w') as fh:
                 import json
                 json.dump(unified_related_list, fh, indent=2)
+            exit(0)
 
         logger.info('Pass 2 - Applying bhp related')
 
-        for item in unified_related_list:
+        for item in direct_related_list:
             key = item.keys()[0]
             value = item.values()[0]
             slug = Slug(key)
@@ -299,13 +274,19 @@ if __name__ == '__main__':
             except (Forbidden, NotFound):
                     continue
             if doc:
-                data_db[collection].update_one(get_item_query(slug),
-                                            {'$set': {'bhp_related': value}})
+                query = get_item_query(slug)
+                related_field = 'bhp_related' if args.mlt else 'related'
+                s = data_db[slug.collection].update_one(query,
+                                            {'$set': {related_field: value}})
+                logger.info('added related to '+str(slug))
             else:
-                logger.info('Problem with {}'.format(key))
+                logger.warn('Problem with {}'.format(key))
                 sys.exit(1)
 
         logger.info('Pass 2 finished')
+
+        if not args.mlt:
+            exit(0)
 
         logger.info('Pass 3 - Completing related and enriching documents')
         for collection in collections:
@@ -335,7 +316,8 @@ if __name__ == '__main__':
                     logger.debug('No related items found for {}'.format(
                         slug.encode('utf8')))
                 doc['related'] = related
-                data_db[collection].update_one(get_item_query(slug),
+                query = get_item_query(slug)
+                data_db[collection].update_one(query,
                                             {'$set': {'related': related}})
 
             finished = datetime.datetime.now()

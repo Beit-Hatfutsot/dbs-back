@@ -37,7 +37,8 @@ DEAFULT_CONF_REQUIRED_KEYS = set([
     'data_db_host',
     'data_db_port',
     'data_db_name',
-    'image_bucket_url',
+    'image_bucket',
+    'thumbnail_bucket',
     'video_bucket_url',
     'redis_host',
     'redis_port',
@@ -327,6 +328,9 @@ def binarize_image(image):
         image_buffer = StringIO()
         thumb.save(image_buffer, "JPEG")
         binary = Binary(image_buffer.getvalue(), BINARY_SUBTYPE)
+    except IOError as e:
+        logging.error("failed to binarize image: "+str(e))
+        return None
 
     # if image is a file object, rewind it
     finally:

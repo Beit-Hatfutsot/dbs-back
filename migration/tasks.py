@@ -6,8 +6,23 @@ from celery import Celery
 from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
+from bhs_api.item import get_collection_id_field, create_slug
+from scripts.batch_related import get_bhp_related
+
 
 MIGRATE_MODE = os.environ.get('MIGRATE_MODE')
+MIGRATE_ES = os.environ.get('MIGRATE_ES', '1')
+MIGRATE_RELATED = os.environ.get('MIGRATE_RELATED', True)
+INDICES = {
+    'places' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
+    'familyNames' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
+    'lexicon' : ['UnitId'],
+    'photoUnits' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He'],
+    'photos' : ['PictureId', 'PictureFileName', 'PicturePath'],
+    'persons' : ['name_lc.0', 'name_lc.1', 'sex', 'BIRT_PLAC_lc', 'MARR_PLAC_lc', 'tree_num', 'DEAT_PLAC_lc'],
+    'synonyms': ['s_group', 'str_lc'],
+    'personalities' : ['UnitId', 'DisplayStatusDesc', 'RightsDesc', 'StatusDesc', 'Header.En', 'Header.He']
+}
 
 def make_celery():
     app, conf = create_app()
@@ -22,7 +37,8 @@ def make_celery():
             app.config['REDIS_HOST'],
             app.config['REDIS_PORT'],
         )
-    app.logger.info('Broker at {}'.format(redis_broker))
+        app.logger.info('MIGRATE_MODE: {}, MIGRATE_ES: {}, Broker at {}'
+                        .format(MIGRATE_MODE, MIGRATE_ES,app.config['REDIS_HOST']))
     celery = Celery(app.import_name, broker=redis_broker)
     celery.conf.update(app.config)
     celery.data_db = app.data_db
@@ -38,26 +54,45 @@ def make_celery():
 celery = make_celery()
 
 
-def update_es(collection, doc):
+def ensure_indices(collection):
+    indices = INDICES.get(collection.name, set())
+    for index in indices:
+        collection.ensure_index(index)
+    # add unique inxexes
+    if collection.name == 'persons':
+        collection.create_index([("tree_num", pymongo.ASCENDING),
+                ("tree_version", pymongo.ASCENDING),
+                ("id", pymongo.ASCENDING),
+            ],
+            unique=True, sparse=True)
+    else:
+        collection.create_index("Slug.He", unique=True, sparse=True)
+        collection.create_index("Slug.En", unique=True, sparse=True)
+
+def update_es(collection, doc, id):
+    if MIGRATE_ES != '1':
+        return
+
     index_name = current_app.data_db.name
-    _id = doc['_id']
-    del doc['_id']
+    body = doc.copy()
+    if '_id' in body:
+        del body['_id']
     try:
         current_app.es.index(index=index_name,
                              doc_type=collection,
-                             id=_id,
-                             body=doc)
+                             id=id,
+                             body=body)
     except elasticsearch.exceptions.SerializationError:
         # UUID fields are causing es to crash, turn them to strings
         uuids_to_str(doc)
         try:
             current_app.es.index(index=index_name,
                                  doc_type=collection,
-                                 id=_id,
+                                 id=id,
                                  body=doc)
         except elasticsearch.exceptions.SerializationError as e:
             current_app.logger.error("Elastic search index failed for {}:{} with {}"
-                                     .format(collection, _id, e))
+                                     .format(collection, id, e))
 
 
 def reslugify(collection, document):
@@ -68,35 +103,25 @@ def reslugify(collection, document):
             document['Slug'][lang] += '-' + str(document[doc_id])
 
 
-def get_collection_id_field(collection_name):
-    doc_id = 'UnitId'
-    if collection_name == 'photos':
-        doc_id = 'PictureId'
-    elif collection_name == 'genTreeIndividuals':
-        doc_id = 'ID'
-    elif collection_name == 'persons':
-        doc_id = 'id'
-    elif collection_name == 'synonyms':
-        doc_id = '_id'
-    elif collection_name == 'trees':
-        doc_id = 'num'
-    return doc_id
-
-
 @celery.task
-def update_tree(data, collection=None):
-    # from celery.contrib import rdb; rdb.set_trace()
-    if not collection:
-        collection = celery.data_db['trees']
+def update_tree(data, db=None):
+    '''  acelery task to update or create a tree '''
+    if not db:
+        trees = celery.data_db['trees']
+        persons = celery.data_db['persons']
+    else:
+        trees = db['trees']
+        persons = db['persons']
+
     num = data['num']
-    tree = collection.find_one({'num': num})
+    tree = trees.find_one({'num': num})
     doc = data.copy()
     file_id = doc.pop('file_id')
     date = doc.pop('date')
-    persons = doc.pop('persons')
+    persons_count = doc.pop('persons')
     current_ver = {'file_id':file_id,
                    'update_date': date,
-                   'persons': persons}
+                   'persons': persons_count}
     if tree:
         # don't add the same version twice
         for i in tree['versions']:
@@ -104,13 +129,21 @@ def update_tree(data, collection=None):
                 return
         doc['versions'] = tree['versions']
         doc['versions'].append(current_ver)
-        collection.update_one({'num': num},
+        trees.update_one({'num': num},
                               {'$set': doc},
                               upsert=True)
+        last_version = len(tree['versions'])-1
+        current_app.logger.info('archiving persons w/ versions<{} in tree {}'
+                                .format(last_version, doc['num']))
+        persons.update_many(
+            {'tree_num': num,
+             'tree_version': {'$lt': last_version}},
+            {'$set': {'archived': True}}
+        )
 
     else:
         doc['versions'] = [current_ver]
-        collection.insert_one(doc)
+        trees.insert_one(doc)
     current_app.redis.set('tree_vers_'+str(num),
                           json.dumps(doc['versions']),
                           300)
@@ -130,14 +163,31 @@ def update_row(doc, collection_name):
     collection = celery.data_db[collection_name]
     # from celery.contrib import rdb; rdb.set_trace()
     update_doc(collection, doc)
+    ensure_indices(collection)
 
 def update_collection(collection, query, doc):
+    if MIGRATE_RELATED != '0':
+        doc['related'] = get_bhp_related(doc, collection.name,
+                                                max_items=6,
+                                                bhp_only=True)
+
     if MIGRATE_MODE  == 'i':
-        collection.insert(doc)
+        doc['Slug'] = create_slug(doc, collection.name)
+        return collection.insert(doc)
     else:
-        collection.update_one(query,
-                        {'$set': doc},
-                        upsert=True)
+        r = collection.update_one(query,
+                                  {'$set': doc},
+                                  upsert=False)
+        # check if update failed and if it did, create a slug
+        if r.modified_count == 0:
+            doc['Slug'] = create_slug(doc, collection.name)
+            try:
+                return collection.insert(doc)
+            except pymongo.errors.DuplicateKeyError:
+                # oops - seems like we need to add the id to the slug
+                reslugify(collection, doc)
+                collection.insert(doc)
+
 
 def update_doc(collection, document):
     # family trees get special treatment
@@ -172,20 +222,23 @@ def update_doc(collection, document):
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
+        # post parsing: add _id and Slug
         doc_id_field = get_collection_id_field(collection.name)
-        doc_id = document[doc_id_field]
-        # Set up collection specific document ids
-        # Search updated collections for collection specific index field
-        # and update it.  Save the _id of updated/inserted doc to
-        # the 'migration_log' collection
-        query = {doc_id_field: doc_id}
         try:
-            update_collection(collection, query, document)
-        except pymongo.errors.DuplicateKeyError:
-            reslugify(collection, document)
-            collection.insert(document)
+            doc_id = document[doc_id_field]
+        except KeyError:
+            current_app.logger.error('update failed because of id {} {}'
+                                     .format(collection.name,
+                                             doc_id_field,
+                                             ))
+        if doc_id:
+            document['_id'] = doc_id
 
-        update_es(collection.name, document)
+
+        query = {doc_id_field: doc_id}
+        result = update_collection(collection, query, document)
+
+        update_es(collection.name, document, doc_id)
 
         try:
             slug = document['Slug']['En']

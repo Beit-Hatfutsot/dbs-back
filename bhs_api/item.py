@@ -5,6 +5,7 @@ import urllib
 import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 from flask import current_app
+from slugify import Slugify
 
 from bhs_api import phonetic
 
@@ -41,6 +42,14 @@ class Slug:
         self.full = slug
         collection, self.local_slug = slug.split('_')
         self.collection = self.slugs_collection_map[collection]
+        # handle the special case of old person slugs that are missing a
+        # version
+        if self.collection == 'persons':
+            if ';' not in self.local_slug:
+                t = self.local_slug.split('.')
+                if len(t) == 2:
+                    self.local_slug = "{};0.{}".format(*t)
+                    self.full = "_".join((collection, self.local_slug))
 
     def __unicode__(self):
         return self.full
@@ -143,15 +152,29 @@ def fetch_item(slug, db=None):
         return _make_serializable(item)
         return item
 
-def enrich_item(item, db):
-    if not 'thumbnail' in item.keys():
-        item['thumbnail'] = _get_thumbnail(item)
-    if not 'main_image_url' in item.keys():
-        try:
-            main_image_id = [image['PictureId'] for image in item['Pictures'] if image['IsPreview'] == '1'][0]
-            item['main_image_url'] = get_image_url(main_image_id)
-        except (KeyError, IndexError):
-            item['main_image_url'] = None
+def enrich_item(item, db=None):
+    if not db:
+        db = current_app.data_db
+    ''' and the media urls to the item '''
+    pictures = item.get('Pictures', None)
+    if pictures:
+        main_image_id = None
+        for image in pictures:
+            is_preview = image.get('IsPreview', False)
+            if is_preview == '1':
+                main_image_id = image['PictureId']
+
+        if not main_image_id:
+            for image in pictures:
+                picture_id = image.get('PictureId', None)
+                if picture_id:
+                    main_image_id = picture_id
+
+        if main_image_id:
+            item['main_image_url'] = get_image_url(main_image_id,
+                                                current_app.conf.image_bucket)
+            item['thumbnail_url'] = get_image_url(main_image_id,
+                                            current_app.conf.thumbnail_bucket)
     video_id_key = 'MovieFileId'
     if video_id_key in item:
         # Try to fetch the video URL
@@ -168,11 +191,12 @@ def enrich_item(item, db):
     return item
 
 
-def get_item_by_id(id, collection, db=None):
+def get_item_by_id(id, collection_name, db=None):
     if not db:
         db = current_app.data_db
-    query = {"_id": id}
-    return _filter_doc(query, collection, db)
+    id_field = get_collection_id_field(collection_name)
+    query = {id_field: id}
+    return _filter_doc(query, collection_name, db)
 
 def get_item_query(slug):
     if isinstance(slug, basestring):
@@ -282,20 +306,66 @@ def search_by_header(string, collection, starts_with=True, db=None):
     else:
         return {}
 
-def get_image_url(image_id):
-    image_bucket_url = current_app.config['IMAGE_BUCKET_URL']
-    collection = current_app.data_db['photos']
+def get_image_url(image_id, bucket):
+    return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
 
-    photo = collection.find_one({'PictureId': image_id})
-    if photo:
-        photo_path = photo['PicturePath']
-        photo_fn = photo['PictureFileName']
-        if not (photo_path and photo_fn):
-            current_app.logger.debug('Bad picture path or filename - {}'.format(image_id))
-            return None
-        extension = photo_path.split('.')[-1].lower()
-        url = '{}/{}.{}'.format(image_bucket_url, image_id, extension)
-        return url
-    else:
-        current_app.logger.debug('photo with UUID {} was not found'.format(image_id))
-        return None
+
+def get_collection_id_field(collection_name):
+    doc_id = 'UnitId'
+    if collection_name == 'photos':
+        doc_id = 'PictureId'
+    elif collection_name == 'genTreeIndividuals':
+        doc_id = 'ID'
+    elif collection_name == 'persons':
+        doc_id = 'id'
+    elif collection_name == 'synonyms':
+        doc_id = '_id'
+    elif collection_name == 'trees':
+        doc_id = 'num'
+    return doc_id
+
+def create_slug(document, collection_name):
+    collection_slug_map = {
+        'places': {'En': 'place',
+                   'He': u'מקום',
+                  },
+        'familyNames': {'En': 'familyname',
+                        'He': u'שםמשפחה',
+                       },
+        'lexicon': {'En': 'lexicon',
+                    'He': u'מלון',
+                   },
+        'photoUnits': {'En': 'image',
+                       'He': u'תמונה',
+                      },
+        'photos': {'En': 'image',
+                   'He': u'תמונה',
+                  },
+        'genTreeIndividuals': {'En': 'person',
+                               'He': u'אדם',
+                              },
+        'synonyms': {'En': 'synonym',
+                     'He': u'שם נרדף',
+                    },
+        'personalities': {'En': 'luminary',
+                          'He': u'אישיות',
+                          },
+        'movies': {'En': 'video',
+                   'He': u'וידאו',
+                  },
+    }
+    try:
+        headers = document['Header'].items()
+    except KeyError:
+        return
+
+    ret = {}
+    slugify = Slugify(translate=None, safe_chars='_')
+    for lang, val in headers:
+        if val:
+            collection_slug = collection_slug_map[collection_name][lang]
+            slug = slugify('_'.join([collection_slug, val.lower()]))
+            ret[lang] = slug.encode('utf8')
+    return ret
+
+

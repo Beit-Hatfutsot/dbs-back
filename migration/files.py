@@ -1,12 +1,15 @@
 import os
 import logging
+import StringIO
+
 import boto
 import gcs_oauth2_boto_plugin
+from PIL import Image
 
 def get_basename(full_path):
     return full_path.split('/')[-1]
 
-def upload_file(file_path, bucket, new_filename=None):
+def upload_file(file_path, bucket, new_filename=None, thumb_bucket=None):
     '''
     Upload the file object to a bucket.
     Add the original file path to its object metadata.
@@ -42,6 +45,21 @@ def upload_file(file_path, bucket, new_filename=None):
             logging.error('Credentials file {} was not found.'.format(boto_cred_file))
 
         return None
+
+    if thumb_bucket:
+        file_obj.seek(0)
+        im = Image.open(file_obj)
+        im.thumbnail((260, 260))
+        thumbnail = StringIO.StringIO()
+        im.save(thumbnail, 'JPEG')
+        thumb_uri = boto.storage_uri('{}/{}'.format(thumb_bucket, fn),
+                                     'gs')
+        new_key = thumb_uri.new_key()
+        # save the thumbnail
+        thumbnail.seek(0)
+        new_key.set_contents_from_file(thumbnail)
+
+    file_obj.close()
     return str(dest_uri)
 
 
@@ -58,7 +76,8 @@ def upload_photo(doc, conf):
         uuid = uuid + '.' + extension
     result = upload_file(os.path.join(mount_point, path),
                          bucket_name,
-                         uuid)
+                         uuid,
+                         conf.thumbnails_bucket_name)
     if result:
         logging.info('Uploaded file result - ' + result)
 

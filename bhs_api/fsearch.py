@@ -1,3 +1,4 @@
+import logging
 import re
 
 from flask import abort, current_app
@@ -49,8 +50,6 @@ def build_query(search_dict):
         elif k == 'sex':
             if search_dict[k].lower() in ['m', 'f']:
                 sex = v.upper()
-            else:
-                abort(400, "Sex must be one of 'm', 'f'")
         elif k == 'individual_id':
             individual_id = v
 
@@ -105,7 +104,7 @@ def build_query(search_dict):
                    'death_year': ['DSD', 'DED']}
 
     # Build gentree search query from all the subqueries
-    search_query = {}
+    search_query = {'archived': {'$exists': False}}
 
     for item in years:
         if item == 'marriage_year':
@@ -117,7 +116,7 @@ def build_query(search_dict):
         search_query[end] = {'$lte': years[item]['max']}
 
     if sex:
-        search_query['G'] = sex
+        search_query['sex'] = sex
     
     for param, item in names_and_places.items():
         for k, v in item.items():
@@ -127,26 +126,26 @@ def build_query(search_dict):
                     s = 'S'
                 else:
                     s = '_lc'
-                search_query['$or'] = [{'BP' + s: v},
-                                       {'MP' + s: v},
-                                       {'DP' + s: v}]
+                search_query['$or'] = [{'BIRT_PLAC' + s: v},
+                                       {'MARR_PLAC' + s: v},
+                                       {'DEAT_PLAC' + s: v}]
 
             else:
                 search_query[k] = v
 
     if 'tree_number' in search_dict:
         try:
-            search_query['GTN'] = int(search_dict['tree_number'])
+            search_query['tree_num'] = int(search_dict['tree_number'])
             # WARNING: Discarding all the other search qeuries if looking for GTN and II
             if individual_id:
-                search_query['II'] = individual_id
+                search_query['id'] = individual_id
         except ValueError:
             abort(400, 'Tree number must be an integer')
 
     return search_query
 
 
-def fsearch(max_results=15, **kwargs):
+def fsearch(max_results=15, db=None, **kwargs):
     '''
     Search in the genTreeIindividuals table.
     Names and places could be matched exactly, by the prefix match
@@ -158,6 +157,10 @@ def fsearch(max_results=15, **kwargs):
     If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `MAX_RESULTS` starting with the `start` argument
     '''
+    if db:
+        collection = db['persons']
+    else:
+        collection = current_app.data_db['persons']
     search_dict = {}
     for key, value in kwargs.items():
         search_dict[key] = value[0]
@@ -165,31 +168,58 @@ def fsearch(max_results=15, **kwargs):
             abort(400, "{} argument couldn't be empty".format(key))
 
 
-    collection = current_app.data_db['persons']
     search_query = build_query(search_dict)
-    current_app.logger.debug('FSearch query:\n{}'.format(search_query))
 
-    results = collection.find(search_query, PROJECTION)
+    results = collection.find(search_query, {
+              'name': 1,
+              'parents': 1,
+              'partners': 1,
+              'siblings': 1,
+              'tree_num': 1,
+              'id': 1,
+              'sex': 1,
+              'tree_version': 1,
+              'Slug': 1,
+              'birth_year': 1,
+              'death_year': 1,
+              'BIRT_PLAC': 1,
+              'DEAT_PLAC': 1,
+              'deceased': 1,
+                })
     total = results.count()
 
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
     results = results.limit(MAX_RESULTS)
-    current_app.logger.debug('FSearch query:\n{} returning {} results'.format(
+    logging.debug('FSearch query:\n{} returning {} results'.format(
                     search_query, results.count()))
     return total, map(clean_person, results)
 
 
 def clean_person(person):
-    private_key = re.compile(
-        "[BD|BP|MD|MP]")
-    private_dict = re.compile(
-        '[BIRT_PLAC|BIRT_DATE|MARR_PLAC|MARR_DATE|OCCU|NOTE]')
-    if 'tree' in person and not person['tree']['deceased']:
-        for key in person.keys():
-            if private_key.match(key):
-                person[key] = ''
-            if private_dict.match(key):
-                person['tree'][key] = {}
-    return person
 
+    # mongo's id
+    del person['_id']
+
+    # translating gedcom names
+    for db_key, api_key in (('BIRT_PLAC', 'birth_place'),
+                     ('DEAT_PLAC', 'death_place'),
+                     ('MARR_PLAC', 'marriage_place'),
+                     ('MARR_DATE', 'marriage_date'),
+                     ('OCCU', 'occupation'),
+                     ('NOTE', 'bio'),
+                     ):
+        try:
+            person[api_key] = person.pop(db_key)
+        except KeyError:
+            pass
+
+    # remove the details of the living
+    if not person['deceased']:
+        for key in person.keys():
+            if key in ['birth_year', 'death_year', 'birth_place',
+                       'death_place', 'marriage_place', 'marriage_date',
+                       'occupation', 'bio',
+                      ]:
+                del person[key]
+    return person
