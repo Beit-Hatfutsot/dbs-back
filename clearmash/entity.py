@@ -124,14 +124,18 @@ class CMEntity():
 
         for v in e['_c6_beit_hatfutsot_bh_base_template_description']['LocalizedString']:
             self.description[v['ISO6391']] = html2text(v['Value'])
-        '''
-        for v in e['_c6_beit_hatfutsot_bh_base_template_url_slug']['LocalizedString']:
-            self.slug[v['ISO6391']] = v['Value']
-        '''
+
+        try:
+            for v in e['_c6_beit_hatfutsot_bh_base_template_url_slug']['LocalizedString']:
+                self.slug[v['ISO6391']] = v['Value']
+        except KeyError:
+            self.slug = None
+
         try:
             self.place_type = e['_c6_beit_hatfutsot_bh_place_place_type']['string']
         except KeyError:
             pass
+
         self.from_date = dict(e['_c6_beit_hatfutsot_bh_base_template_from_date'])
         self.to_date = dict(e['_c6_beit_hatfutsot_bh_base_template_to_date'])
 
@@ -161,10 +165,11 @@ class CMEntity():
         client, soapheaders = get_clearmash_client()
         factory = client.type_factory('ns1')
         doc = dict(serialize_object(self.xml['Document']))
-        del doc['TemplateReference']
+        template_reference =  doc.pop('TemplateReference')
+        doc['TemplateId'] = template_reference['TemplateId']
         entity = factory.EntitySaveData(Document=doc)
         edit = factory.EditWebDocumentParameters(EntityId=self.id,
-                                                 ApproveCriteria="OnlyNewData",
+                                                 ApproveCriteria="AllPendingData", # "OnlyNewData",
                                                  DataBaseChangeset=self.changeset,
                                                  Entity=entity)
         r = client.service.EditDocument(edit,
