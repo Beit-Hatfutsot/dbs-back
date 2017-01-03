@@ -3,10 +3,10 @@
 import logging.config
 from datetime import datetime, timedelta
 
-from flask import current_app
 from zeep import Client, xsd
 from zeep.helpers import serialize_object
 from html2text import html2text
+from clearmash.utils import get_clearmash_client
 
 from bhs_api import create_app
 
@@ -34,21 +34,6 @@ logging.config.dictConfig({
         },
     }
 })
-
-def get_clearmash_client():
-
-    client = Client("{}/API/V5/Services/WebContentManagement.svc?wsdl"
-                    .format(current_app.conf.clearmash_url))
-    header = xsd.Element(
-        '',
-        xsd.ComplexType([
-            xsd.Element(
-                'ClientToken',
-                xsd.String()),
-        ])
-    )
-    header_value = header(ClientToken=current_app.conf.clearmash_token)
-    return client, header_value
 
 
 def ticks_to_dt(ticks):
@@ -88,9 +73,11 @@ class CMEntity():
         pass
 
     def __init__(self, unit_id):
-        client, soapheaders = get_clearmash_client()
-        r = client.service.GetDocument(unit_id,
-                        _soapheaders=[soapheaders])
+        
+        self.client, self.soapheaders = get_clearmash_client()
+            
+        r = self.client.service.GetDocument(unit_id,
+                        _soapheaders=[self.soapheaders])
         if not r:
             raise self.NotFound('GetDocument failed for id {}'.format(unit_id))
         self.xml = r['Entity']
@@ -148,8 +135,7 @@ class CMEntity():
             raise self.Empty('failed because object is empty')
 
         if self.slug:
-            import pdb; pdb.set_trace()
-            raise self.Slugged('failed because object already has a slug')
+            raise self.Slugged('set_slug failed because the slug exists')
 
         self.slug = slug
         parent = self.xml['Document']['Fields_LocalizedText']['LocalizedTextDocumentField']
@@ -162,20 +148,20 @@ class CMEntity():
                             ]
                         }
                     })
-        client, soapheaders = get_clearmash_client()
-        factory = client.type_factory('ns1')
+        factory = self.client.type_factory('ns1')
         doc = dict(serialize_object(self.xml['Document']))
         template_reference =  doc.pop('TemplateReference')
         doc['TemplateId'] = template_reference['TemplateId']
         entity = factory.EntitySaveData(Document=doc)
         edit = factory.EditWebDocumentParameters(EntityId=self.id,
-                                                 ApproveCriteria="AllPendingData", # "OnlyNewData",
-                                                 DataBaseChangeset=self.changeset,
-                                                 Entity=entity)
-        r = client.service.EditDocument(edit,
-                        _soapheaders=[soapheaders])
+                                ApproveCriteria="AllPendingData",
+                                DataBaseChangeset=self.changeset,
+                                Entity=entity)
+
+        self.client.service.EditDocument(edit, _soapheaders=[self.soapheaders])
 
 if __name__ == '__main__':
+    # doing a bit of testing
     app, conf = create_app()
     with app.app_context():
         e = CMEntity(15841)
