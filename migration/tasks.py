@@ -7,7 +7,7 @@ from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
 from bhs_api.item import get_collection_id_field, create_slug
-from scripts.add_coordinates_to_places import get_place_geo
+from scripts.get_places_geo import get_place_geo
 from scripts.batch_related import get_bhp_related
 
 

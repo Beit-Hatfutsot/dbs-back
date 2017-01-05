@@ -366,11 +366,3 @@ def create_slug(document, collection_name):
             slug = slugify('_'.join([collection_slug, val.lower()]))
             ret[lang] = slug.encode('utf8')
     return ret
-
-
-def get_places_geo():
-    filters = SHOW_FILTER.copy()
-    filters['geometry'] = {'$exists': True}
-    filters['Header.En'] = {'$nin' : [None, '']}
-    return current_app.data_db['places'].find(filters, {'Header': True,
-        'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
