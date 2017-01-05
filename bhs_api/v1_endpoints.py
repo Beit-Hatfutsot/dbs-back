@@ -24,7 +24,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER, get_geojson)
+                          enrich_item, SHOW_FILTER, get_places_geo)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -606,6 +606,6 @@ def get_story(hash):
 
 @v1_endpoints.route('/geo/places')
 def get_coordinates():
-    points = get_geojson()
+    points = get_places_geo()
     return humanify(list(points))
 

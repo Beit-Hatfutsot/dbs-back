@@ -368,11 +368,9 @@ def create_slug(document, collection_name):
     return ret
 
 
-def get_geojson():
+def get_places_geo():
     filters = SHOW_FILTER.copy()
     filters['geometry'] = {'$exists': True}
     filters['Header.En'] = {'$nin' : [None, '']}
-    response = []
-    data = {}
     return current_app.data_db['places'].find(filters, {'Header': True,
         'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
