@@ -43,7 +43,7 @@ DEAFULT_CONF_REQUIRED_KEYS = set([
     'redis_host',
     'redis_port',
     'caching_ttl',
-    'geocoder_key'
+    'opencage_key'
     ])
 # TODO: delete the next 3 lines
 # Set default GCE project id
