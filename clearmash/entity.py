@@ -72,14 +72,29 @@ class CMEntity():
     class Slugged(Exception):
         pass
 
-    def __init__(self, unit_id):
-        
+    def __init__(self, id=None, slug=None):
+        ''' Initializing this class reads an entity from clearmash.
+            Entity can be specified using `id` (==UnitId) or `slug`.
+        '''
+
         self.client, self.soapheaders = get_clearmash_client()
-            
-        r = self.client.service.GetDocument(unit_id,
-                        _soapheaders=[self.soapheaders])
-        if not r:
-            raise self.NotFound('GetDocument failed for id {}'.format(unit_id))
+
+        if id:
+            r = self.client.service.GetDocument(id,
+                            _soapheaders=[self.soapheaders])
+            if not r:
+                raise self.NotFound('GetDocument failed for id {}'.format(id))
+        elif slug:
+            # TODO: fix lookup by slug #FAIL
+            factory = self.client.type_factory('ns1')
+            lookup = factory.LookupDocumentByLocalizedField(
+                FieldId='_c6_beit_hatfutsot_bh_base_template_url_slug',
+                Value=slug)
+            r = self.client.service.LookupDocument(lookup,
+                            _soapheaders=[self.soapheaders])
+            if not r:
+                raise self.NotFound('GetDocument failed for id {}'.format(id))
+
         self.xml = r['Entity']
         row = serialize_object(self.xml['Document'])
 
@@ -164,5 +179,6 @@ if __name__ == '__main__':
     # doing a bit of testing
     app, conf = create_app()
     with app.app_context():
+        e = CMEntity(slug='some_slug')
         e = CMEntity(15841)
         e.set_slug({'en':'some_slug', 'he':u'בךה'})

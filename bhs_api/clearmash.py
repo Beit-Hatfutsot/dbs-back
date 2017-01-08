@@ -1,4 +1,5 @@
-from flask import request, abort, current_app
+from flask import request, abort, current_app, Response
 
 def item_updated():
-    pass
+    current_app.logger.info(request.data)
+    return Response()
