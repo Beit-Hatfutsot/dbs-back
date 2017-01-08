@@ -34,3 +34,5 @@ elasticsearch_host: bhs-infra
 redis_host: localhost
 redis_port: 6379
 caching_ttl: 3600
+#opencagedata:
+geocoder_key: 0ef3d3f7ec66ed4a1f0ab77bada03cff
