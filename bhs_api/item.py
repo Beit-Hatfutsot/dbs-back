@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 import re
 import urllib
-
 import elasticsearch
 from werkzeug.exceptions import NotFound, Forbidden
 from flask import current_app
 from slugify import Slugify
-
 from bhs_api import phonetic
+from opencage.geocoder import OpenCageGeocode
 
 SHOW_FILTER = {
                 'StatusDesc': 'Completed',
@@ -367,5 +366,3 @@ def create_slug(document, collection_name):
             slug = slugify('_'.join([collection_slug, val.lower()]))
             ret[lang] = slug.encode('utf8')
     return ret
-
-

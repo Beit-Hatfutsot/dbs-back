@@ -475,6 +475,7 @@ def get_suggestions(collection,string):
     return humanify(rv)
 
 
+
 @v1_endpoints.route('/item/<slugs>')
 def get_items(slugs):
     if slugs:
@@ -605,3 +606,14 @@ def get_story(hash):
     user = get_user(hash)
     del user['email']
     return humanify (user)
+
+@v1_endpoints.route('/geo/places')
+def get_geocoded_places():
+    filters = SHOW_FILTER.copy()
+    filters['geometry'] = {'$exists': True}
+    filters['Header.En'] = {'$nin' : [None, '']}
+
+    points = current_app.data_db['places'].find(filters, {'Header': True,
+        'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
+    return humanify(list(points))
+

@@ -7,6 +7,7 @@ from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
 from bhs_api.item import get_collection_id_field, create_slug
+from scripts.get_places_geo import get_place_geo
 from scripts.batch_related import get_bhp_related
 
 
@@ -190,6 +191,10 @@ def update_collection(collection, query, doc):
 
 
 def update_doc(collection, document):
+    # update place items with geojson
+    if collection.name = 'places':
+        document['geometry'] = get_place_geo(document)
+
     # family trees get special treatment
     if collection.name == 'persons':
         tree_num = document['tree_num']
