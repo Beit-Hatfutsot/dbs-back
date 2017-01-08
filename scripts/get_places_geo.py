@@ -17,7 +17,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_geojson(doc):
+def get_place_geo(doc):
     url = 'https://api.opencagedata.com/geocode/v1/geojson'
     query = doc['Header']['En']
     parameters = {}

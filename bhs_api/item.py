@@ -366,19 +366,3 @@ def create_slug(document, collection_name):
             slug = slugify('_'.join([collection_slug, val.lower()]))
             ret[lang] = slug.encode('utf8')
     return ret
-
-
-def get_geojson():
-    filters = SHOW_FILTER.copy()
-    filters['geometry'] = {'$exists': True}
-    filters['Header.En'] = {'$nin' : [None, '']}
-    response = []
-    data = {}
-
-    for doc in current_app.data_db['places'].find(filters):
-        data['Header'] = {'En' : doc['Header']['En'], 'He' : doc['Header']['He']}
-        data['Slug'] = {'En' : doc['Slug']['En'], 'He' : doc['Slug']['He']}
-        data['geometry'] = doc['geometry']
-        response.append(data) 
-    return response
-
