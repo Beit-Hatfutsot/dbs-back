@@ -92,7 +92,7 @@ class CMEntity():
                 Value=slug)
             r = self.client.service.LookupDocument(lookup,
                             _soapheaders=[self.soapheaders])
-            if not r:
+            if not r or not r['Entity']:
                 raise self.NotFound('GetDocument failed for id {}'.format(id))
 
         self.xml = r['Entity']

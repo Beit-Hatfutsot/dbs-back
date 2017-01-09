@@ -46,7 +46,8 @@ LookupDocumentByLocalizedField(
     </pre></dd>
 </dl>
 
-*FAILS*: the language field (aka ISO6391) is probably missing 
+*FAILS*: the language field (aka ISO6391) is probably missing but it's not found
+in the schema of `LookupDocumentByLocalizedField`
 
 ### Update Document
 
@@ -63,11 +64,11 @@ EditWebDocumentParameters(
     </pre></dd>
 </dl>
 
-We use this when we get a call back from clearmash indicating an entity was
+We use this when we get a callback from clearmash indicating an entity was
 updated. Then, we get the entity and if it has no slug, we
 copy its `Document` and make the following changes to get an updated document:
 
-* add an element in the 'Fields_LocalizedText.LocalizedTextDocumentField' array:
+* add an element to the 'Fields_LocalizedText.LocalizedTextDocumentField' array:
 <pre>
 {
     'Id': '_c6_beit_hatfutsot_bh_base_template_url_slug',
@@ -146,7 +147,7 @@ should support the following fields:
     A valid tree number, like 7806
 * sex (enum[String], optional)
 
-### Auto complete
+### Autocomplete
 
 <dl>
     <dt>Method</dt>
