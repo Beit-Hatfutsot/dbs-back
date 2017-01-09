@@ -192,7 +192,7 @@ def update_collection(collection, query, doc):
 
 def update_doc(collection, document):
     # update place items with geojson
-    if collection.name = 'places':
+    if collection.name == 'places':
         document['geometry'] = get_place_geo(document)
 
     # family trees get special treatment

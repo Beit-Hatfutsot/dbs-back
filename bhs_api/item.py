@@ -6,7 +6,6 @@ from werkzeug.exceptions import NotFound, Forbidden
 from flask import current_app
 from slugify import Slugify
 from bhs_api import phonetic
-from opencage.geocoder import OpenCageGeocode
 
 SHOW_FILTER = {
                 'StatusDesc': 'Completed',

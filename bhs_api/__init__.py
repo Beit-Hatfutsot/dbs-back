@@ -63,9 +63,6 @@ def create_app(testing=False, live=False):
     # CACHING
     app.config['CACHING_TTL'] = conf.caching_ttl
 
-    #opencagedata
-    app.config['GEOCODER_KEY'] = conf.geocoder_key
-
     app.mail = Mail(app)
     app.db = MongoEngine(app)
     app.user_datastore = MongoEngineUserDatastore(app.db, User, Role)

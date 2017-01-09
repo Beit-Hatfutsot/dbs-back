@@ -1,5 +1,7 @@
+import json
 import boto
 import elasticsearch
+import requests
 from migration.tasks import update_doc, update_tree
 from migration.files import upload_file
 
@@ -130,3 +132,22 @@ def test_update_person(app):
     assert doc['archived'] == True
     doc = persons.find_one({'id':'I1', 'tree_version': 1})
     assert 'archived' not in doc
+
+
+def test_update_place(mocker, app):
+    mocker.patch('elasticsearch.Elasticsearch.index')
+    mocker.patch('requests.get')
+    resp = requests.Response()
+    resp.status_code = 200
+    resp._content = json.dumps({'features': [{'geometry': 'geo'}]})
+    requests.get.return_value = resp
+    collection = app.data_db['places']
+    with app.app_context():
+        update_doc(collection, {
+            'UnitId': 2000,
+            'UnitText1': {'En': "Oh la la!"},
+            'Header': {'En': 'Paris'},
+        })
+
+    doc =  collection.find_one({'UnitId':2000})
+    assert doc['geometry'] == 'geo'
