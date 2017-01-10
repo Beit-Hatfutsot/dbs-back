@@ -46,8 +46,7 @@ LookupDocumentByLocalizedField(
     </pre></dd>
 </dl>
 
-*FAILS*: the language field (aka ISO6391) is probably missing but it's not found
-in the schema of `LookupDocumentByLocalizedField`
+The slug can be in Hebrew or English or any future language.
 
 ### Update Document
 

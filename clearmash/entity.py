@@ -179,6 +179,9 @@ if __name__ == '__main__':
     # doing a bit of testing
     app, conf = create_app()
     with app.app_context():
-        e = CMEntity(slug='some_slug')
         e = CMEntity(15841)
-        e.set_slug({'en':'some_slug', 'he':u'בךה'})
+        try:
+            e.set_slug({'en':'the_slug', 'he':u'בךה'})
+        except e.Slugged:
+            pass
+        e = CMEntity(slug='the_slug')
