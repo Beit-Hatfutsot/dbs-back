@@ -48,6 +48,19 @@ LookupDocumentByLocalizedField(
 
 The slug can be in Hebrew or English or any future language.
 
+### Get multiple entities By Slug
+
+Used to fetch the related items.
+
+<dl>
+    <dt>Method</dt>
+    <dd>TBD</dd>
+    <dt>Parameters</dt>
+    <dd>
+    TBD
+    </dd>
+</dl>
+
 ### Update Document
 
 <dl>
