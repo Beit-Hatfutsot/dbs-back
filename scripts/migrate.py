@@ -87,9 +87,11 @@ def get_queries(collection_name=None):
 
     for filename in filenames:
         try:
-            fh = open(repo_path + filename)
+            fh = open(filename)
         except IOError:
-            logger.error('Could not open file for query: \'{}\'. Make sure there is a SQL file for this query.'.format(filename[:-4]) )
+            logger.error('Could not open file \'{}\' in {}.'.format(filename,
+                                                                    os.getcwd())
+                        )
             sys.exit(1)
 
         queries[filename[:-4]] = fh.read()
@@ -406,19 +408,10 @@ if __name__ == '__main__':
             continue
 
         if since:
-            unit_cursor = get_touched_units(collection_name, since, until)
-            units = list(unit_cursor)
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
 
-            if not units:
-                logger.info('{}:Skipping'.format(collection_name))
-                continue
-
-            unit_ids = [unit['UnitId'] for unit in units]
-            sql_cursor = sqlClient.execute(query, select_ids=True,
-                                        unit_ids=unit_ids)
         elif args.unitid:
-            sql_cursor = sqlClient.execute(query, select_ids=True,
-                                        unit_ids=[args.unitid])
+            sql_cursor = sqlClient.execute(query, unit_id=args.unitid)
 
         else:
             sql_cursor = sqlClient.execute(query)
