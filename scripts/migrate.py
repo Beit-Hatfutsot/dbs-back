@@ -77,7 +77,6 @@ def get_queries(collection_name=None):
     repo_path = conf.queries_repo_path
     if repo_path[-1] != '/':
         repo_path = repo_path + '/'
-    os.chdir(repo_path)
 
     if collection_name:
         filenames = [collection_name + '.sql']
@@ -87,7 +86,7 @@ def get_queries(collection_name=None):
 
     for filename in filenames:
         try:
-            fh = open(filename)
+            fh = open(os.path.join(repo_path, filename))
         except IOError:
             logger.error('Could not open file \'{}\' in {}.'.format(filename,
                                                                     os.getcwd())
@@ -316,8 +315,9 @@ def get_touched_units(collection_name,  since, until):
 def parse_n_update(row, collection_name):
     doc = parse_doc(row, collection_name)
     id_field = get_collection_id_field(collection_name)
-    logger.info('{}:Updating {}: {}'.format(
-        collection_name, id_field, doc[id_field]))
+    logger.info('{}:Updating {}: {}, updated {}'.format(
+        collection_name, id_field, doc[id_field],
+        doc.get('UpdateDate', '?')))
     update_row.delay(doc, collection_name)
     return doc
 
@@ -330,19 +330,9 @@ def get_file_descriptors(tree):
     return file_id, file_name
 
 
-def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
-    since = datetime.datetime.fromtimestamp(since_timestamp)
-    until = datetime.datetime.fromtimestamp(until_timestamp)
+def migrate_trees(cursor):
     count = 0
-    treenums = treenums.split(',') if treenums else None
-        
-    for row in sql_cursor:
-        # special case for a specific tree
-        if treenums:
-            if str(row['GenTreeNumber']) not in treenums:
-                continue
-        elif row['UpdateDate'] < since or row['UpdateDate'] > until:
-            continue
+    for row in cursor:
         file_id, file_name = get_file_descriptors(row)
         try:
             gedcom_fd = open(file_name)
@@ -399,9 +389,10 @@ if __name__ == '__main__':
     photos_to_update = []
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
-            #TODO: `since` should be part of the sql query
-            sql_cursor = sqlClient.execute(query)
-            count = migrate_trees(sql_cursor, since, until, args.treenum)
+            tree_ids = args.treenum.split(',') if args.treenum else None
+            sql_cursor = sqlClient.execute(query, since=since, until=until,
+                                           unit_ids=tree_ids)
+            count = migrate_trees(sql_cursor)
             if not count:
                 logger.info('{}:Skipping'.format(collection_name))
 
@@ -411,7 +402,7 @@ if __name__ == '__main__':
             sql_cursor = sqlClient.execute(query, since=since, until=until)
 
         elif args.unitid:
-            sql_cursor = sqlClient.execute(query, unit_id=args.unitid)
+            sql_cursor = sqlClient.execute(query, unit_ids=[args.unitid])
 
         else:
             sql_cursor = sqlClient.execute(query)
@@ -436,9 +427,8 @@ if __name__ == '__main__':
     if len(photos_to_update) > 0:
         photos_query = get_queries('photos')['photos']
         photos_cursor = sqlClient.execute(photos_query,
-                                          select_ids=True,
                                           unit_ids=photos_to_update,
-                                          stringify=True)
+                                          )
         for row in photos_cursor:
             upload_photo(row, conf)
 
