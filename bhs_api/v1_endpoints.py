@@ -606,9 +606,12 @@ def get_story(hash):
 
 @v1_endpoints.route('/geo/places')
 def get_geocoded_places():
+    args = request.args
     filters = SHOW_FILTER.copy()
     filters['geometry'] = {'$exists': True}
     filters['Header.En'] = {'$nin' : [None, '']}
+    filters['geometry.coordinates.1'] = {'$gte': float(args['southWestLat']), '$lte': float(args['northEastLat'])}
+    filters['geometry.coordinates.0'] = {'$gte': float(args['southWestLng']), '$lte': float(args['northEastLng'])}
 
     points = current_app.data_db['places'].find(filters, {'Header': True,
         'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
