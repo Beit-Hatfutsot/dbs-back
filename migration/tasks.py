@@ -236,10 +236,6 @@ def update_doc(collection, document):
                                      .format(collection.name,
                                              doc_id_field,
                                              ))
-        if doc_id:
-            document['_id'] = doc_id
-
-
         query = {doc_id_field: doc_id}
         result = update_collection(collection, query, document)
 
