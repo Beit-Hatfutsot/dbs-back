@@ -18,12 +18,11 @@ class MigrationSQLClient:
         params = {}
         if unit_ids:
             params['unit_ids'] = [i for i in unit_ids if i]
-            params['all_ids'] = 0
+            since = until = 0
         else:
             params['unit_ids'] = [0]
-            params['all_ids'] = 1
-        params['since'] = MayaDT(since).iso8601() if since else 0
-        params['until'] = MayaDT(until).iso8601() if until else now().iso8601()
+        params['since'] = MayaDT(since).datetime().strftime('%Y-%m-%d %H:%M:%S')
+        params['until'] = MayaDT(until).datetime().strftime('%Y-%m-%d %H:%M:%S')
         self.cursor.execute(query, params)
         return self.cursor
 

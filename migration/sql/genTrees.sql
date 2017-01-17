@@ -47,7 +47,7 @@ LEFT JOIN dbo.RightsTypes rt with (nolock) ON u.RightsCode = rt.RightsCode
 LEFT JOIN dbo.UnitDisplayStatus uds with (nolock) ON u.UnitDisplayStatus = uds.DisplayStatus
 LEFT JOIN dbo.UnitStatuses us with (nolock) ON u.UnitStatus = us.UnitStatus
 LEFT JOIN dbo.UnitTypes ut with (nolock) ON u.UnitType = ut.UnitType
-WHERE     u.UnitType = 4 AND (u.UpdateDate BETWEEN %(since)s AND %(until)s OR u.UnitId IN %(unit_ids)s))
+WHERE     u.UnitType = 4 AND (u.UpdateDate BETWEEN %(since)s AND %(until)s))
 select	gt.GenTreeNumber, 
 		gt.GenTreeFileId,
 		gt.GenTreePath ,

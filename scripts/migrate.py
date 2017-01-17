@@ -57,9 +57,8 @@ def parse_args():
     parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
-    parser.add_argument('-t', '--treenum')
     parser.add_argument('-i', '--unitid', type=int,
-                        help='migrate a specifc unit id')
+                        help='migrate a specifc unit/tree id')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -293,25 +292,6 @@ def parse_doc(doc, collection_name):
     return collection_procedure_map[collection_name](doc)
 
 
-def get_touched_units(collection_name,  since, until):
-    query = get_queries('audit')['audit']
-    # genTreeIndividuals is a special case:
-    # we need to return a cursor to all updated/inserted tree units
-    if collection_name in ('genTreeIndividuals', 'genTrees'):
-        unit_type = get_unit_type('familyTrees')
-    else:
-        unit_type = get_unit_type(collection_name)
-    if unit_type:
-        cursor = sqlClient.audit(query=query,
-                                operation='update',
-                                from_date=since,
-                                to_date=until,
-                                unit_type=unit_type)
-        return cursor
-    else:
-        return None
-
-
 def parse_n_update(row, collection_name):
     doc = parse_doc(row, collection_name)
     id_field = get_collection_id_field(collection_name)
@@ -330,9 +310,12 @@ def get_file_descriptors(tree):
     return file_id, file_name
 
 
-def migrate_trees(cursor):
+def migrate_trees(cursor, treenums=None):
     count = 0
     for row in cursor:
+        if treenums:
+            if row['GenTreeNumber'] not in treenums:
+                continue
         file_id, file_name = get_file_descriptors(row)
         try:
             gedcom_fd = open(file_name)
@@ -378,34 +361,25 @@ if __name__ == '__main__':
     else:
         since = int(args.since)
 
-	# connect to BHP SQL Server
-
-    if args.treenum:
-        collection = 'genTrees'
-    else:
-        collection = args.collection
+    collection = args.collection
     queries = get_queries(collection)
     logger.info('looking for changed items in {}-{}'.format(since, until))
     photos_to_update = []
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
-            tree_ids = args.treenum.split(',') if args.treenum else None
+            tree_nums = [args.unitid] if args.unitid else None
             sql_cursor = sqlClient.execute(query, since=since, until=until,
-                                           unit_ids=tree_ids)
-            count = migrate_trees(sql_cursor)
+                                           unit_ids=tree_nums)
+            count = migrate_trees(sql_cursor ,tree_nums)
             if not count:
                 logger.info('{}:Skipping'.format(collection_name))
 
             continue
 
-        if since:
-            sql_cursor = sqlClient.execute(query, since=since, until=until)
-
-        elif args.unitid:
+        if args.unitid:
             sql_cursor = sqlClient.execute(query, unit_ids=[args.unitid])
-
         else:
-            sql_cursor = sqlClient.execute(query)
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
 
         if sql_cursor:
             for row in sql_cursor:
