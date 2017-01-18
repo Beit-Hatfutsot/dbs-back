@@ -3,18 +3,17 @@ import pytest
 from pytest_flask.plugin import client
 import urllib
 
-def test_get_geocoded_places(client, app):
-    for i in [{
-            'UnitId': 1000,
-            'UnitText1': {'En': 'The Geo Place'},
-            'Header': {'En': 'test_place'},
-            'UnitPlaces': [{'PlaceIds': 3}],
-            'StatusDesc': 'Completed',
-            'RightsDesc': 'Full',
-            'DisplayStatusDesc':  'free',
-            'PlaceTypeDesc': {'En': "Country"},
-            'geometry': {'type': 'Point',
-                         'coordinates': [10.01, 49.5]}
+places_tester = [{
+        'UnitId': 1000,
+        'UnitText1': {'En': 'The Geo Place'},
+        'Header': {'En': 'test_place'},
+        'UnitPlaces': [{'PlaceIds': 3}],
+        'StatusDesc': 'Completed',
+        'RightsDesc': 'Full',
+        'DisplayStatusDesc':  'free',
+        'PlaceTypeDesc': {'En': "Country"},
+        'geometry': {'type': 'Point',
+                     'coordinates': [10.01, 49.5]}
         },{
             'UnitId': 2000,
             'UnitText1': {'En': 'The Geoless Place'},
@@ -24,15 +23,17 @@ def test_get_geocoded_places(client, app):
             'StatusDesc': 'Completed',
             'RightsDesc': 'Full',
             'DisplayStatusDesc':  'free'
-        } ]:
-        app.data_db['places'].insert(i)
+        }]
+
+def test_get_geo_places(client, app):
+    app.data_db['places'].insert(places_tester)
 
     url = '/v1/geo/places'
     parameters = {
-        'northEastLat': '51.41976382669737',
-        'northEastLng': '12.579345703125002',
-        'southWestLat': '48.31973404047173',
-        'southWestLng': '9.195556640625002'
+        'ne_lat': '51.41976382669737',
+        'ne_lng': '12.579345703125002',
+        'sw_lat': '48.31973404047173',
+        'sw_lng': '9.195556640625002'
     }
     parameters = urllib.urlencode(parameters)
     ful_url = url + '?' + parameters
@@ -41,5 +42,37 @@ def test_get_geocoded_places(client, app):
     assert res.status_code == 200
     assert len(res.json) == 1
     assert res.json[0]['Header']['En'] == 'test_place'
+
+def test_get_geo_places_bad_param_value(client, app):
+    app.data_db['places'].insert(places_tester)
+
+    url = '/v1/geo/places'
+    parameters = {
+        'ne_lat': 'badstring',
+        'ne_lng': '12.579345703125002',
+        'sw_lat': '48.31973404047173',
+        'sw_lng': '9.195556640625002'
+    }
+    parameters = urllib.urlencode(parameters)
+    ful_url = url + '?' + parameters
+    with app.app_context():
+        res = client.get(ful_url)
+    assert res.status_code == 400
+
+def test_get_geo_places_bad_param_key(client, app):
+    app.data_db['places'].insert(places_tester)
+
+    url = '/v1/geo/places'
+    parameters = {
+        'ne_lat': '51.41976382669737',
+        'bad_key': '12.579345703125002',
+        'sw_lat': '48.31973404047173',
+        'sw_lng': '9.195556640625002'
+    }
+    parameters = urllib.urlencode(parameters)
+    ful_url = url + '?' + parameters
+    with app.app_context():
+        res = client.get(ful_url)
+    assert res.status_code == 400
 
 
