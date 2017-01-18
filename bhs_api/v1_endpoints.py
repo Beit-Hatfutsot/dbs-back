@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import cPickle
 from datetime import timedelta, datetime
 import re
 import urllib
@@ -607,6 +608,11 @@ def get_story(hash):
 @v1_endpoints.route('/geo/places')
 def get_geocoded_places():
     args = request.args
+    redis_key = 'geo:places'
+    cache = current_app.redis.get(redis_key)
+    if cache:
+        return cPickle.loads(cache)
+        
     filters = SHOW_FILTER.copy()
     filters['geometry'] = {'$exists': True}
     filters['Header.En'] = {'$nin' : [None, '']}
@@ -615,5 +621,9 @@ def get_geocoded_places():
 
     points = current_app.data_db['places'].find(filters, {'Header': True,
         'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
-    return humanify(list(points))
+    ret = humanify(list(points))
+    current_app.redis.set(redis_key,
+                          cPickle.dumps(ret),
+                          ex=current_app.config['CACHING_TTL'])
+    return ret
 
