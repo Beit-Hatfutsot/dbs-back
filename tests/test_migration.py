@@ -31,12 +31,13 @@ def test_update_doc(mocker, app):
         r=update_doc(collection, the_tester)
     doc =  collection.find_one({'UnitId':1000})
     assert doc['UnitText1']['En'] == 'The Tester'
+    assert doc['_id'] == 1000
     body = the_tester.copy()
     del body["_id"]
     elasticsearch.Elasticsearch.index.assert_called_once_with(
         body = body,
         doc_type = 'personalities',
-        id=the_tester['UnitId'],
+        id=doc['_id'],
         index = 'db',
        )
     assert doc['related'] == ['place_some']
@@ -49,10 +50,11 @@ def test_updated_doc(mocker, app):
     with app.app_context():
         update_doc(collection, the_tester)
         original_slug = collection.find_one({'UnitId':1000})['Slug']['En']
+        id = collection.find_one({'UnitId':1000})['_id']
         elasticsearch.Elasticsearch.index.assert_called_once_with(
             body = es_body,
             doc_type = 'personalities',
-            id=the_tester['UnitId'],
+            id=id,
             index = 'db',
         )
         elasticsearch.Elasticsearch.index.reset_mock()
@@ -64,7 +66,7 @@ def test_updated_doc(mocker, app):
         elasticsearch.Elasticsearch.index.assert_called_once_with(
             body = updated_tester,
             doc_type = 'personalities',
-            id=updated_tester['UnitId'],
+            id=id,
             index = 'db',
         )
 
