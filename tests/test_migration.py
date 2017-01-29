@@ -14,43 +14,51 @@ second_tree = dict(num=100,
                     persons=16,
                     date='right now')
 
-the_tester = {
+THE_TESTER = {
     'UnitId': 1000,
     'UnitText1': {'En': 'The Tester'},
     'Header': {'En': 'Nik Nikos'},
     'UnitPlaces': [{'PlaceIds': 3}],
-            'StatusDesc': 'Completed',
-            'RightsDesc': 'Full',
-            'DisplayStatusDesc':  'free',
+    'StatusDesc': 'Completed',
+    'RightsDesc': 'Full',
+    'DisplayStatusDesc':  'free',
 }
 
 def test_update_doc(mocker, app):
+    ''' This function tests the simplest case for
+        migration.tasks.update_doc function
+    '''
     mocker.patch('elasticsearch.Elasticsearch.index')
     collection = app.data_db['personalities']
     with app.app_context():
-        r=update_doc(collection, the_tester)
-    doc =  collection.find_one({'UnitId':1000})
-    assert doc['UnitText1']['En'] == 'The Tester'
-    assert doc['_id'] == 1000
-    body = the_tester.copy()
-    del body["_id"]
-    elasticsearch.Elasticsearch.index.assert_called_once_with(
-        body = body,
-        doc_type = 'personalities',
-        id=doc['_id'],
-        index = 'db',
-       )
-    assert doc['related'] == ['place_some']
+        # make sure the collection is clean
+        doc =  collection.find_one({'UnitId':1000})
+        assert not doc
+        r=update_doc(collection, THE_TESTER)
+        doc =  collection.find_one({'UnitId':1000})
+        assert doc['UnitText1']['En'] == 'The Tester'
+        assert doc['_id'] == 1000
+        body = THE_TESTER.copy()
+        del body["_id"]
+        elasticsearch.Elasticsearch.index.assert_called_once_with(
+            body = body,
+            doc_type = 'personalities',
+            id=doc['_id'],
+            index = 'db',
+        )
+        assert doc['related'] == ['place_some']
 
 def test_updated_doc(mocker, app):
+    ''' testing a creation and an update, ensuring uniquness '''
     mocker.patch('elasticsearch.Elasticsearch.index')
     collection = app.data_db['personalities']
-    es_body = the_tester.copy()
+    es_body = THE_TESTER.copy()
     del es_body["_id"]
     with app.app_context():
-        update_doc(collection, the_tester)
-        original_slug = collection.find_one({'UnitId':1000})['Slug']['En']
-        id = collection.find_one({'UnitId':1000})['_id']
+        update_doc(collection, THE_TESTER)
+        slug = collection.find_one({'UnitId':1000})['Slug']['En']
+        assert slug ==  collection.find_one({'UnitId':1000})['Slug']['En']
+        id = THE_TESTER['_id']
         elasticsearch.Elasticsearch.index.assert_called_once_with(
             body = es_body,
             doc_type = 'personalities',
@@ -58,10 +66,11 @@ def test_updated_doc(mocker, app):
             index = 'db',
         )
         elasticsearch.Elasticsearch.index.reset_mock()
-        updated_tester = the_tester.copy()
+        updated_tester = THE_TESTER.copy()
         updated_tester['Header']['En'] = 'Nikos Nikolveich'
         updated_tester['UnitText1']['En'] = 'The Great Tester'
         update_doc(collection, updated_tester)
+        assert collection.count({'UnitId':1000}) == 1
         del updated_tester['_id']
         elasticsearch.Elasticsearch.index.assert_called_once_with(
             body = updated_tester,
@@ -69,9 +78,6 @@ def test_updated_doc(mocker, app):
             id=id,
             index = 'db',
         )
-
-    assert original_slug ==  collection.find_one({'UnitId':1000})['Slug']['En']
-    assert collection.count({'UnitId':1000}) == 1
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')
