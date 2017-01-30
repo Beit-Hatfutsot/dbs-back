@@ -23,6 +23,8 @@ def parse_args():
                         help='debug mode, dump only 100 records of each collection')
     parser.add_argument('--db',
                         help='the db to run on defaults to the value in /etc/bhs/config.yml')
+    parser.add_argument('--header', action='store_true',
+                        help='add this to add a header line to the output')
     parser.add_argument('--ftp_server',
                         help='the address of the ftp server to push mojp-dump.tgz to')
     parser.add_argument('--ftp_user', default='anonymous')
@@ -65,7 +67,9 @@ if __name__ == '__main__':
         if collection == 'photoUnits':
             header = ['URL', 'ID', 'Title', 'Period', 'Body', 'Places']
 
-        writer.writerow(header)
+        if args.header:
+            writer.writerow(header)
+
         started = datetime.now()
         cursor = db[collection].find(SHOW_FILTER)
         if args.debug:
@@ -118,8 +122,9 @@ if __name__ == '__main__':
         print 'Collection {} took {}'.format(collection, finished-started)
     fns = [i+'.csv' for i in collections]
     tgz_fn = 'mojp-csv-dump.{}.tgz'.format(
-            datetime.now().strftime("%d.%m.%y-%H:%M:%S"))
+            datetime.now().strftime("%d.%m.%y-%H%M%S"))
     tgz_path = os.path.join(args.out, tgz_fn)
+    print "tar-ing to " + tgz_path
     call(['tar','-C', args.out,
           '-czf', tgz_path] + fns)
 

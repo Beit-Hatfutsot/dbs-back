@@ -321,22 +321,11 @@ def parse_n_update(row, collection_name):
 
 
 def get_file_descriptors(tree):
-    ''' there are two file paths in the dbs, return the one that points to the
-        latest file based on creation time.
-        returns both the file_id and the full file name
-    '''
-    file_id1 = str(tree['GenTreeFileId'])
-    file_name1 = os.path.join(conf.gentree_mount_point,
-                              os.path.dirname(tree['GenTreePath']),
-                              file_id1+'.ged')
-    file_id2 = os.path.split(tree['GenTreePath'])[-1].split('.')[0]
-    file_name2 = os.path.join(conf.gentree_mount_point,
+    ''' returns both the file_id and the full file name of the gedcom file '''
+    file_id = os.path.split(tree['GenTreePath'])[-1].split('.')[0]
+    file_name = os.path.join(conf.gentree_mount_point,
                               tree['GenTreePath'])
-
-    if os.path.getctime(file_name1) > os.path.getctime(file_name2):
-        return file_id1, file_name1
-    else:
-        return file_id2, file_name2
+    return file_id, file_name
 
 
 def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
