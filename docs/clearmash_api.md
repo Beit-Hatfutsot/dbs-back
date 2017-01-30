@@ -9,7 +9,9 @@ get the data we need. The zeep also has a nice way of parsing the WSDLs,
 so to dump a WSDL use:
 
     python -m zeep https://bh.clearmash.com/API/V5/Services/WebContentManagement.svc?wsdl
-
+    
+    python -m zeep https://bh.clearmash.com/API/V5/Services/Search.svc?wsdl
+    
 ## Auhorization
 
 To allow access to the sytstem you need a sceret client token. That token is
@@ -48,19 +50,6 @@ LookupDocumentByLocalizedField(
 
 The slug can be in Hebrew or English or any future language.
 
-### Get multiple entities By Slug
-
-Used to fetch the related items.
-
-<dl>
-    <dt>Method</dt>
-    <dd>TBD</dd>
-    <dt>Parameters</dt>
-    <dd>
-    TBD
-    </dd>
-</dl>
-
 ### Update Document
 
 <dl>
@@ -98,14 +87,29 @@ copy its `Document` and make the following changes to get an updated document:
 
 ## Search
 
+Acces to ClearMash entities is through its `Search.svc` wsdl.
+
+### Get related entities
+
+Used to fetch the related items.
+
+<dl>
+    <dt>Method</dt>
+    <dd>SimpleGetRelated</dd>
+    <dt>Parameters</dt>
+    <dd>
+    SimpleGetRelated(Id=entity id)
+    </dd>
+</dl>
+
 ### General Search
 
 <dl>
     <dt>Method</dt>
-    <dd>TBD</dd>
+    <dd>SimpleSearch</dd>
     <dt>Parameters</dt>
     <dd>
-    TBD
+    SimpleSearch(query = the search query, numOfResults = number of results)
     </dd>
 </dl>
 
@@ -116,13 +120,14 @@ Used to support [general search page](http://test.dbs.bh.org.il/search).
 
 <dl>
     <dt>Method</dt>
-    <dd>TBD</dd>
+    <dd>AdvanceSearch</dd>
     <dt>Parameters</dt>
     <dd>
-    TBD
+    AdvanceSearch(SearchParameters object)
     </dd>
 </dl>
 
+SearchParameters structure as described here: https://www.clearmash.com/skn/c7/Support/e2008/SearchParameters
 
 Get a complex query and return a list of person entities, used to support
 [Family Tree search page](http://test.dbs.bh.org.il/person). The complex query
@@ -163,10 +168,10 @@ should support the following fields:
 
 <dl>
     <dt>Method</dt>
-    <dd>TBD</dd>
+    <dd>AutoComplete</dd>
     <dt>Parameters</dt>
     <dd>
-    TBD
+    AutoComplete(AutoCompleteParameters object)
     </dd>
 </dl>
 
