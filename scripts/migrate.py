@@ -70,10 +70,17 @@ def get_now_str():
     now_str = datetime.datetime.strftime(now, format)
     return now_str
 
-def get_queries(collection_name=None):
+def get_queries(collection_name=None, repo_path=conf.queries_repo_path):
+    ''' return a dictionary with values of MSSQL query template and filenames 
+        keys.
+
+        :param collection_name: the name of the collection, if False or missing
+                                return the queries for all the collections
+        :param repo_path: where all the files are. defaults to the value from 
+                          the conf file
+    '''
     queries = {}
 
-    repo_path = conf.queries_repo_path
     if repo_path[-1] != '/':
         repo_path = repo_path + '/'
 
