@@ -88,7 +88,7 @@ class CMEntity():
             return
 
         if id:
-            r = self.client.service.GetDocument(entityId=id, changeset=0)
+            r = self.client.service.GetDocument(entityId=id, changeset=-1)
             if not r:
                 raise self.NotFound('GetDocument failed for id {}'.format(id))
         elif slug:
