@@ -174,20 +174,30 @@ def update_collection(collection, query, doc):
 
     if MIGRATE_MODE  == 'i':
         doc['Slug'] = create_slug(doc, collection.name)
+        try:
+            doc['_id'] = query['_id']
+        except KeyError:
+            pass
+
         return collection.insert(doc)
     else:
         r = collection.update_one(query,
                                   {'$set': doc},
                                   upsert=False)
         # check if update failed and if it did, create a slug
-        if r.modified_count == 0:
+        if r.matched_count == 0:
             doc['Slug'] = create_slug(doc, collection.name)
+            try:
+                doc['_id'] = query['_id']
+            except KeyError:
+                pass
+
             try:
                 return collection.insert(doc)
             except pymongo.errors.DuplicateKeyError:
                 # oops - seems like we need to add the id to the slug
                 reslugify(collection, doc)
-                collection.insert(doc)
+                return collection.insert(doc)
 
 
 def update_doc(collection, document):
@@ -236,11 +246,10 @@ def update_doc(collection, document):
                                      .format(collection.name,
                                              doc_id_field,
                                              ))
-        if doc_id:
-            document['_id'] = doc_id
+            return
 
 
-        query = {doc_id_field: doc_id}
+        query = {'_id': doc_id}
         result = update_collection(collection, query, document)
 
         update_es(collection.name, document, doc_id)
