@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from zeep import Client, xsd
 from zeep.helpers import serialize_object
 from html2text import html2text
-from clearmash.utils import get_clearmash_client
 
+from clearmash.utils import get_clearmash_client
 from bhs_api import create_app
 
 LOGLEVEL='DEBUG'
@@ -72,16 +72,23 @@ class CMEntity():
     class Slugged(Exception):
         pass
 
-    def __init__(self, id=None, slug=None):
-        ''' Initializing this class reads an entity from clearmash.
+    def __init__(self, id=None, slug=None, entity=None):
+        if entity:
+            self._copy(entity)
+        else:
+            self.client = get_clearmash_client('WebContentManagement')
+            self.get(id, slug)
+
+    def get(self, id=None, slug=None):
+        ''' get a specific entity from clearmash.
             Entity can be specified using `id` (==UnitId) or `slug`.
         '''
 
-        self.client, self.soapheaders = get_clearmash_client()
+        if not id and not slug:
+            return
 
         if id:
-            r = self.client.service.GetDocument(id,
-                            _soapheaders=[self.soapheaders])
+            r = self.client.service.GetDocument(entityId=id, changeset=0)
             if not r:
                 raise self.NotFound('GetDocument failed for id {}'.format(id))
         elif slug:
@@ -90,14 +97,16 @@ class CMEntity():
             lookup = factory.LookupDocumentByLocalizedField(
                 FieldId='_c6_beit_hatfutsot_bh_base_template_url_slug',
                 Value=slug)
-            r = self.client.service.LookupDocument(lookup,
-                            _soapheaders=[self.soapheaders])
+            r = self.client.service.LookupDocument(lookup)
             if not r or not r['Entity']:
                 raise self.NotFound('GetDocument failed for id {}'.format(id))
 
+
         self.xml = r['Entity']
         row = serialize_object(self.xml['Document'])
+        self._copy(row)
 
+    def _copy(self, row):
         self.changeset = r['Entity']['Changeset']
         # loop on all fields and output the `e` dict 
         e = {}
@@ -173,7 +182,7 @@ class CMEntity():
                                 DataBaseChangeset=self.changeset,
                                 Entity=entity)
 
-        self.client.service.EditDocument(edit, _soapheaders=[self.soapheaders])
+        self.client.service.EditDocument(edit)
 
 if __name__ == '__main__':
     # doing a bit of testing
