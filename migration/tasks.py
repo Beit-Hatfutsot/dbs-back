@@ -70,30 +70,44 @@ def ensure_indices(collection):
         collection.create_index("Slug.He", unique=True, sparse=True)
         collection.create_index("Slug.En", unique=True, sparse=True)
 
-def update_es(collection, doc, id):
+def update_es(collection, doc, id, new):
     if MIGRATE_ES != '1':
         return
 
+    # index only the docs that are publicly available
+    if doc['StatusDesc'] != 'Completed' or\
+       doc['RightsDesc'] != 'Full' or\
+       doc['DisplayStatusDesc'] == 'Internal Use' or\
+       doc['UnitText1']['En'] in [None, ''] and \
+       doc['UnitText1']['He'] in [None, '']:
+        return
     index_name = current_app.data_db.name
     body = doc.copy()
     if '_id' in body:
         del body['_id']
-    try:
-        current_app.es.index(index=index_name,
-                             doc_type=collection,
-                             id=id,
-                             body=body)
-    except elasticsearch.exceptions.SerializationError:
-        # UUID fields are causing es to crash, turn them to strings
-        uuids_to_str(doc)
+    if new:
         try:
             current_app.es.index(index=index_name,
-                                 doc_type=collection,
-                                 id=id,
-                                 body=doc)
-        except elasticsearch.exceptions.SerializationError as e:
-            current_app.logger.error("Elastic search index failed for {}:{} with {}"
-                                     .format(collection, id, e))
+                                doc_type=collection,
+                                id=id,
+                                body=body)
+        except elasticsearch.exceptions.SerializationError:
+            # UUID fields are causing es to crash, turn them to strings
+            uuids_to_str(doc)
+            try:
+                current_app.es.index(index=index_name,
+                                    doc_type=collection,
+                                    id=id,
+                                    body=doc)
+            except elasticsearch.exceptions.SerializationError as e:
+                current_app.logger.error("Elastic search index failed for {}:{} with {}"
+                                        .format(collection, id, e))
+    else:
+        current_app.es.update(index=index_name,
+                            doc_type=collection,
+                            id=id,
+                            body={"doc": body})
+
 
 
 def reslugify(collection, document):
@@ -167,6 +181,11 @@ def update_row(doc, collection_name):
     ensure_indices(collection)
 
 def update_collection(collection, query, doc):
+    """ update the mongo collection.
+        returns True is a new doc was created and False is an existing item
+        has been updated
+    """
+
     if MIGRATE_RELATED != '0':
         doc['related'] = get_bhp_related(doc, collection.name,
                                                 max_items=6,
@@ -179,7 +198,8 @@ def update_collection(collection, query, doc):
         except KeyError:
             pass
 
-        return collection.insert(doc)
+        collection.insert(doc)
+        created = True
     else:
         r = collection.update_one(query,
                                   {'$set': doc},
@@ -192,12 +212,17 @@ def update_collection(collection, query, doc):
             except KeyError:
                 pass
 
+            created = True
             try:
-                return collection.insert(doc)
+                collection.insert(doc)
             except pymongo.errors.DuplicateKeyError:
                 # oops - seems like we need to add the id to the slug
                 reslugify(collection, doc)
-                return collection.insert(doc)
+                collection.insert(doc)
+        else:
+            created = False
+
+    return created
 
 
 def update_doc(collection, document):
@@ -250,9 +275,9 @@ def update_doc(collection, document):
 
 
         query = {'_id': doc_id}
-        result = update_collection(collection, query, document)
+        created = update_collection(collection, query, document)
 
-        update_es(collection.name, document, doc_id)
+        update_es(collection.name, document, doc_id, created)
 
         try:
             slug = document['Slug']['En']
