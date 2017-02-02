@@ -103,11 +103,24 @@ def update_es(collection, doc, id, new):
                 current_app.logger.error("Elastic search index failed for {}:{} with {}"
                                         .format(collection, id, e))
     else:
-        current_app.es.update(index=index_name,
-                            doc_type=collection,
-                            id=id,
-                            body={"doc": body})
-
+        try:
+            current_app.es.update(index=index_name,
+                                doc_type=collection,
+                                id=id,
+                                body={"doc": body})
+        except elasticsearch.exceptions.NotFoundError as e:
+            # So it's in the DB, passes the SHOW_FILTER and not found in ES
+            # weird, but that's what we have.
+            # let's index it.
+            current_app.logger.info(
+                "Resorting to ES index function as update failed for {}:{} with {}"
+                .format(collection, id, e))
+            item = current_app.data_db[collection].find_one({'_id': id})
+            del item['_id']
+            current_app.es.index(index=index_name,
+                                doc_type=collection,
+                                id=id,
+                                body=item)
 
 
 def reslugify(collection, document):
