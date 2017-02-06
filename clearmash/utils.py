@@ -1,5 +1,6 @@
+from lxml import etree
 from flask import current_app
-from zeep import Client, xsd
+from zeep import Client
 
 
 def get_clearmash_client(ep):
@@ -11,15 +12,7 @@ def get_clearmash_client(ep):
                     .format(current_app.conf.clearmash_url,
                             ep)
                    )
-    header = xsd.Element(
-        '',
-        xsd.ComplexType([
-            xsd.Element(
-                'ClientToken',
-                xsd.String()),
-        ])
-    )
-    client.set_default_soapheaders([
-        header(ClientToken=current_app.conf.clearmash_token)
-    ])
+    header = etree.Element('ClientToken')
+    header.text = current_app.conf.clearmash_token
+    client.set_default_soapheaders([header])
     return client
