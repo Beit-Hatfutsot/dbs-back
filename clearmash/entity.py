@@ -88,7 +88,7 @@ class CMEntity():
             return
 
         if id:
-            r = self.client.service.GetDocument(entityId=id, changeset=-1)
+            r = self.client.service.GetDocument(entityId=id)
             if not r:
                 raise self.NotFound('GetDocument failed for id {}'.format(id))
         elif slug:
@@ -104,10 +104,10 @@ class CMEntity():
 
         self.xml = r['Entity']
         row = serialize_object(self.xml['Document'])
+        self.changeset = r['Entity']['Changeset']
         self._copy(row)
 
     def _copy(self, row):
-        self.changeset = r['Entity']['Changeset']
         # loop on all fields and output the `e` dict 
         e = {}
         for k, v in row.items():
@@ -117,7 +117,10 @@ class CMEntity():
                 try:
                     e[j['Id']] = j['Value']
                 except KeyError:
-                    e[j['Id']] = j['DatasourceItemsIds']
+                    if 'DatasourceItemsIds' in j:
+                        e[j['Id']] = j['DatasourceItemsIds']
+                    else:
+                        logging.warn('skippingi field {} keys {}'.format(j['Id'], j.keys()))
 
         self.id = e['entity_id']
         self.is_deleted = e['is_deleted']
@@ -133,8 +136,9 @@ class CMEntity():
         for v in e['entity_name']['LocalizedString']:
             self.title[v['ISO6391']] = v['Value']
 
-        for v in e['_c6_beit_hatfutsot_bh_base_template_description']['LocalizedString']:
-            self.description[v['ISO6391']] = html2text(v['Value'])
+        if '_c6_beit_hatfutsot_bh_base_template_description' in e:
+            for v in e['_c6_beit_hatfutsot_bh_base_template_description']['LocalizedString']:
+                self.description[v['ISO6391']] = html2text(v['Value'])
 
         try:
             for v in e['_c6_beit_hatfutsot_bh_base_template_url_slug']['LocalizedString']:
@@ -147,8 +151,12 @@ class CMEntity():
         except KeyError:
             pass
 
-        self.from_date = dict(e['_c6_beit_hatfutsot_bh_base_template_from_date'])
-        self.to_date = dict(e['_c6_beit_hatfutsot_bh_base_template_to_date'])
+        if '_c6_beit_hatfutsot_bh_base_template_from_date' in e:
+            self.from_date =\
+                dict(e['_c6_beit_hatfutsot_bh_base_template_from_date'])
+        if '_c6_beit_hatfutsot_bh_base_template_to_date' in e:
+            self.to_date =\
+                dict(e['_c6_beit_hatfutsot_bh_base_template_to_date'])
 
     def set_slug(self, slug):
         ''' set the entity's slug
@@ -176,6 +184,13 @@ class CMEntity():
         doc = dict(serialize_object(self.xml['Document']))
         template_reference =  doc.pop('TemplateReference')
         doc['TemplateId'] = template_reference['TemplateId']
+        '''
+        for k in ('Fields_ChildDocuments', 'Fields_RelatedDocuments'):
+            try:
+                del doc[k]
+            except KeyError:
+                pass
+        '''
         entity = factory.EntitySaveData(Document=doc)
         edit = factory.EditWebDocumentParameters(EntityId=self.id,
                                 ApproveCriteria="AllPendingData",
@@ -188,7 +203,7 @@ if __name__ == '__main__':
     # doing a bit of testing
     app, conf = create_app()
     with app.app_context():
-        e = CMEntity(15841)
+        e = CMEntity(930)
         try:
             e.set_slug({'en':'the_slug', 'he':u'בךה'})
         except e.Slugged:
