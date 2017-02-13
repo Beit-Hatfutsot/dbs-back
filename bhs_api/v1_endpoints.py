@@ -397,10 +397,11 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
-        for item in rv['hits']['hits']:
-            enrich_item(item['_source'])
         if not rv:
             abort(500, 'Sorry, the search cluster appears to be down')
+        else:
+            for item in rv['hits']['hits']:
+                enrich_item(item['_source'])
         return humanify(rv)
 
 @v1_endpoints.route('/wsearch')
