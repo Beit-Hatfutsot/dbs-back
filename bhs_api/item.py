@@ -6,6 +6,7 @@ from werkzeug.exceptions import NotFound, Forbidden
 from flask import current_app
 from slugify import Slugify
 from bhs_api import phonetic
+from bhs_api.fsearch import clean_person
 
 SHOW_FILTER = {
                 'StatusDesc': 'Completed',
@@ -101,7 +102,7 @@ def _make_serializable(obj):
     return obj
 
 def fetch_items(slug_list, db=None):
-                
+
     if not db:
         db = current_app.data_db
 
@@ -234,6 +235,8 @@ def _filter_doc(query, collection, db):
                 return None
             else:
                 return item
+        elif collection == 'persons':
+            return clean_person(item)
         else:
             return item
     else:
