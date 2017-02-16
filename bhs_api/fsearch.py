@@ -221,7 +221,7 @@ def clean_person(person):
             pass
 
     # remove the details of the living
-    if 'birth_year' in person and \
+    if 'birth_year' in person and isinstance(person['birth_year'], int) and \
        datetime.now().year - int(person['birth_year']) < 100 or \
        'deceased' in person and \
        not person['deceased']:
