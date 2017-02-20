@@ -75,12 +75,16 @@ def update_es(collection, doc, id, new):
         return
 
     # index only the docs that are publicly available
-    if doc['StatusDesc'] != 'Completed' or\
-       doc['RightsDesc'] != 'Full' or\
-       doc['DisplayStatusDesc'] == 'Internal Use' or\
-       doc['UnitText1']['En'] in [None, ''] and \
-       doc['UnitText1']['He'] in [None, '']:
+    try:
+        if doc['StatusDesc'] != 'Completed' or\
+           doc['RightsDesc'] != 'Full' or\
+           doc['DisplayStatusDesc'] == 'Internal Use' or\
+           doc['UnitText1']['En'] in [None, ''] and \
+           doc['UnitText1']['He'] in [None, '']:
+            return
+    except KeyError:
         return
+
     index_name = current_app.data_db.name
     body = doc.copy()
     if '_id' in body:
