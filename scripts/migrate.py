@@ -54,11 +54,12 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-c', '--collection')
     parser.add_argument('--host', default='localhost')
-    parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
     parser.add_argument('-i', '--unitid', type=int,
                         help='migrate a specifc unit/tree id')
+    parser.add_argument('-g', '--gedcom_path', type=int,
+                        help='file path to a gedcom file. works only when -i XXX -c genTrees is used')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -302,21 +303,24 @@ def parse_n_update(row, collection_name):
     return doc
 
 
-def get_file_descriptors(tree):
+def get_file_descriptors(tree, gedcom_path):
     ''' returns both the file_id and the full file name of the gedcom file '''
-    file_id = os.path.split(tree['GenTreePath'])[-1].split('.')[0]
+    if not gedcom_path:
+        gedcom_path = tree['GenTreePath']
+    file_id = os.path.split(gedcom_path)[-1].split('.')[0]
     file_name = os.path.join(conf.gentree_mount_point,
-                              tree['GenTreePath'])
+                             gedcom_path)
     return file_id, file_name
 
 
-def migrate_trees(cursor, treenums=None):
+def migrate_trees(cursor, treenum=None, gedcom_path=None):
     count = 0
+
     for row in cursor:
         if treenums:
-            if row['GenTreeNumber'] not in treenums:
+            if row['GenTreeNumber'] != treenum:
                 continue
-        file_id, file_name = get_file_descriptors(row)
+        file_id, file_name = get_file_descriptors(row, gedcom_path)
         try:
             gedcom_fd = open(file_name)
         except IOError:
@@ -368,9 +372,8 @@ if __name__ == '__main__':
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
             tree_nums = [args.unitid] if args.unitid else None
-            sql_cursor = sqlClient.execute(query, since=since, until=until,
-                                           unit_ids=tree_nums)
-            count = migrate_trees(sql_cursor ,tree_nums)
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
+            count = migrate_trees(sql_cursor, args.unitid, args.gedcom_path)
             if not count:
                 logger.info('{}:Skipping'.format(collection_name))
 
