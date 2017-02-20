@@ -1,9 +1,10 @@
-import requests
+from bh_datasets.common.base import BaseDataset, BaseDatasetItem, BaseDatasetItems
 
 
-class EuropeanaDataset(object):
+class EuropeanaDataset(BaseDataset):
 
-    def __init__(self, wskey):
+    def __init__(self, wskey, **kwargs):
+        super(EuropeanaDataset, self).__init__(**kwargs)
         self.wskey = wskey
 
     def source_search(self, query, only_images=False, rows=20, start=1):
@@ -11,11 +12,8 @@ class EuropeanaDataset(object):
         qf = 'PROVIDER:"Judaica Europeana"'
         if only_images:
             qf += " TYPE:IMAGE"
-        res = requests.get("http://www.europeana.eu/api/v2/search.json", {"wskey": self.wskey,
-                                                                    "qf": qf,
-                                                                    "query": query,
-                                                                    "rows": rows,
-                                                                    "start": start})
+        res = self.requests.get("http://www.europeana.eu/api/v2/search.json",
+                                {"wskey": self.wskey, "qf": qf, "query": query, "rows": rows, "start": start})
         res_json = res.json()
         if not res_json["success"]:
             raise Exception("europeana search failed: {}".format(res_json["error"]))
@@ -23,7 +21,7 @@ class EuropeanaDataset(object):
             return EuropeanaItems.from_json_search_results(res_json)
 
 
-class EuropeanaItems(object):
+class EuropeanaItems(BaseDatasetItems):
 
     def __init__(self, itemsCount, totalResults, items):
         self.itemsCount = itemsCount
@@ -35,7 +33,7 @@ class EuropeanaItems(object):
         return cls(json_search_results["itemsCount"], json_search_results["totalResults"], json_search_results["items"])
 
 
-class EuropeanaItem(object):
+class EuropeanaItem(BaseDatasetItem):
 
     def __init__(self, item_data):
         self.item_data = item_data
