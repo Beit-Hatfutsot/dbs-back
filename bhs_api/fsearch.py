@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 
 from flask import abort, current_app
 from bhs_api import phonetic
@@ -109,7 +110,7 @@ def build_query(search_dict):
     for item in years:
         if item == 'marriage_year':
             # Look in the MSD array
-            search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}} 
+            search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}}
             continue
         start, end = year_ranges[item]
         search_query[start] = {'$gte': years[item]['min']}
@@ -117,7 +118,7 @@ def build_query(search_dict):
 
     if sex:
         search_query['sex'] = sex
-    
+
     for param, item in names_and_places.items():
         for k, v in item.items():
             # place is an or of all place fields
@@ -197,9 +198,14 @@ def fsearch(max_results=15, db=None, **kwargs):
 
 
 def clean_person(person):
-
-    # mongo's id
-    del person['_id']
+    ''' clean a person up. replace gedcom names with better names and clean
+        details of the living.
+    '''
+    try:
+        # mongo's id
+        del person['_id']
+    except KeyError:
+        pass
 
     # translating gedcom names
     for db_key, api_key in (('BIRT_PLAC', 'birth_place'),
@@ -215,7 +221,10 @@ def clean_person(person):
             pass
 
     # remove the details of the living
-    if not person['deceased']:
+    if 'birth_year' in person and isinstance(person['birth_year'], int) and \
+       datetime.now().year - int(person['birth_year']) < 100 or \
+       'deceased' in person and \
+       not person['deceased']:
         for key in person.keys():
             if key in ['birth_year', 'death_year', 'birth_place',
                        'death_place', 'marriage_place', 'marriage_date',
