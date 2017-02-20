@@ -221,14 +221,14 @@ def clean_person(person):
             pass
 
     # remove the details of the living
-    if 'birth_year' in person and isinstance(person['birth_year'], int) and \
+    if 'birth_year' in person and isinstance(person['birth_year'], (int, float)) and \
        datetime.now().year - int(person['birth_year']) < 100 or \
        'deceased' in person and \
        not person['deceased']:
         for key in person.keys():
             if key in ['birth_year', 'death_year', 'birth_place',
                        'death_place', 'marriage_place', 'marriage_date',
-                       'occupation', 'bio',
+                       'occupation', 'bio', 'BIRT_DATE'
                       ]:
                 del person[key]
     return person
