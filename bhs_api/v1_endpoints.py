@@ -58,7 +58,7 @@ def es_search(q, size, collection=None, from_=0, sort=None):
         "default_operator": "and"
     }}}
     if sort == "abc":
-        if q.strip()[0] in u"אבגדהוזחטיכלמנסעפצקרשת":
+        if phonetic.is_hebrew(q.strip()):
             # hebrew alphabetical sort
             body["sort"] = [{"Header.He.keyword": "asc"}, "_score"]
         else:
