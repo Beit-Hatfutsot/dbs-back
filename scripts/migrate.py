@@ -328,7 +328,7 @@ def get_file_descriptors(tree):
     return file_id, file_name
 
 
-def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
+def migrate_trees(sql_cursor, since_timestamp, until_timestamp, treenums, on_save=None):
     since = datetime.datetime.fromtimestamp(since_timestamp)
     until = datetime.datetime.fromtimestamp(until_timestamp)
     count = 0
@@ -344,7 +344,7 @@ def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
         file_id, file_name = get_file_descriptors(row)
         try:
             gedcom_fd = open(file_name)
-        except IOError:
+        except IOError, e:
             logger.error('failed to open gedocm file tree number {}, path {}: {}'
                          .format(row['GenTreeNumber'], file_name, str(e)))
             continue
@@ -357,7 +357,7 @@ def migrate_trees(cursor, since_timestamp, until_timestamp, treenums):
             continue
         logger.info('>>> migrating tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
-        Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update)
+        Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update if not on_save else on_save)
         logger.info('<<< migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
         count += 1
