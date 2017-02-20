@@ -2,11 +2,12 @@ import pymssql
 from maya import MayaDT, now
 
 class MigrationSQLClient:
-    def __init__(self, server, user, password, db, max_recursive_calls=2):
+    def __init__(self, server, user, password, db, max_recursive_calls=2,
+                 debug=False):
         self.connection = pymssql.connect(server, user, password, db,
             as_dict=True, login_timeout=10)
 
-        self.connection._conn.debug_queries= True
+        self.connection._conn.debug_queries = debug
         self.cursor = self.connection.cursor()
         self.recursive_calls = 0
         self.max_recursive_calls = max_recursive_calls
