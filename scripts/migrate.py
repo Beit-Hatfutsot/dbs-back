@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
     parser.add_argument('-i', '--unitid', type=int,
                         help='migrate a specifc unit/tree id')
-    parser.add_argument('-g', '--gedcom_path', type=int,
+    parser.add_argument('-g', '--gedcom_path',
                         help='file path to a gedcom file. works only when -i XXX -c genTrees is used')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
@@ -317,7 +317,7 @@ def migrate_trees(cursor, treenum=None, gedcom_path=None):
     count = 0
 
     for row in cursor:
-        if treenums:
+        if treenum:
             if row['GenTreeNumber'] != treenum:
                 continue
         file_id, file_name = get_file_descriptors(row, gedcom_path)
