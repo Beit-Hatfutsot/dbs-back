@@ -1,10 +1,8 @@
 import logging
 import re
-from datetime import datetime
-
 from flask import abort, current_app
 from bhs_api import phonetic
-from bhs_api.utils import is_living_person
+from bhs_api.persons import is_living_person, LIVING_PERSON_WHITELISTED_KEYS
 
 MAX_RESULTS=30 # aka chunk size
 
@@ -208,6 +206,8 @@ def clean_person(person):
     ''' clean a person up. replace gedcom names with better names and clean
         details of the living.
     '''
+
+
     try:
         # mongo's id
         del person['_id']
@@ -216,12 +216,11 @@ def clean_person(person):
 
     # translating gedcom names
     for db_key, api_key in (('BIRT_PLAC', 'birth_place'),
-                     ('DEAT_PLAC', 'death_place'),
-                     ('MARR_PLAC', 'marriage_place'),
-                     ('MARR_DATE', 'marriage_date'),
-                     ('OCCU', 'occupation'),
-                     ('NOTE', 'bio'),
-                     ):
+                            ('DEAT_PLAC', 'death_place'),
+                            ('MARR_PLAC', 'marriage_place'),
+                            ('MARR_DATE', 'marriage_date'),
+                            ('OCCU', 'occupation'),
+                            ('NOTE', 'bio')):
         try:
             person[api_key] = person.pop(db_key)
         except KeyError:
@@ -230,9 +229,6 @@ def clean_person(person):
     # remove the details of the living
     if is_living_person(person.get('deceased'), person.get('birth_year')):
         for key in person.keys():
-            if key in ['birth_year', 'death_year', 'birth_place',
-                       'death_place', 'marriage_place', 'marriage_date',
-                       'occupation', 'bio', 'BIRT_DATE'
-                      ]:
+            if key not in LIVING_PERSON_WHITELISTED_KEYS:
                 del person[key]
     return person
