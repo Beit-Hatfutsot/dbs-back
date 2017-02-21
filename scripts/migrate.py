@@ -320,7 +320,7 @@ def get_file_descriptors(tree, gedcom_path):
     return file_id, file_name
 
 
-def migrate_trees(cursor, treenum=None, gedcom_path=None):
+def migrate_trees(cursor, treenum=None, gedcom_path=None, on_save=None):
     count = 0
 
     for row in cursor:
