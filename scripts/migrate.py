@@ -54,12 +54,12 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument('-c', '--collection')
     parser.add_argument('--host', default='localhost')
-    parser.add_argument('-p', '--port', default=27017)
     parser.add_argument('-s', '--since', default=0)
     parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
-    parser.add_argument('-t', '--treenum')
     parser.add_argument('-i', '--unitid', type=int,
-                        help='migrate a specifc unit id')
+                        help='migrate a specifc unit/tree id')
+    parser.add_argument('-g', '--gedcom_path',
+                        help='file path to a gedcom file. works only when -i XXX -c genTrees is used')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
 
@@ -71,13 +71,19 @@ def get_now_str():
     now_str = datetime.datetime.strftime(now, format)
     return now_str
 
-def get_queries(collection_name=None):
+def get_queries(collection_name=None, repo_path=conf.queries_repo_path):
+    ''' return a dictionary with values of MSSQL query template and filenames
+        keys.
+
+        :param collection_name: the name of the collection, if False or missing
+                                return the queries for all the collections
+        :param repo_path: where all the files are. defaults to the value from
+                          the conf file
+    '''
     queries = {}
 
-    repo_path = conf.queries_repo_path
     if repo_path[-1] != '/':
         repo_path = repo_path + '/'
-    os.chdir(repo_path)
 
     if collection_name:
         filenames = [collection_name + '.sql']
@@ -87,9 +93,11 @@ def get_queries(collection_name=None):
 
     for filename in filenames:
         try:
-            fh = open(repo_path + filename)
+            fh = open(os.path.join(repo_path, filename))
         except IOError:
-            logger.error('Could not open file for query: \'{}\'. Make sure there is a SQL file for this query.'.format(filename[:-4]) )
+            logger.error('Could not open file \'{}\' in {}.'.format(filename,
+                                                                    os.getcwd())
+                        )
             sys.exit(1)
 
         queries[filename[:-4]] = fh.read()
@@ -292,56 +300,34 @@ def parse_doc(doc, collection_name):
     return collection_procedure_map[collection_name](doc)
 
 
-def get_touched_units(collection_name,  since, until):
-    query = get_queries('audit')['audit']
-    # genTreeIndividuals is a special case:
-    # we need to return a cursor to all updated/inserted tree units
-    if collection_name in ('genTreeIndividuals', 'genTrees'):
-        unit_type = get_unit_type('familyTrees')
-    else:
-        unit_type = get_unit_type(collection_name)
-    if unit_type:
-        cursor = sqlClient.audit(query=query,
-                                operation='update',
-                                from_date=since,
-                                to_date=until,
-                                unit_type=unit_type)
-        return cursor
-    else:
-        return None
-
-
 def parse_n_update(row, collection_name):
     doc = parse_doc(row, collection_name)
     id_field = get_collection_id_field(collection_name)
-    logger.info('{}:Updating {}: {}'.format(
-        collection_name, id_field, doc[id_field]))
+    logger.info('{}:Updating {}: {}, updated {}'.format(
+        collection_name, id_field, doc[id_field],
+        doc.get('UpdateDate', '?')))
     update_row.delay(doc, collection_name)
     return doc
 
 
-def get_file_descriptors(tree):
+def get_file_descriptors(tree, gedcom_path):
     ''' returns both the file_id and the full file name of the gedcom file '''
-    file_id = os.path.split(tree['GenTreePath'])[-1].split('.')[0]
+    if not gedcom_path:
+        gedcom_path = tree['GenTreePath']
+    file_id = os.path.split(gedcom_path)[-1].split('.')[0]
     file_name = os.path.join(conf.gentree_mount_point,
-                              tree['GenTreePath'])
+                             gedcom_path)
     return file_id, file_name
 
 
-def migrate_trees(sql_cursor, since_timestamp, until_timestamp, treenums, on_save=None):
-    since = datetime.datetime.fromtimestamp(since_timestamp)
-    until = datetime.datetime.fromtimestamp(until_timestamp)
+def migrate_trees(cursor, treenum=None, gedcom_path=None):
     count = 0
-    treenums = treenums.split(',') if treenums else None
-        
-    for row in sql_cursor:
-        # special case for a specific tree
-        if treenums:
-            if str(row['GenTreeNumber']) not in treenums:
+
+    for row in cursor:
+        if treenum:
+            if row['GenTreeNumber'] != treenum:
                 continue
-        elif row['UpdateDate'] < since or row['UpdateDate'] > until:
-            continue
-        file_id, file_name = get_file_descriptors(row)
+        file_id, file_name = get_file_descriptors(row, gedcom_path)
         try:
             gedcom_fd = open(file_name)
         except IOError, e:
@@ -386,42 +372,24 @@ if __name__ == '__main__':
     else:
         since = int(args.since)
 
-	# connect to BHP SQL Server
-
-    if args.treenum:
-        collection = 'genTrees'
-    else:
-        collection = args.collection
+    collection = args.collection
     queries = get_queries(collection)
     logger.info('looking for changed items in {}-{}'.format(since, until))
     photos_to_update = []
     for collection_name, query in queries.items():
         if collection_name == 'genTrees':
-            #TODO: `since` should be part of the sql query
-            sql_cursor = sqlClient.execute(query)
-            count = migrate_trees(sql_cursor, since, until, args.treenum)
+            tree_nums = [args.unitid] if args.unitid else None
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
+            count = migrate_trees(sql_cursor, args.unitid, args.gedcom_path)
             if not count:
                 logger.info('{}:Skipping'.format(collection_name))
 
             continue
 
-        if since:
-            unit_cursor = get_touched_units(collection_name, since, until)
-            units = list(unit_cursor)
-
-            if not units:
-                logger.info('{}:Skipping'.format(collection_name))
-                continue
-
-            unit_ids = [unit['UnitId'] for unit in units]
-            sql_cursor = sqlClient.execute(query, select_ids=True,
-                                        unit_ids=unit_ids)
-        elif args.unitid:
-            sql_cursor = sqlClient.execute(query, select_ids=True,
-                                        unit_ids=[args.unitid])
-
+        if args.unitid:
+            sql_cursor = sqlClient.execute(query, unit_ids=[args.unitid])
         else:
-            sql_cursor = sqlClient.execute(query)
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
 
         if sql_cursor:
             for row in sql_cursor:
@@ -443,9 +411,8 @@ if __name__ == '__main__':
     if len(photos_to_update) > 0:
         photos_query = get_queries('photos')['photos']
         photos_cursor = sqlClient.execute(photos_query,
-                                          select_ids=True,
                                           unit_ids=photos_to_update,
-                                          stringify=True)
+                                          )
         for row in photos_cursor:
             upload_photo(row, conf)
 
