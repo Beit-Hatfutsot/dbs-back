@@ -4,6 +4,7 @@ from datetime import datetime
 
 from flask import abort, current_app
 from bhs_api import phonetic
+from bhs_api.utils import is_living_person
 
 MAX_RESULTS=30 # aka chunk size
 
@@ -227,14 +228,11 @@ def clean_person(person):
             pass
 
     # remove the details of the living
-    if 'birth_year' in person and isinstance(person['birth_year'], int) and \
-       datetime.now().year - int(person['birth_year']) < 100 or \
-       'deceased' in person and \
-       not person['deceased']:
+    if is_living_person(person.get('deceased'), person.get('birth_year')):
         for key in person.keys():
             if key in ['birth_year', 'death_year', 'birth_place',
                        'death_place', 'marriage_place', 'marriage_date',
-                       'occupation', 'bio',
+                       'occupation', 'bio', 'BIRT_DATE'
                       ]:
                 del person[key]
     return person

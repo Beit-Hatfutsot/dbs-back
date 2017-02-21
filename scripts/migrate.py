@@ -72,12 +72,12 @@ def get_now_str():
     return now_str
 
 def get_queries(collection_name=None, repo_path=conf.queries_repo_path):
-    ''' return a dictionary with values of MSSQL query template and filenames 
+    ''' return a dictionary with values of MSSQL query template and filenames
         keys.
 
         :param collection_name: the name of the collection, if False or missing
                                 return the queries for all the collections
-        :param repo_path: where all the files are. defaults to the value from 
+        :param repo_path: where all the files are. defaults to the value from
                           the conf file
     '''
     queries = {}
@@ -320,7 +320,7 @@ def get_file_descriptors(tree, gedcom_path):
     return file_id, file_name
 
 
-def migrate_trees(cursor, treenum=None, gedcom_path=None):
+def migrate_trees(cursor, treenum=None, gedcom_path=None, on_save=None):
     count = 0
 
     for row in cursor:
@@ -330,7 +330,7 @@ def migrate_trees(cursor, treenum=None, gedcom_path=None):
         file_id, file_name = get_file_descriptors(row, gedcom_path)
         try:
             gedcom_fd = open(file_name)
-        except IOError:
+        except IOError, e:
             logger.error('failed to open gedocm file tree number {}, path {}: {}'
                          .format(row['GenTreeNumber'], file_name, str(e)))
             continue
@@ -343,7 +343,7 @@ def migrate_trees(cursor, treenum=None, gedcom_path=None):
             continue
         logger.info('>>> migrating tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
-        Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update)
+        Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update if not on_save else on_save)
         logger.info('<<< migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
         count += 1

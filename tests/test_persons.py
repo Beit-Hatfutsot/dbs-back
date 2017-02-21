@@ -1,6 +1,7 @@
 import json
 import logging
 import pytest
+from datetime import datetime
 
 from bhs_api.fsearch import fsearch, clean_person
 
@@ -54,12 +55,12 @@ def test_clean_person(mock_db):
 
     cleaned = clean_person({
             'name_lc': ['yossi', 'cohen'],
-            'birth_year': 2000,
+            'birth_year': datetime.now().year-20,
             'id': 'I1',
             'Slug': {'En': 'person_1;0.I7'},
             'bio': 'yossi is a big boy'
         })
-    assert 'bio' not in cleaned # this will FAIL in 2100
+    assert 'bio' not in cleaned
 
     # and one for the dead
     cleaned = clean_person({
@@ -70,6 +71,31 @@ def test_clean_person(mock_db):
             'bio': 'yossi is a big boy'
         })
     assert 'bio' in cleaned
+
+    # test case using year in float + with BIRT_DATE field
+    cleaned = clean_person({
+            'name_lc': ['yossi', 'cohen'],
+            'birth_year': float(datetime.now().year-70),
+            'id': 'I1',
+            'Slug': {'En': 'person_1;0.I1'},
+            'bio': 'yossi is a big boy',
+            'deceased': False,
+            'BIRT_DATE': "Jan 15, 1972"
+        })
+    assert 'BIRT_DATE' not in cleaned
+
+    # deceased person should be deceased regardless of birth year
+    cleaned = clean_person({
+        'name_lc': ['yossi', 'cohen'],
+        'birth_year': float(datetime.now().year - 5),
+        'id': 'I1',
+        'Slug': {'En': 'person_1;0.I1'},
+        'bio': 'yossi is a little dead boy',
+        'deceased': True,
+        'BIRT_DATE': "Jan 15, 1972"
+    })
+    assert 'bio' in cleaned
+
 
 def test_get_persons(client, mock_db):
     mock_db['persons'].insert({
