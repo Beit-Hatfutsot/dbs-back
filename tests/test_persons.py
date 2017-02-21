@@ -58,6 +58,18 @@ def test_clean_person(mock_db):
         })
     assert 'bio' in cleaned
 
+    # test case using year in float + with BIRT_DATE field
+    cleaned = clean_person({
+            'name_lc': ['yossi', 'cohen'],
+            'birth_year': 1950.0,
+            'id': 'I1',
+            'Slug': {'En': 'person_1;0.I1'},
+            'bio': 'yossi is a big boy',
+            'deceased': True,
+            'BIRT_DATE': "Jan 15, 1972"
+        })
+    assert 'BIRT_DATE' not in cleaned
+
 def test_get_persons(client, mock_db):
     mock_db['persons'].insert({
             'name_lc': ['yossi', 'cohen'],
