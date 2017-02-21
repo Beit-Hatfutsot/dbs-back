@@ -109,6 +109,7 @@ class Gedcom2Persons:
                 for key in node:
                     if key not in LIVING_PERSON_WHITELISTED_KEYS:
                         del node[key]
+            ret.append(node)
         return ret if isinstance(nodes, collections.Iterable) else node
 
 
