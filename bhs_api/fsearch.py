@@ -40,9 +40,12 @@ def build_query(search_dict):
     # Set up optional queries
     sex = None
     individual_id = None
+    only_deceased = False
 
     # Sort all the arguments to those with name or place and those with year
     for k, v in search_dict.items():
+        if k.endswith('place') or '_year' in k:
+            only_deceased = True
         if k.endswith('name') or k.endswith('place'):
             # The search is case insensitive
             names_and_places[k] = v.lower()
@@ -142,6 +145,9 @@ def build_query(search_dict):
                 search_query['id'] = individual_id
         except ValueError:
             abort(400, 'Tree number must be an integer')
+
+    if only_deceased:
+        search_query["deceased"] = True
 
     return search_query
 

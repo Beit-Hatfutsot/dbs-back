@@ -7,7 +7,7 @@ from bhs_api.fsearch import fsearch, clean_person
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
 def test_fsearch_api(mock_db):
-    for i in  [{
+    for i in [{
             'name_lc': ['albert', 'einstein'],
             'deceased': True,
             'tree_num': 2,
@@ -22,11 +22,24 @@ def test_fsearch_api(mock_db):
             'tree_version': 1,
             'id': 'I7',
             'Slug': {'En': 'person_1;0.I7'},
-        } ]:
-        mock_db['persons'].insert(i)
+            'BIRT_PLAC_lc': "acapulco"
+        },{
+            'name_lc': ['cookie', 'monster'],
+            'deceased': False,
+            'tree_num': 2,
+            'tree_version': 1,
+            'id': 'I9',
+            'Slug': {'En': 'person_1;0.I9'},
+            'BIRT_PLAC_lc': "acapulco"
+        }]:
+            mock_db['persons'].insert(i)
     total, persons = fsearch(last_name=['Einstein'], db=mock_db)
     assert total == 1
     assert persons[0]['tree_version'] == 1
+    # searching with living person details should not return any living persons
+    total, persons = fsearch(birth_place=["Acapulco"], db=mock_db)
+    assert total == 1
+    assert persons[0]['id'] == "I7"
 
 def test_clean_person(mock_db):
     # two cases for cleaning up the personal info
