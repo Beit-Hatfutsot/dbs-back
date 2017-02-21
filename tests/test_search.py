@@ -1,5 +1,6 @@
 # -- coding: utf8
 from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import NotFoundError
 
 
 ### environment setup functions
@@ -11,7 +12,10 @@ def given_invalid_elasticsearch_client(app):
 def given_local_elasticsearch_client_with_test_data(app):
     app.es = Elasticsearch("localhost")
     app.es_data_db_index_name = index_name = "bh_dbs_back_pytest"
-    app.es.indices.delete(index_name)
+    try:
+        app.es.indices.delete(index_name)
+    except NotFoundError:
+        pass
     app.es.index(index_name, "places", PLACES_BOURGES)
     app.es.index(index_name, "places", PLACES_BOZZOLO)
     app.es.index(index_name, "photoUnits", PHOTOS_BOYS_PRAYING)
