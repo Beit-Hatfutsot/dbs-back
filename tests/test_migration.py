@@ -65,7 +65,10 @@ def test_updated_doc(mocker, app):
             id=id,
             index = 'db',
         )
+        # reset ES mock
         elasticsearch.Elasticsearch.index.reset_mock()
+        mocker.patch('elasticsearch.Elasticsearch.index')
+
         updated_tester = THE_TESTER.copy()
         updated_tester['Header']['En'] = 'Nikos Nikolveich'
         updated_tester['UnitText1']['En'] = 'The Great Tester'

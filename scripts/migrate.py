@@ -55,10 +55,11 @@ def parse_args():
     parser.add_argument('-c', '--collection')
     parser.add_argument('--host', default='localhost')
     parser.add_argument('-s', '--since', default=0)
-    parser.add_argument('-u', '--until', default=calendar.timegm(time.localtime()))
+    parser.add_argument('-u', '--until', type= int,
+                        default=calendar.timegm(time.localtime()))
     parser.add_argument('-i', '--unitid', type=int,
                         help='migrate a specifc unit/tree id')
-    parser.add_argument('-g', '--gedcom_path',
+    parser.add_argument('-g', '--gedcom-path',
                         help='file path to a gedcom file. works only when -i XXX -c genTrees is used')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
@@ -320,13 +321,16 @@ def get_file_descriptors(tree, gedcom_path):
     return file_id, file_name
 
 
-def migrate_trees(cursor, treenum=None, gedcom_path=None, on_save=None):
+def migrate_trees(cursor, on_save=None, treenum=None, gedcom_path=None):
+    ''' get command line arguments and sql query and initiated update_tree
+        and update_row celery tasks returns how many people migrated
+    '''
     count = 0
 
     for row in cursor:
-        if treenum:
-            if row['GenTreeNumber'] != treenum:
-                continue
+        if treenum and row['GenTreeNumber'] != treenum:
+            continue
+
         file_id, file_name = get_file_descriptors(row, gedcom_path)
         try:
             gedcom_fd = open(file_name)
@@ -336,23 +340,24 @@ def migrate_trees(cursor, treenum=None, gedcom_path=None, on_save=None):
             continue
 
         try:
-            g = Gedcom(fd=gedcom_fd)
+            gedcom = Gedcom(fd=gedcom_fd)
         except (SyntaxError, GedcomParseError) as e:
             logger.error('failed to parse tree number {}, path {}: {}'
                          .format(row['GenTreeNumber'], file_name, str(e)))
             continue
+
         logger.info('>>> migrating tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
-        Gedcom2Persons(g, row['GenTreeNumber'], file_id, parse_n_update if not on_save else on_save)
+        Gedcom2Persons(gedcom, row['GenTreeNumber'], file_id, parse_n_update if not on_save else on_save)
         logger.info('<<< migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
         count += 1
+
     return count
 
 
 if __name__ == '__main__':
     args = parse_args()
-    until = int(args.until)
 
     since_file = None
     if not args.since:
@@ -372,37 +377,28 @@ if __name__ == '__main__':
     else:
         since = int(args.since)
 
+    args.since = since
     collection = args.collection
     queries = get_queries(collection)
     logger.info('looking for changed items in {}-{}'.format(since, until))
     photos_to_update = []
     for collection_name, query in queries.items():
+        # family trees are a special case
         if collection_name == 'genTrees':
-            tree_nums = [args.unitid] if args.unitid else None
-            sql_cursor = sqlClient.execute(query, since=since, until=until)
-            count = migrate_trees(sql_cursor, args.unitid, args.gedcom_path)
+            cursor = sqlClient.execute(query, **args)
+            count = migrate_trees(cursor, **args)
             if not count:
                 logger.info('{}:Skipping'.format(collection_name))
-
             continue
 
-        if args.unitid:
-            sql_cursor = sqlClient.execute(query, unit_ids=[args.unitid])
-        else:
-            sql_cursor = sqlClient.execute(query, since=since, until=until)
-
-        if sql_cursor:
-            for row in sql_cursor:
-                doc = parse_n_update(row, collection_name)
-                # collect all the photos
-                pictures = doc.get('Pictures', None)
-                if pictures:
-                    for pic in pictures:
-                        if 'PictureId' in pic:
-                            photos_to_update.append(pic['PictureId'])
-        else:
-            logger.warn('failed getting updated units {}:{}'
-                        .format(collection_name, ','.join(units)))
+        for row in sqlClient.execute(query, **args):
+            doc = parse_n_update(row, collection_name)
+            # collect all the photos
+            pictures = doc.get('Pictures', None)
+            if pictures:
+                for pic in pictures:
+                    if 'PictureId' in pic:
+                        photos_to_update.append(pic['PictureId'])
 
         # TODO:
         # rsync_media(collection_name)
