@@ -1,4 +1,4 @@
-from bh_datasets.europeana.dataset import EuropeanaDataset
+from bh_datasets.europeana.dataset import EuropeanaDataset, EuropeanaItems, EuropeanaItem
 from ..common.mocks import MockRequests, MockJsonResponse
 
 
@@ -29,6 +29,8 @@ def when_searching_for_cohen_images(europeana_dataset):
 def assert_results_for_cohen_images(results):
     assert results.itemsCount == 5
     assert results.totalResults == 790
+    assert isinstance(results.items, EuropeanaItems)
+    assert isinstance(results.items[0], EuropeanaItem)
     assert results.items[0].title == u'Kabalath Chabbath'
     assert len(results.items) == 5
 

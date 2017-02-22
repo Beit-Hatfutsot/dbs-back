@@ -18,10 +18,10 @@ class EuropeanaDataset(BaseDataset):
         if not res_json["success"]:
             raise Exception("europeana search failed: {}".format(res_json["error"]))
         else:
-            return EuropeanaItems.from_json_search_results(res_json)
+            return EuropeanaResults.from_json_search_results(res_json)
 
 
-class EuropeanaItems(BaseDatasetItems):
+class EuropeanaResults(BaseDatasetItems):
 
     def __init__(self, itemsCount, totalResults, items):
         self.itemsCount = itemsCount
