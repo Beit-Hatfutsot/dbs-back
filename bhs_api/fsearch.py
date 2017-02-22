@@ -35,7 +35,12 @@ def _generate_year_range(year, fudge_factor=0):
 
 
 def build_query(search_dict):
-    ''' build a mongo search query based on the search_dict '''
+    ''' build a mongo search query based on the search_dict 
+
+    >>> build_query({'birth_year': '1862:2'})
+    {'BSD': {'$gte': 18600000}, 'archived': {'$exists': False}, 'BED': {'$lte': 18649999}}
+    
+    '''
     names_and_places = {}
     years = {}
     # Set up optional queries

@@ -42,6 +42,29 @@ def test_fsearch_api(mock_db):
     assert total == 1
     assert persons[0]['id'] == "I7"
 
+def test_fsearch_range(mock_db):
+    for i in  [{
+            'name_lc': ['albert', 'einstein'],
+            'deceased': True,
+            'tree_num': 2,
+            'tree_version': 0,
+            'id': 'I3',
+            'archived': True,
+            'Slug': {'En': 'person_1;0.I2'},
+            'birth_year': 1863,
+        },{
+            'name_lc': ['albert', 'einstein'],
+            'deceased': True,
+            'tree_num': 2,
+            'tree_version': 1,
+            'id': 'I7',
+            'Slug': {'En': 'person_1;0.I7'},
+            'birth_year': 1860,
+        } ]:
+        mock_db['persons'].insert(i)
+    total, persons = fsearch(birth_year=["1862:2"], db=mock_db)
+    assert total == 2
+
 def test_clean_person(mock_db):
     # two cases for cleaning up the personal info
     cleaned = clean_person({
