@@ -34,7 +34,6 @@ def push_conf():
 
 def deploy():
     push_code()
-    test()
     restart()
 
 def test():

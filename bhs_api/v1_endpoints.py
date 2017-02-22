@@ -50,19 +50,31 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 '''
 
 
-def es_search(q, size, collection=None, from_=0):
+def es_search(q, size, collection=None, from_=0, sort=None):
     # body = {"query": { "match" : { "_all": {"query": q, "operator": "and"} }}}
     body = {"query": { "query_string" : {
         "fields": ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He'],
         "query": q,
         "default_operator": "and"
     }}}
+    if sort == "abc":
+        if phonetic.is_hebrew(q.strip()):
+            # hebrew alphabetical sort
+            body["sort"] = [{"Header.He.keyword": "asc"}, "_score"]
+        else:
+            # english alphabetical sort
+            body["sort"] = [{"Header.En.keyword": "asc"}, "_score"]
+    elif sort == "rel":
+        # relevance sort
+        body["sort"] = ["_score"]
+    elif sort == "year" and collection == "photoUnits":
+        body["sort"] = [{"UnitPeriod.PeriodStartDate.keyword": "asc"}, "_score"]
     try:
         try:
             collection = collection.split(',')
         except:
             pass
-        results = current_app.es.search(index=current_app.data_db.name, body=body,
+        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body,
                             doc_type=collection, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
         current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
@@ -389,7 +401,7 @@ def save_user_content():
 @v1_endpoints.route('/search')
 def general_search():
     args = request.args
-    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None}
+    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None}
     for param in parameters.keys():
         if param in args:
             parameters[param] = args[param]
@@ -397,10 +409,11 @@ def general_search():
         abort(400, 'You must specify a search query')
     else:
         rv = es_search(**parameters)
-        for item in rv['hits']['hits']:
-            enrich_item(item['_source'])
         if not rv:
             abort(500, 'Sorry, the search cluster appears to be down')
+        else:
+            for item in rv['hits']['hits']:
+                enrich_item(item['_source'])
         return humanify(rv)
 
 @v1_endpoints.route('/wsearch')
