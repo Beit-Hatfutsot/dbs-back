@@ -8,6 +8,7 @@ import boto
 from bson.code import Code
 
 from .tasks import update_row, update_tree
+from bhs_api.utils import is_living_person
 
 THIS_YEAR = datetime.now().year
 # google storage: OUTPUT_BUCKET = 'bhs-familytrees-json'
@@ -95,13 +96,7 @@ class Gedcom2Persons:
             node_id = e.pointer[1:-1]
             node = dict(id=node_id,
                         sex = e.gender)
-            deceased = e.deceased
-            if not deceased and e.birth_year > 0:
-                try:
-                    deceased = THIS_YEAR - int(e.birth_year) > 100
-                except ValueError:
-                    pass
-            node['deceased'] = deceased
+            node['deceased'] = not is_living_person(e.deceased, e.birth_year)
             if not e.private:
                 node['name'] = e.name
                 if full and node['deceased']:
