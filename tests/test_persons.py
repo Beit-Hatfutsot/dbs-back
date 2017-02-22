@@ -3,7 +3,7 @@ import logging
 import pytest
 from datetime import datetime
 
-from bhs_api.fsearch import fsearch, clean_person
+from bhs_api.fsearch import fsearch, clean_person, build_query, build_search_dict
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
@@ -63,7 +63,26 @@ def test_fsearch_range(mock_db):
         } ]:
         mock_db['persons'].insert(i)
     total, persons = fsearch(birth_year=["1862:2"], db=mock_db)
-    assert total == 2
+    assert total == 1
+    assert persons[0]["birth_year"] == 1860
+
+
+def test_fsearch_build_search_dict():
+    res = build_search_dict(birth_year=["1862:2"], death_year=["1899:3"])
+    assert sorted(res.items()) == [("birth_year", "1862:2"), ("death_year", "1899:3")]
+
+
+def test_fsearch_build_query():
+    res = build_query({"birth_year": "1862:2", "death_year": "1899:3"})
+    assert sorted(res) == ["archived", "birth_year", "death_year", "deceased"]
+    assert sorted(res["birth_year"]) == ["$gte", "$lte"]
+    assert sorted(res["death_year"]) == ["$gte", "$lte"]
+    assert res["birth_year"]["$lte"] == 1864
+    assert res["birth_year"]["$gte"] == 1860
+    assert res["death_year"]["$lte"] == 1902
+    assert res["death_year"]["$gte"] == 1896
+    assert res["archived"] == {"$exists": False}
+    assert res["deceased"] == True
 
 def test_clean_person(mock_db):
     # two cases for cleaning up the personal info

@@ -29,17 +29,13 @@ PROJECTION = {'name': 1,
                 }
 
 def _generate_year_range(year, fudge_factor=0):
-    maximum = int(str(year + fudge_factor) + '9999')
-    minimum = int(str(year - fudge_factor) + '0000')
+    maximum = int(str(year + fudge_factor))
+    minimum = int(str(year - fudge_factor))
     return {'min': minimum, 'max': maximum}
 
 
 def build_query(search_dict):
-    ''' build a mongo search query based on the search_dict 
-
-    >>> build_query({'birth_year': '1862:2'})
-    {'BSD': {'$gte': 18600000}, 'archived': {'$exists': False}, 'BED': {'$lte': 18649999}}
-    
+    ''' build a mongo search query based on the search_dict
     '''
     names_and_places = {}
     years = {}
@@ -121,9 +117,8 @@ def build_query(search_dict):
             # Look in the MSD array
             search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}}
             continue
-        start, end = year_ranges[item]
-        search_query[start] = {'$gte': years[item]['min']}
-        search_query[end] = {'$lte': years[item]['max']}
+        else:
+            search_query[item] = {"$gte": years[item]['min'], "$lte": years[item]['max']}
 
     if sex:
         search_query['sex'] = sex
@@ -158,6 +153,15 @@ def build_query(search_dict):
     return search_query
 
 
+def build_search_dict(**kwargs):
+    search_dict = {}
+    for key, value in kwargs.items():
+        search_dict[key] = value[0]
+        if not value[0]:
+            abort(400, "{} argument couldn't be empty".format(key))
+    return search_dict
+
+
 def fsearch(max_results=15, db=None, **kwargs):
     '''
     Search in the genTreeIindividuals table.
@@ -174,11 +178,7 @@ def fsearch(max_results=15, db=None, **kwargs):
         collection = db['persons']
     else:
         collection = current_app.data_db['persons']
-    search_dict = {}
-    for key, value in kwargs.items():
-        search_dict[key] = value[0]
-        if not value[0]:
-            abort(400, "{} argument couldn't be empty".format(key))
+    search_dict = build_search_dict(**kwargs)
 
 
     search_query = build_query(search_dict)
