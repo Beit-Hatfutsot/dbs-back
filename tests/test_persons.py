@@ -3,7 +3,7 @@ import logging
 import pytest
 from datetime import datetime
 
-from bhs_api.fsearch import fsearch, clean_person
+from bhs_api.fsearch import fsearch, clean_person, build_query, build_search_dict
 
 # The documentation for client is at http://werkzeug.pocoo.org/docs/0.9/test/
 
@@ -41,6 +41,56 @@ def test_fsearch_api(mock_db):
     total, persons = fsearch(birth_place=["Acapulco"], db=mock_db)
     assert total == 1
     assert persons[0]['id'] == "I7"
+
+def test_fsearch_range(mock_db):
+    for i in [{
+        'name_lc': ['albert', 'einstein'],
+        'deceased': True,
+        'tree_num': 2,
+        'tree_version': 0,
+        'id': 'I3',
+        'archived': True,
+        'Slug': {'En': 'person_1;0.I2'},
+        'birth_year': 1863,
+    }, {
+        'name_lc': ['albert', 'einstein'],
+        'deceased': True,
+        'tree_num': 2,
+        'tree_version': 1,
+        'id': 'I7',
+        'Slug': {'En': 'person_1;0.I7'},
+        'birth_year': 1860,
+        "marriage_years": [1875, 1888]
+    }]:
+        mock_db['persons'].insert(i)
+    total, persons = fsearch(birth_year=["1862:2"], db=mock_db)
+    assert total == 1
+    assert persons[0]["birth_year"] == 1860
+    total, persons = fsearch(marriage_year=["1876:2"], db=mock_db)
+    assert total == 1
+    assert persons[0]["id"] == "I7"
+    assert persons[0]["marriage_years"] == [1875, 1888]
+
+
+def test_fsearch_build_search_dict():
+    res = build_search_dict(birth_year=["1862:2"], death_year=["1899:3"], marriage_year=["1856:2"])
+    assert sorted(res.items()) == [("birth_year", "1862:2"), ("death_year", "1899:3"), ("marriage_year", "1856:2")]
+
+
+def test_fsearch_build_query():
+    res = build_query({"birth_year": "1862:2", "death_year": "1899:3", "marriage_year": "1856:2"})
+    assert sorted(res) == ["archived", "birth_year", "death_year", "deceased", "marriage_years"]
+    assert sorted(res["birth_year"]) == ["$gte", "$lte"]
+    assert sorted(res["death_year"]) == ["$gte", "$lte"]
+    assert sorted(res["marriage_years"]) == ["$gte", "$lte"]
+    assert res["birth_year"]["$lte"] == 1864
+    assert res["birth_year"]["$gte"] == 1860
+    assert res["death_year"]["$lte"] == 1902
+    assert res["death_year"]["$gte"] == 1896
+    assert res["marriage_years"]["$lte"] == 1858
+    assert res["marriage_years"]["$gte"] == 1854
+    assert res["archived"] == {"$exists": False}
+    assert res["deceased"] == True
 
 def test_clean_person(mock_db):
     # two cases for cleaning up the personal info

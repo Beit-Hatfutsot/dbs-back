@@ -90,23 +90,22 @@ class Gedcom2Persons:
         data['tree_file_id'] = self.meta['file_id']
         self.onsave(data, 'persons')
 
-    def flatten(self, nodes, full=False):
+    def flatten(self, node_or_nodes, full=False):
         ret = []
-        for e in nodes if isinstance(nodes, collections.Iterable) else [nodes]:
+        nodes = node_or_nodes if isinstance(node_or_nodes, collections.Iterable) else [node_or_nodes]
+        for e in nodes:
             node_id = e.pointer[1:-1]
-            node = dict(id=node_id,
-                        sex = e.gender)
+            node = dict(id=node_id, sex=e.gender)
             node['deceased'] = not is_living_person(e.deceased, e.birth_year)
             if not e.private:
                 node['name'] = e.name
                 if full and node['deceased']:
                     node['birth_year'] = e.birth_year
                     node['death_year'] = e.death_year
-                    node['marriage_years'] = e.marriage_years
+                    node['marriage_years'] = self.gedcom.marriage_years(e)
                     add_children(e, None, node)
             ret.append(node)
-        return ret if isinstance(nodes, collections.Iterable) else node
-
+        return ret if isinstance(node_or_nodes, collections.Iterable) else ret[0]
 
     def find_partners(self, node, depth=0, exclude_ids=None):
         ret = []
