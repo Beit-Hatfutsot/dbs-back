@@ -113,12 +113,14 @@ def build_query(search_dict):
     search_query = {'archived': {'$exists': False}}
 
     for item in years:
+        search_query_item = item
         if item == 'marriage_year':
-            # Look in the MSD array
-            search_query['MSD'] = {'$elemMatch': {'$gte': years[item]['min'], '$lte': years[item]['max']}}
-            continue
-        else:
-            search_query[item] = {"$gte": years[item]['min'], "$lte": years[item]['max']}
+            # marriage years are represented inside an array (person can be married multiple times..)
+            # mongo supports searching inside array fields - the semantics are the same
+            # mongo detects that it's an array field and will search all the array elements
+            # see https://docs.mongodb.com/manual/tutorial/query-arrays/#query-an-array
+            search_query_item = "marriage_years"
+        search_query[search_query_item] = {"$gte": years[item]['min'], "$lte": years[item]['max']}
 
     if sex:
         search_query['sex'] = sex
@@ -184,21 +186,22 @@ def fsearch(max_results=15, db=None, **kwargs):
     search_query = build_query(search_dict)
 
     results = collection.find(search_query, {
-              'name': 1,
-              'parents': 1,
-              'partners': 1,
-              'siblings': 1,
-              'tree_num': 1,
-              'id': 1,
-              'sex': 1,
-              'tree_version': 1,
-              'Slug': 1,
-              'birth_year': 1,
-              'death_year': 1,
-              'BIRT_PLAC': 1,
-              'DEAT_PLAC': 1,
-              'deceased': 1,
-                })
+        'name': 1,
+        'parents': 1,
+        'partners': 1,
+        'siblings': 1,
+        'tree_num': 1,
+        'id': 1,
+        'sex': 1,
+        'tree_version': 1,
+        'Slug': 1,
+        'birth_year': 1,
+        'death_year': 1,
+        'BIRT_PLAC': 1,
+        'DEAT_PLAC': 1,
+        'deceased': 1,
+        "marriage_years": 1
+    })
     total = results.count()
 
     if 'start' in search_dict:

@@ -47,7 +47,8 @@ def given_mock_gedcom_tree_with_single_person(deceased=True, birth_year=1679, de
             }),
         },
         "families": lambda self, node, attr: [],
-        "get_parents": lambda self, e: []
+        "get_parents": lambda self, e: [],
+        "marriage_years": lambda self, e: [1345, 1355, 1377]
     })()
 
 
@@ -97,6 +98,7 @@ def test_gedcom_to_persons():
     gedcom = given_mock_gedcom_tree_with_single_person(deceased=True)
     persons_data = gedcom_2_persons(gedcom)
     assert persons_data[0]["deceased"] == True
+    assert persons_data[0]["marriage_years"] == [1345, 1355, 1377]
     # person not marked as deceased - need to guess if he is deceased based on birth year
     # if born more then 100 years ago - he is considered deceased
     gedcom = given_mock_gedcom_tree_with_single_person(deceased=False, birth_year=1789)
