@@ -35,8 +35,7 @@ def _generate_year_range(year, fudge_factor=0):
 
 
 def build_query(search_dict):
-    ''' build a mongo search query based on the search_dict
-    '''
+    ''' build a mongo search query based on the search_dict '''
     names_and_places = {}
     years = {}
     # Set up optional queries
