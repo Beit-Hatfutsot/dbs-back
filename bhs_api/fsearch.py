@@ -61,7 +61,7 @@ def build_query(search_dict):
 
     # Build a dict of all the names_and_places queries
     for search_arg in names_and_places:
-        field_name = ARGS_TO_INDEX[search_arg]
+        field_name = ARGS_TO_INDEX[search_arg]  # this ensures only known/indexed name/place fields will be searched
         split_arg = names_and_places[search_arg].split(';')
         search_str = split_arg[0]
         # No modifications are supported for first names because
@@ -97,35 +97,37 @@ def build_query(search_dict):
                 fudge_factor = int(split_arg[1])
             except ValueError:
                 abort(400, 'Year and fudge factor must be integers')
-            years[search_arg] = _generate_year_range(year, fudge_factor)
+            else:
+                years[search_arg] = _generate_year_range(year, fudge_factor)
         else:
             try:
                 year = int(years[search_arg])
                 years[search_arg] = year
             except ValueError:
                 abort(400, 'Year must be an integer')
-            years[search_arg] = _generate_year_range(year)
-
-    year_ranges = {'birth_year': ['BSD', 'BED'],
-                   'death_year': ['DSD', 'DED']}
+            else:
+                years[search_arg] = _generate_year_range(year)
 
     # Build gentree search query from all the subqueries
     search_query = {'archived': {'$exists': False}}
 
     for item in years:
-        search_query_item = item
-        if item == 'marriage_year':
-            # marriage years are represented inside an array (person can be married multiple times..)
-            # mongo supports searching inside array fields - the semantics are the same
-            # mongo detects that it's an array field and will search all the array elements
-            # see https://docs.mongodb.com/manual/tutorial/query-arrays/#query-an-array
-            search_query_item = "marriage_years"
-        search_query[search_query_item] = {"$gte": years[item]['min'], "$lte": years[item]['max']}
+        if item in ["marriage_year", "birth_year", "death_year"]:
+            # only known/indexed year attributes will be filtered on
+            search_query_item = item
+            if item == 'marriage_year':
+                # marriage years are represented inside an array (person can be married multiple times..)
+                # mongo supports searching inside array fields - the semantics are the same
+                # mongo detects that it's an array field and will search all the array elements
+                # see https://docs.mongodb.com/manual/tutorial/query-arrays/#query-an-array
+                search_query_item = "marriage_years"
+            search_query[search_query_item] = {"$gte": years[item]['min'], "$lte": years[item]['max']}
 
     if sex:
         search_query['sex'] = sex
 
     for param, item in names_and_places.items():
+        # the names_and_places array contains only known/indexed fields (see above)
         for k, v in item.items():
             # place is an or of all place fields
             if param == 'place':
