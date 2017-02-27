@@ -8,7 +8,7 @@ argparse==1.2.1
 boto==2.35.1
 flask-mongoengine==0.7.1
 mongoengine==0.10.0
-git+https://github.com/OriHoch/mongomock.git@support-for-operator-filtering-inside-list-fields#egg=mongomock
+-e git+https://github.com/OriHoch/mongomock.git@support-for-operator-filtering-inside-list-fields#egg=mongomock
 pymongo==3.0.3
 pytest>=2.7
 pytest-flask==0.4.0
