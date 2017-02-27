@@ -1,4 +1,5 @@
-from bh_datasets.common.base import BaseDataset, BaseDatasetItem, BaseDatasetItems
+from bh_datasets.common.base import BaseDataset, BaseDatasetItem, BaseDatasetResults
+from ..common.bh_doc import BhDoc
 
 
 class EuropeanaDataset(BaseDataset):
@@ -13,7 +14,7 @@ class EuropeanaDataset(BaseDataset):
         if only_images:
             qf += " TYPE:IMAGE"
         res = self.requests.get("http://www.europeana.eu/api/v2/search.json",
-                                {"wskey": self.wskey, "qf": qf, "query": query, "rows": rows, "start": start})
+                                {"wskey": self.wskey, "qf": qf, "query": query, "rows": rows, "start": start, "profile": "rich"})
         res_json = res.json()
         if not res_json["success"]:
             raise Exception("europeana search failed: {}".format(res_json["error"]))
@@ -21,7 +22,7 @@ class EuropeanaDataset(BaseDataset):
             return EuropeanaResults.from_json_search_results(res_json)
 
 
-class EuropeanaResults(BaseDatasetItems):
+class EuropeanaResults(BaseDatasetResults):
 
     def __init__(self, itemsCount, totalResults, items):
         self.itemsCount = itemsCount
@@ -39,16 +40,12 @@ class EuropeanaItem(BaseDatasetItem):
         self.item_data = item_data
 
     def __getattr__(self, item):
-        res = self.item_data.get(item)
-        if item == "title":
-            if isinstance(res, list):
-                if len(res) == 1:
-                    res = res[0]
-                else:
-                    raise Exception("WTF is this shit!?!?!?")
-            elif not isinstance(res, (str, unicode)):
-                raise Exception("WTF is this shit!?!?!?")
-        return res
+        return self.item_data.get(item)
+
+    def get_bh_doc(self):
+        return BhDoc("EUROPEANA", self.id,
+                     titles=self.title,  # title is a list of the main and alternative titles of the item
+                     )
 
     @classmethod
     def from_json_search_result(cls, json_search_result):
