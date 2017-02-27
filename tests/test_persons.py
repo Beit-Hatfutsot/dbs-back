@@ -123,6 +123,7 @@ def test_clean_person(mock_db):
     assert 'bio' in cleaned
 
     # test case using year in float + with BIRT_DATE field
+    # also, testing unknown fields - should also be removed (we have white-list of fields for living persons)
     cleaned = clean_person({
             'name_lc': ['yossi', 'cohen'],
             'birth_year': float(datetime.now().year-70),
@@ -130,11 +131,14 @@ def test_clean_person(mock_db):
             'Slug': {'En': 'person_1;0.I1'},
             'bio': 'yossi is a big boy',
             'deceased': False,
-            'BIRT_DATE': "Jan 15, 1972"
+            'BIRT_DATE': "Jan 15, 1972",
+            "FOO": "bar"
         })
-    assert 'BIRT_DATE' not in cleaned
+    # ensure all fields are removed except the white-listed fields
+    assert sorted(cleaned) == ['Slug', 'deceased', 'id', 'name_lc']
 
     # deceased person should be deceased regardless of birth year
+    # also, ensure that unknown fields are not removed
     cleaned = clean_person({
         'name_lc': ['yossi', 'cohen'],
         'birth_year': float(datetime.now().year - 5),
@@ -142,9 +146,11 @@ def test_clean_person(mock_db):
         'Slug': {'En': 'person_1;0.I1'},
         'bio': 'yossi is a little dead boy',
         'deceased': True,
-        'BIRT_DATE': "Jan 15, 1972"
+        'BIRT_DATE': "Jan 15, 1972",
+        "FOO": "bar"
     })
     assert 'bio' in cleaned
+    assert "FOO" in cleaned
 
 
 def test_get_persons(client, mock_db):

@@ -8,7 +8,7 @@ import boto
 from bson.code import Code
 
 from .tasks import update_row, update_tree
-from bhs_api.utils import is_living_person
+from bhs_api.persons import is_living_person, LIVING_PERSON_WHITELISTED_KEYS
 
 THIS_YEAR = datetime.now().year
 # google storage: OUTPUT_BUCKET = 'bhs-familytrees-json'
@@ -104,6 +104,11 @@ class Gedcom2Persons:
                     node['death_year'] = e.death_year
                     node['marriage_years'] = self.gedcom.marriage_years(e)
                     add_children(e, None, node)
+            if not node['deceased']:
+                # it's alive! delete all keys not in the living person whitelist
+                for key in node:
+                    if key not in LIVING_PERSON_WHITELISTED_KEYS:
+                        del node[key]
             ret.append(node)
         return ret if isinstance(node_or_nodes, collections.Iterable) else ret[0]
 
