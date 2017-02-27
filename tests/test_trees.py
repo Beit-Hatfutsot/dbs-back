@@ -74,12 +74,22 @@ def test_migrate_trees(mocker):
         # update_row.delay(doc, collection_name)
         return doc
     assert migrate_trees(cursor, on_save=on_save) == 1
-    assert saved_docs[0][0]["id"] == "I29"  # row
-    assert saved_docs[0][1] == "persons"  # collection_name
-    assert saved_docs[0][2] == "id"  # collection_id_field
-    assert saved_docs[0][3]["id"] == "I29"  # doc
-    assert saved_docs[0][3]["deceased"] == False
-    assert saved_docs[3][3]["deceased"] == True
+
+    i29 = [doc for doc in saved_docs if doc[0]["id"] == "I29"][0]
+    assert i29[0]["id"] == "I29"  # row
+    assert i29[1] == "persons"  # collection_name
+    assert i29[2] == "id"  # collection_id_field
+    assert i29[3]["id"] == "I29"  # doc
+    assert i29[3]["deceased"] == False
+
+    i19 = [doc for doc in saved_docs if doc[0]["id"] == "I19"][0][3]
+    assert i19["id"] == "I19"
+    assert i19["deceased"] == True
+
+    i9 = [doc for doc in saved_docs if doc[0]["id"] == "I09"][0][3]
+    assert i9["marriage_years"] == [1933]
+    assert i9["birth_year"] == 1911
+    assert i9["death_year"] == 1965
 
 
 def test_gedcom_to_persons():
