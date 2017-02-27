@@ -22,5 +22,5 @@ for field in ["name_lc.0",
               "sex",
               "tree_num",
               "deceased"]:
-    print("creating field for {}".format(field))
+    print("creating index for field {}".format(field))
     app.data_db.persons.create_index(field)
