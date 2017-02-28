@@ -4,7 +4,12 @@ from flask import abort, current_app
 from bhs_api import phonetic
 from bhs_api.persons import is_living_person, LIVING_PERSON_WHITELISTED_KEYS
 
-MAX_RESULTS=30 # aka chunk size
+MAX_RESULTS = 30  # aka chunk size
+MAX_COUNT_RESULTS = -1  # maximum number of results to count for the total results, -1 means count all results
+                        # currently we keep it at -1 to prevent breaking backwards compatibility with frontend
+                        # frontend can pass on a max_count_results parameter to specify a different number
+                        # once frontend is modified to support the limit on count results, this default can be
+                        # changed to e.g. 1000
 
 ARGS_TO_INDEX = {'first_name':       'name_lc.0',
                  'last_name':        'name_lc.1',
@@ -163,7 +168,7 @@ def build_search_dict(**kwargs):
     return search_dict
 
 
-def fsearch(max_results=15, db=None, **kwargs):
+def fsearch(max_results=None, db=None, max_count_results=None, **kwargs):
     '''
     Search in the genTreeIindividuals table.
     Names and places could be matched exactly, by the prefix match
@@ -175,16 +180,18 @@ def fsearch(max_results=15, db=None, **kwargs):
     If `tree_number` kwarg is present, return only the results from this tree.
     Return up to `MAX_RESULTS` starting with the `start` argument
     '''
+    max_results = max_results[0] if isinstance(max_results, (list, tuple)) else max_results
+    max_count_results = max_count_results[0] if isinstance(max_count_results, (list, tuple)) else max_count_results
+    max_results = int(MAX_RESULTS if not max_results else max_results)
+    max_count_results = int(MAX_COUNT_RESULTS if not max_count_results else max_count_results)
     if db:
         collection = db['persons']
     else:
         collection = current_app.data_db['persons']
     search_dict = build_search_dict(**kwargs)
 
-
     search_query = build_query(search_dict)
-
-    results = collection.find(search_query, {
+    projection = {
         'name': 1,
         'parents': 1,
         'partners': 1,
@@ -200,15 +207,19 @@ def fsearch(max_results=15, db=None, **kwargs):
         'DEAT_PLAC': 1,
         'deceased': 1,
         "marriage_years": 1
-    })
-    total = results.count()
+    }
 
+    if max_count_results == -1:
+        total = collection.find(search_query).count()
+    else:
+        total = collection.find(search_query).limit(max_count_results).count(True)
+
+    results = collection.find(search_query, projection)
     if 'start' in search_dict:
         results = results.skip(int(search_dict['start']))
-    results = results.limit(MAX_RESULTS)
-    logging.debug('FSearch query:\n{} returning {} results'.format(
-                    search_query, results.count()))
-    return total, map(clean_person, results)
+    results = map(clean_person, results.limit(max_results))
+    logging.debug('FSearch query:\n{} returning {} results'.format(search_query, len(results)))
+    return total, results
 
 
 def clean_person(person):
