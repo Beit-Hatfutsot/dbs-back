@@ -71,6 +71,24 @@ def test_fsearch_range(mock_db):
     assert persons[0]["id"] == "I7"
     assert persons[0]["marriage_years"] == [1875, 1888]
 
+def test_fsearch_results_limit(mock_db):
+    mock_db['persons'].remove()
+    for i in range(0, 100):
+        mock_db['persons'].insert({
+            'name_lc': ['firstname{}'.format(i), 'lastname{}'.format(i)],
+            'deceased': True,
+            'tree_num': 2,
+            'tree_version': 0,
+            'id': 'I26{}'.format(i),
+            'Slug': {'En': 'person_{};0.I26{}'.format(i, i)},
+        })
+    total, persons = fsearch(max_results=3, db=mock_db)
+    assert total == 100
+    assert len(persons) == 3
+    total, persons = fsearch(max_results=3, max_count_results=5, db=mock_db)
+    assert total == 5
+    assert len(persons) == 3
+
 
 def test_fsearch_build_search_dict():
     res = build_search_dict(birth_year=["1862:2"], death_year=["1899:3"], marriage_year=["1856:2"])
@@ -78,19 +96,24 @@ def test_fsearch_build_search_dict():
 
 
 def test_fsearch_build_query():
-    res = build_query({"birth_year": "1862:2", "death_year": "1899:3", "marriage_year": "1856:2"})
-    assert sorted(res) == ["archived", "birth_year", "death_year", "deceased", "marriage_years"]
-    assert sorted(res["birth_year"]) == ["$gte", "$lte"]
-    assert sorted(res["death_year"]) == ["$gte", "$lte"]
-    assert sorted(res["marriage_years"]) == ["$gte", "$lte"]
-    assert res["birth_year"]["$lte"] == 1864
-    assert res["birth_year"]["$gte"] == 1860
-    assert res["death_year"]["$lte"] == 1902
-    assert res["death_year"]["$gte"] == 1896
-    assert res["marriage_years"]["$lte"] == 1858
-    assert res["marriage_years"]["$gte"] == 1854
-    assert res["archived"] == {"$exists": False}
-    assert res["deceased"] == True
+    # use json in the expected respons to allow copy-pasting directly to mongo to test the queries
+    # e.g.:
+    #
+    assert build_query({
+        "birth_year": "1862:2",
+        "death_year": "1899:3",
+        "marriage_year": "1856:2"
+    }) == json.loads("""{
+        "archived": {"$exists": false},
+        "death_year": {"$lte": 1902, "$gte": 1896},
+        "marriage_years": {"$lte": 1858, "$gte": 1854},
+        "deceased": true,
+        "birth_year": {"$lte": 1864, "$gte": 1860}
+    }""")
+    assert build_query({"last_name": "cohen"}) == json.loads("""{
+        "archived": {"$exists": false},
+        "name_lc.1": "cohen"
+    }""")
 
 def test_clean_person(mock_db):
     # two cases for cleaning up the personal info
