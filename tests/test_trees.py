@@ -47,7 +47,8 @@ def given_mock_gedcom_tree_with_single_person(deceased=True, birth_year=1679, de
             }),
         },
         "families": lambda self, node, attr: [],
-        "get_parents": lambda self, e: []
+        "get_parents": lambda self, e: [],
+        "marriage_years": lambda self, e: [1345, 1355, 1377]
     })()
 
 
@@ -74,12 +75,22 @@ def test_migrate_trees(mocker):
         # update_row.delay(doc, collection_name)
         return doc
     assert migrate_trees(cursor, on_save=on_save) == 1
-    assert saved_docs[0][0]["id"] == "I29"  # row
-    assert saved_docs[0][1] == "persons"  # collection_name
-    assert saved_docs[0][2] == "id"  # collection_id_field
-    assert saved_docs[0][3]["id"] == "I29"  # doc
-    assert saved_docs[0][3]["deceased"] == False
-    assert saved_docs[3][3]["deceased"] == True
+
+    i29 = [doc for doc in saved_docs if doc[0]["id"] == "I29"][0]
+    assert i29[0]["id"] == "I29"  # row
+    assert i29[1] == "persons"  # collection_name
+    assert i29[2] == "id"  # collection_id_field
+    assert i29[3]["id"] == "I29"  # doc
+    assert i29[3]["deceased"] == False
+
+    i19 = [doc for doc in saved_docs if doc[0]["id"] == "I19"][0][3]
+    assert i19["id"] == "I19"
+    assert i19["deceased"] == True
+
+    i9 = [doc for doc in saved_docs if doc[0]["id"] == "I09"][0][3]
+    assert i9["marriage_years"] == [1933]
+    assert i9["birth_year"] == 1911
+    assert i9["death_year"] == 1965
 
 
 def test_gedcom_to_persons():
@@ -87,6 +98,7 @@ def test_gedcom_to_persons():
     gedcom = given_mock_gedcom_tree_with_single_person(deceased=True)
     persons_data = gedcom_2_persons(gedcom)
     assert persons_data[0]["deceased"] == True
+    assert persons_data[0]["marriage_years"] == [1345, 1355, 1377]
     # person not marked as deceased - need to guess if he is deceased based on birth year
     # if born more then 100 years ago - he is considered deceased
     gedcom = given_mock_gedcom_tree_with_single_person(deceased=False, birth_year=1789)

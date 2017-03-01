@@ -380,20 +380,3 @@ def get_unit_type(collection_identifier):
     except KeyError:
         map_output = None
     return map_output
-
-
-def is_living_person(is_deceased, birth_year):
-    if is_deceased:
-        # deceased == not living!
-        return False
-    elif not isinstance(birth_year, (int, float)):
-        # doesn't have a valid birth year
-        # consider him as living (to be on the safe-side)
-        return True
-    elif datetime.datetime.now().year - int(birth_year) < 100:
-        # born less then 100 years ago
-        # consider him as living
-        return True
-    else:
-        # consider him as dead
-        return False

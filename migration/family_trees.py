@@ -8,7 +8,7 @@ import boto
 from bson.code import Code
 
 from .tasks import update_row, update_tree
-from bhs_api.utils import is_living_person
+from bhs_api.persons import is_living_person, LIVING_PERSON_WHITELISTED_KEYS
 
 THIS_YEAR = datetime.now().year
 # google storage: OUTPUT_BUCKET = 'bhs-familytrees-json'
@@ -90,23 +90,27 @@ class Gedcom2Persons:
         data['tree_file_id'] = self.meta['file_id']
         self.onsave(data, 'persons')
 
-    def flatten(self, nodes, full=False):
+    def flatten(self, node_or_nodes, full=False):
         ret = []
-        for e in nodes if isinstance(nodes, collections.Iterable) else [nodes]:
+        nodes = node_or_nodes if isinstance(node_or_nodes, collections.Iterable) else [node_or_nodes]
+        for e in nodes:
             node_id = e.pointer[1:-1]
-            node = dict(id=node_id,
-                        sex = e.gender)
+            node = dict(id=node_id, sex=e.gender)
             node['deceased'] = not is_living_person(e.deceased, e.birth_year)
             if not e.private:
                 node['name'] = e.name
                 if full and node['deceased']:
                     node['birth_year'] = e.birth_year
                     node['death_year'] = e.death_year
-                    node['marriage_years'] = e.marriage_years
+                    node['marriage_years'] = self.gedcom.marriage_years(e)
                     add_children(e, None, node)
+            if not node['deceased']:
+                # it's alive! delete all keys not in the living person whitelist
+                for key in node:
+                    if key not in LIVING_PERSON_WHITELISTED_KEYS:
+                        del node[key]
             ret.append(node)
-        return ret if isinstance(nodes, collections.Iterable) else node
-
+        return ret if isinstance(node_or_nodes, collections.Iterable) else ret[0]
 
     def find_partners(self, node, depth=0, exclude_ids=None):
         ret = []
