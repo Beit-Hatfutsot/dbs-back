@@ -9,12 +9,15 @@ class EuropeanaDataset(BaseDataset):
         self.wskey = wskey
 
     def source_search(self, query, only_images=False, rows=20, start=1):
-        # http://www.europeana.eu/api/v2/search.json?wskey=End3LH3bn&qf=PROVIDER:%22Judaica+Europeana%22+TYPE:IMAGE&query=cohen&rows=5&start=1
+        # api docs: http://labs.europeana.eu/api/search
+        if rows > 100:
+            raise Exception("Europeana supports up to 100 rows per request")
         qf = 'PROVIDER:"Judaica Europeana"'
         if only_images:
             qf += " TYPE:IMAGE"
         res = self.requests.get("http://www.europeana.eu/api/v2/search.json",
-                                {"wskey": self.wskey, "qf": qf, "query": query, "rows": rows, "start": start, "profile": "rich"})
+                                {"wskey": self.wskey, "qf": qf, "query": query, "rows": rows, "start": start,
+                                 "profile": "rich"})
         res_json = res.json()
         if not res_json["success"]:
             raise Exception("europeana search failed: {}".format(res_json["error"]))
@@ -43,9 +46,12 @@ class EuropeanaItem(BaseDatasetItem):
         return self.item_data.get(item)
 
     def get_bh_doc(self):
-        return BhDoc("EUROPEANA", self.id,
-                     titles=self.title,  # title is a list of the main and alternative titles of the item
-                     )
+        kwargs = {"titles": self.title,
+                  "tags": []}
+        if self.type == "IMAGE" and self.edmIsShownBy:
+            kwargs["image_links"] = self.edmIsShownBy
+            kwargs["tags"].append("TYPE:IMAGE")
+        return BhDoc("EUROPEANA", self.id, **kwargs)
 
     @classmethod
     def from_json_search_result(cls, json_search_result):
