@@ -1,13 +1,12 @@
 from bh_datasets.europeana.dataset import EuropeanaDataset, EuropeanaResults, EuropeanaItem
 from ..common.bh_doc import BhDoc
 from ..common.mocks import MockRequests, MockJsonResponse
+from .constants import EUROPEANA_WSKEY
 
 
 use_mock_requests = True  # you can change to False if you want to make the actual Europeana http request
                           # this should only be used for local testing because we can't be sure they will always
                           # return the same results
-
-EUROPEANA_WSKEY = "End3LH3bn"  # we currently use this in our frontend code so I assume it's not secret
 
 COHEN_IMAGES_SEARCH_URL = "http://www.europeana.eu/api/v2/search.json"
 COHEN_IMAGES_SEARCH_PARAMS = {'query': 'cohen',

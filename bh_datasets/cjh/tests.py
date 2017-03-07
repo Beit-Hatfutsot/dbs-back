@@ -1,4 +1,4 @@
-from bh_datasets.cjh.dataset import CjhDataset, CjhResults, CjhItem
+from bh_datasets.cjh.dataset import CjhDataset, CjhResults, CjhItem, CjhDType
 from ..common.bh_doc import BhDoc
 from ..common.mocks import MockRequests, MockJsonResponse
 
@@ -15,12 +15,12 @@ COHEN_SEARCH_PARAMS = {"fl": "title,dtype,description,fulllink,thumbnail",
                        "q": "cohen",
                        "start": 0}
 COHEN_SEARCH_DOCS = [{"thumbnail": "http://url/to/thumbnail/image",
-                      "dtype": "taken to UnitType in mongo",
+                      "dtype": "Tombstones",
                       "title": ["array", "of", "titles"],
                       "fulllink": "url of the item page in CJH",
                       "description": ["array", "of", "descriptions"]},
                      {"title": ["item can also be without thumbnail url"],
-                      "dtype": "???",
+                      "dtype": "Acrylic paintings",
                       "fulllink": "url of the item page in CJH", "description": ["array", "of", "descriptions"]}]
 
 
@@ -45,6 +45,9 @@ def assert_results_for_cohen_search(results):
     assert isinstance(results.items[0], CjhItem)
     assert results.items[0].title == COHEN_SEARCH_DOCS[0]["title"]
     assert len(results.items) == len(COHEN_SEARCH_DOCS)
+    assert isinstance(results.items[1].dtype, CjhDType)
+    assert results.items[1].dtype.dtype == "Acrylic paintings"
+    assert results.items[1].dtype.is_known_dtype() == True
 
 
 def assert_bh_docs_for_cohen_search(items):
