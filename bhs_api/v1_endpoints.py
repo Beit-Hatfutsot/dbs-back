@@ -23,7 +23,7 @@ import requests
 
 from bhs_api import SEARCH_CHUNK_SIZE
 from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                           upload_file, send_gmail, humanify)
+                           upload_file, send_gmail, humanify, SEARCHABLE_COLLECTIONS)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           enrich_item, SHOW_FILTER)
@@ -177,53 +177,22 @@ def _validate_filetype(file_info_str):
 
     return False
 
+def get_completion_all_collections(string, size=7):
+    text_completion_result = {}
+    phonetic_result = {}
+    for collection in SEARCHABLE_COLLECTIONS:
+        text_completion_result[collection], phonetic_result[collection] = get_completion(collection, string, size)
+    return text_completion_result, phonetic_result
+
 def get_completion(collection, string, size=7):
     '''Search in the elastic search index for completion options.
-    Returns to array each with up to `size` results. The first array contains
-    the text completion and the second the phonetic suggestions.
+    Returns tuple of (text_completion_results, phonetic_results)
+    Where each array contains up to `size` results.
     '''
-
-    if phonetic.is_hebrew(string):
-        lang = 'He'
-    else:
-        lang = 'En'
-
-    ''' TODO: fix pohonetics search or remove this code
-    dms_soundex = phonetic.get_dms(string)
-    if " " in dms_soundex:
-        dms_completion = {"regex":"[{}]".format(dms_soundex.replace(' ', '|'))}
-        dms_completion = {"prefix": dms_soundex.split(' ')[0]}
-    else:
-        dms_completion = {"prefix": dms_soundex}
-
-    q = {
-        "_source": ["Slug", "Header"],
-        "suggest": {
-            "header" : {
-                "prefix" : string,
-                "completion" : {
-                    "field" : "Header.{}.suggest".format(lang),
-                    "size": size,
-                    "contexts": {
-                        "collection": collection,
-                    }
-                }
-            },
-            "phonetic" : {
-                "completion" : {
-                    "field" : "dm_soundex",
-                    "size": size,
-                    "contexts": {
-                        "collection": collection,
-                    }
-                }
-            }
-        }
-    }
-    q["suggest"]["phonetic"].update(dms_completion)
-    '''
-
-    # no phonetics query
+    # currently we only do a simple starts with search, without contains or phonetics
+    # TODO: fix phonetics search, some work was done for that
+    # see https://github.com/Beit-Hatfutsot/dbs-back/blob/2e79c363e40472f28fd07f8a344fe55ab77198ee/bhs_api/v1_endpoints.py#L189
+    lang = "He" if phonetic.is_hebrew(string) else "En"
     q = {
         "_source": ["Slug", "Header"],
         "suggest": {
@@ -239,21 +208,17 @@ def get_completion(collection, string, size=7):
             },
         }
     }
-    results = current_app.es.search(index=current_app.es_data_db_index_name,
-                                body=q,
-                                size=0)
+    q["suggest"]["header"]["completion"]["contexts"] = {"collection": collection}
+    results = current_app.es.search(index=current_app.es_data_db_index_name, body=q, size=0)
     try:
         header_options = results['suggest']['header'][0]['options']
     except KeyError:
         header_options = []
-
     try:
         phonetic_options = results['suggest']['phonetic'][0]['options']
     except KeyError:
         phonetic_options = []
-
-    return  [i['_source']['Header'][lang] for i in header_options],\
-            [i['_source']['Header'][lang] for i in phonetic_options]
+    return  [i['_source']['Header'][lang] for i in header_options], [i['_source']['Header'][lang] for i in phonetic_options]
 
 
 def get_phonetic(collection, string, limit=5):
@@ -476,19 +441,20 @@ def get_suggestions(collection,string):
     '''
     rv = {}
     try:
-        rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
+        if collection == "*":
+            rv['starts_with'], rv['phonetic'] = get_completion_all_collections(string)
+            rv['contains'] = {}
+            # make all the words in the suggestion start with a capital letter
+            rv = {k: {kk: [i.title() for i in vv] for kk, vv in v.items()} for k, v in rv.items()}
+            return humanify(rv)
+        else:
+            rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
+            rv['contains'] = []
+            # make all the words in the suggestion start with a capital letter
+            rv = {k: [i.title() for i in v] for k, v in rv.items()}
+            return humanify(rv)
     except Exception, e:
         return humanify({"error": "unexpected exception getting completion data: {}".format(e)}, 500)
-    rv['contains'] = []
-
-    # make all the words in the suggestion start with a capital letter
-    for k,v in rv.items():
-        newv = []
-        for i in v:
-            newv.append(i.title())
-        rv[k] = newv
-
-    return humanify(rv)
 
 
 

@@ -41,7 +41,7 @@ class MongoToEsDumper(object):
                     "max_input_length": 20,
                     "contexts": [{
                         "name": "collection",
-                        "type": "category",
+                        "type": "CATEGORY",
                         "path": "_type"
                     }]
                 }
@@ -76,7 +76,7 @@ class MongoToEsDumper(object):
             "max_input_length": 20,
             "contexts": [{
                 "name": "collection",
-                "type": "category",
+                "type": "CATEGORY",
                 "path": "_type"
             }]
         }

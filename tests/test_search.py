@@ -2,6 +2,7 @@
 from elasticsearch import Elasticsearch
 from scripts.dump_mongo_to_es import MongoToEsDumper
 from copy import deepcopy
+import os
 
 
 ### environment setup functions
@@ -16,23 +17,25 @@ def index_doc(app, collection, doc):
     doc.get("Header", {}).setdefault("En_lc", doc.get("Header", {}).get("En", "").lower())
     app.es.index(app.es_data_db_index_name, collection, doc)
 
-def index_docs(app, collections):
-    MongoToEsDumper(es=app.es, es_index_name=app.es_data_db_index_name, mongo_db=None).create_es_index(delete_existing=True)
-    for collection, docs in collections.items():
-        for doc in docs:
-            index_doc(app, collection, doc)
-    app.es.indices.refresh(app.es_data_db_index_name)
+def index_docs(app, collections, reuse_db=False):
+    if not reuse_db or not app.es.indices.exists(app.es_data_db_index_name):
+        MongoToEsDumper(es=app.es, es_index_name=app.es_data_db_index_name, mongo_db=None).create_es_index(delete_existing=True)
+        for collection, docs in collections.items():
+            for doc in docs:
+                index_doc(app, collection, doc)
+        app.es.indices.refresh(app.es_data_db_index_name)
 
 def given_local_elasticsearch_client_with_test_data(app):
     app.es = Elasticsearch("localhost")
     app.es_data_db_index_name = "bh_dbs_back_pytest"
+    reuse_db = os.environ.get("REUSE_DB", "") == "1"
     index_docs(app, {
         "places": [PLACES_BOURGES, PLACES_BOZZOLO],
         "photoUnits": [PHOTO_BRICKS, PHOTOS_BOYS_PRAYING],
         "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
         "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
         "movies": [MOVIES_MIDAGES, MOVIES_SPAIN]
-    })
+    }, reuse_db)
 
 ### custom assertions
 
@@ -184,6 +187,16 @@ def test_invalid_suggest(client, app):
     given_invalid_elasticsearch_client(app)
     assert_suggest_response(client, u"places", u"mos",
                             500, expected_error_message="unexpected exception getting completion data: ConnectionError")
+
+def test_general_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"*", u"bo",
+                            200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": []},
+                                                "contains": {},
+                                                "starts_with": {"places": [u'Bourges', u'Bozzolo'],
+                                                                               # notice that suggest captilizes all letters
+                                                                "photoUnits": ['Boys Praying At The Synagogue Of Mosad Aliyah, Israel 1963'],
+                                                                "familyNames": [], "personalities": [], "movies": []}})
 
 def test_places_suggest(client, app):
     given_local_elasticsearch_client_with_test_data(app)
