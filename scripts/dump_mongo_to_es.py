@@ -60,6 +60,29 @@ class MongoToEsDumper(object):
             ret["properties"]["{}_lc".format(lang)] = {"type": "keyword"}
         return ret
 
+    def _get_index_body(self):
+        body = {
+            "mappings": {
+                collection: {
+                    "properties": {
+                        "Header": self.header_mapping,
+                    }
+                }
+                for collection in SEARCHABLE_COLLECTIONS
+            }
+        }
+        body["mappings"]["familyNames"]["properties"]["dm_soundex"] = {
+            "type": "completion",
+            "max_input_length": 20,
+            "contexts": [{
+                "name": "collection",
+                "type": "category",
+                "path": "_type"
+            }]
+        }
+        return body
+
+
     def create_es_index(self, delete_existing=False):
         if self.es.indices.exists(self.es_index_name):
             if delete_existing:
@@ -67,28 +90,7 @@ class MongoToEsDumper(object):
             else:
                 raise Exception()
         # set the mapping to support completion fields
-        self.es.indices.create(self.es_index_name, body={
-            "mappings": {
-                "places": {"properties": {
-                    "Header": self.header_mapping,
-                }},
-                "familyNames": {"properties": {
-                    "Header": self.header_mapping,
-                    "dm_soundex": {
-                        "type": "completion",
-                        "max_input_length": 20,
-                        "contexts": [{
-                            "name": "collection",
-                            "type": "category",
-                            "path": "_type"
-                        }]
-                    }
-                }},
-                "photoUnits": {"properties": {
-                    "Header": self.header_mapping
-                }}
-            }
-        })
+        self.es.indices.create(self.es_index_name, body=self._get_index_body())
 
     def _process_collection(self, collection):
         started = datetime.datetime.now()

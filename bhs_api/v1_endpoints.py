@@ -8,6 +8,7 @@ import re
 import urllib
 import mimetypes
 from uuid import UUID
+import json
 
 from flask import Flask, Blueprint, request, abort, url_for, current_app
 from flask.ext.security import auth_token_required
@@ -74,6 +75,7 @@ def es_search(q, size, collection=None, from_=0, sort=None):
             collection = collection.split(',')
         except:
             pass
+        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collection, json.dumps(body)))
         results = current_app.es.search(index=current_app.es_data_db_index_name, body=body,
                             doc_type=collection, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
