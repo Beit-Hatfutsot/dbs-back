@@ -1,6 +1,7 @@
 # -- coding: utf8
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import NotFoundError
+from scripts.dump_mongo_to_es import MongoToEsDumper
 
 
 ### environment setup functions
@@ -12,10 +13,7 @@ def given_invalid_elasticsearch_client(app):
 def given_local_elasticsearch_client_with_test_data(app):
     app.es = Elasticsearch("localhost")
     app.es_data_db_index_name = index_name = "bh_dbs_back_pytest"
-    try:
-        app.es.indices.delete(index_name)
-    except NotFoundError:
-        pass
+    MongoToEsDumper(es=app.es, es_index_name=index_name, mongo_db=None).create_es_index(delete_existing=True)
     app.es.index(index_name, "places", PLACES_BOURGES)
     app.es.index(index_name, "places", PLACES_BOZZOLO)
     app.es.index(index_name, "photoUnits", PHOTOS_BOYS_PRAYING)
@@ -94,24 +92,54 @@ def test_multiple_search_results_with_sorting(client, app):
     results = [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&sort=rel"), 3)]
     assert 312757 in results and 187521 in results and 187559 in results
     # sort=abc - query is in hebrew, ordered on the hebrew headers
+    # 187559 = בוצולו
+    # 187521 = בורג
+    # 312757 = נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&sort=abc"), 3)] == [187559, 187521, 312757]
     # sort=abc - query is in english, ordered on the english headers
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=jews&sort=abc"), 3)] == [187521, 187559, 312757]
+    # 187521 = BOURGES
+    # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
+    # 187559 = BOZZOLO
+    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=jews&sort=abc"), 3)] == [187521, 312757, 187559]
 
     # places search, sort=rel
     results = [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&collection=places"), 2)]
     assert 187521 in results and 187559 in results
     # sort=abc - query is in hebrew, ordered on the hebrew headers
+    # 187559 = בוצולו
+    # 187521 = בורג
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&collection=places&sort=abc"), 2)] == [187559, 187521]
     # sort=abc - query is in english, ordered on the english headers
+    # 187521 = BOURGES
+    # 187559 = BOZZOLO
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=jews&collection=places&sort=abc"), 2)] == [187521, 187559]
 
     # images search, sort=year
+
+    # 303772 = Building Blocks for Housing Projects, Israel 1950s
+    # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=Photo&collection=photoUnits&sort=year"), 2)] == [303772, 312757]
     # alphabetical english
+    # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
+    # 303772 = Building Blocks for Housing Projects, Israel 1950s
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=Photo&collection=photoUnits&sort=abc"), 2)] == [312757, 303772]
     # alphabetical hebrew
+    # 393772 - לבנים למפעל בנייה למגורים, ישראל שנות 1960
+    # 312757 = נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=זוננפלד&collection=photoUnits&sort=abc"), 2)] == [303772, 312757]
+
+def test_suggest(client, app):
+    given_invalid_elasticsearch_client(app)
+    res = client.get(u"/v1/suggest/places/mos")
+    assert res.status_code == 500
+    assert "unexpected exception getting completion data: ConnectionError" in res.data
+    given_local_elasticsearch_client_with_test_data(app)
+    res = client.get(u"/v1/suggest/places/bo")
+    assert res.status_code == 200
+    assert res.json == {"phonetic": [], "contains": [], "starts_with": ["Bourges", "Bozzolo"]}
+    res = client.get(u"/v1/suggest/photoUnits/נער")
+    assert res.status_code == 200
+    assert res.json == {u'phonetic': [], u'contains': [], u'starts_with': [u'נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950']}
 
 
 ### constants
@@ -185,7 +213,9 @@ PLACES_BOURGES = {
     },
     "Header": {
       "En": "BOURGES",
-      "He": u"בורג'"
+      "He": u"בורג'",
+      "En_lc": "bourges",
+      "He_lc": u"בורג'"
     },
     "ForPreview": False
 }
@@ -253,7 +283,9 @@ PLACES_BOZZOLO = {
     },
     "Header": {
       "En": "BOZZOLO",
-      "He": "בוצולו"
+      "He": u"בוצולו",
+      "En_lc": "bozzolo",
+      "He_lc": u"בוצולו"
     },
     "ForPreview": False
 }
@@ -448,7 +480,9 @@ PHOTOS_BOYS_PRAYING = {
     },
     "Header": {
       "En": "Boys praying at the synagogue of Mosad Aliyah, Israel 1963",
-      "He": "נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950"
+      "He": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950",
+      "En_lc": "boys praying at the synagogue of mosad aliyah, israel 1963",
+      "He_lc": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950"
     },
     "PeriodTypeDesc": {
       "En": "Period|",
@@ -623,7 +657,9 @@ PHOTO_BRICKS = {
     },
     "Header": {
       "En": "Building Blocks for Housing Projects, Israel 1950s",
-      "He": "לבנים למפעל בנייה למגורים, ישראל שנות 1960"
+      "He": u"לבנים למפעל בנייה למגורים, ישראל שנות 1960",
+      "En_lc": "building blocks for housing projects, israel 1950s",
+      "He_lc": u"לבנים למפעל בנייה למגורים, ישראל שנות 1960"
     },
     "PeriodTypeDesc": {
       "En": "Period|",

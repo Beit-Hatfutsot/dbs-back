@@ -60,10 +60,10 @@ def es_search(q, size, collection=None, from_=0, sort=None):
     if sort == "abc":
         if phonetic.is_hebrew(q.strip()):
             # hebrew alphabetical sort
-            body["sort"] = [{"Header.He.keyword": "asc"}, "_score"]
+            body["sort"] = [{"Header.He_lc": "asc"}, "_score"]
         else:
             # english alphabetical sort
-            body["sort"] = [{"Header.En.keyword": "asc"}, "_score"]
+            body["sort"] = [{"Header.En_lc": "asc"}, "_score"]
     elif sort == "rel":
         # relevance sort
         body["sort"] = ["_score"]
@@ -237,8 +237,7 @@ def get_completion(collection, string, size=7):
             },
         }
     }
-
-    results = current_app.es.search(index=current_app.data_db.name,
+    results = current_app.es.search(index=current_app.es_data_db_index_name,
                                 body=q,
                                 size=0)
     try:
@@ -474,8 +473,10 @@ def get_suggestions(collection,string):
     Each field holds a list of up to 5 strings.
     '''
     rv = {}
-
-    rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
+    try:
+        rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
+    except Exception, e:
+        return humanify({"error": "unexpected exception getting completion data: {}".format(e)}, 500)
     rv['contains'] = []
 
     # make all the words in the suggestion start with a capital letter
