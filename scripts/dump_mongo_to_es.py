@@ -10,6 +10,7 @@ from bhs_api import create_app
 from bhs_api import phonetic
 from bhs_api.utils import uuids_to_str, SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
+from scripts.elasticsearch_create_index import ElasticsearchCreateIndexCommand
 
 
 def parse_args():
@@ -30,67 +31,6 @@ class MongoToEsDumper(object):
         self.es = es
         self.es_index_name = es_index_name
         self.mongo_db = mongo_db
-
-    @property
-    def completion_field(self):
-        return {
-            "type": "text",
-            "fields": {
-                "suggest": {
-                    "type": "completion",
-                    "max_input_length": 20,
-                    "contexts": [{
-                        "name": "collection",
-                        "type": "CATEGORY",
-                        "path": "_type"
-                    }]
-                }
-            },
-        }
-
-    @property
-    def header_mapping(self):
-        ret = {
-            "properties": {}
-        }
-        for lang in ["En", "He"]:
-            ret["properties"][lang] = self.completion_field
-            # currently the best option for case-insensitive search is to lower case when indexing a document
-            # type keyword allows for efficient sorting
-            ret["properties"]["{}_lc".format(lang)] = {"type": "keyword"}
-        return ret
-
-    def _get_index_body(self):
-        body = {
-            "mappings": {
-                collection: {
-                    "properties": {
-                        "Header": self.header_mapping,
-                    }
-                }
-                for collection in SEARCHABLE_COLLECTIONS
-            }
-        }
-        body["mappings"]["familyNames"]["properties"]["dm_soundex"] = {
-            "type": "completion",
-            "max_input_length": 20,
-            "contexts": [{
-                "name": "collection",
-                "type": "CATEGORY",
-                "path": "_type"
-            }]
-        }
-        return body
-
-
-    def create_es_index(self, delete_existing=False):
-        if self.es.indices.exists(self.es_index_name):
-            if delete_existing:
-                self.es.indices.delete(self.es_index_name)
-            else:
-                raise Exception()
-        # set the mapping to support completion fields
-        self.es.indices.create(self.es_index_name, body=self._get_index_body())
 
     def _process_collection(self, collection):
         started = datetime.datetime.now()
@@ -139,7 +79,7 @@ class MongoToEsDumper(object):
         return res
 
     def main(self, collections, delete_existing=False):
-        self.create_es_index(delete_existing=delete_existing)
+        ElasticsearchCreateIndexCommand().create_es_index(self.es, self.es_index_name, delete_existing=delete_existing)
         for collection in collections:
             self._process_collection(collection)
 
