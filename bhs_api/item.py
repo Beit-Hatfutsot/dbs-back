@@ -151,7 +151,7 @@ def fetch_item(slug, db=None):
         return _make_serializable(item)
         return item
 
-def enrich_item(item, db=None):
+def enrich_item(item, db=None, collection_name=None):
     if not db:
         db = current_app.data_db
     ''' and the media urls to the item '''
@@ -184,8 +184,14 @@ def enrich_item(item, db=None):
         else:
             return {}
             #abort(404, 'No video URL was found for this movie item.')
-    if 'Slug' not in item and 'GTN' in item:
-        item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
+
+    if 'Slug' not in item:
+        if 'GTN' in item:
+            item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
+        elif collection_name:
+            slug = create_slug(item, collection_name)
+            if slug:
+                item['Slug'] = slug
 
     return item
 
