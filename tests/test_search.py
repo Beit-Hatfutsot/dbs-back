@@ -113,6 +113,25 @@ def test_multiple_search_results_with_sorting(client, app):
     # alphabetical hebrew
     assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=זוננפלד&collection=photoUnits&sort=abc"), 2)] == [303772, 312757]
 
+def test_search_result_without_slug(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+
+    assert "Slug" not in PHOTO_BRICKS
+    results = list(assert_search_results(client.get(u"/v1/search?q=Blocks&collection=photoUnits&sort=abc"), 1))
+    # slug is generated on-the-fly if it doesn't exist in source data
+    assert results[0]["_source"]["Slug"] == {
+      "En": "image_building-blocks-for-housing-projects-israel-1950s",
+      "He": u"תמונה_לבנים-למפעל-בנייה-למגורים-ישראל-שנות-1960"
+    }
+
+    assert "Slug" not in PLACES_BOURGES
+    results = list(assert_search_results(client.get(u"/v1/search?q=bourges&collection=places&sort=abc"), 1))
+    # slug is generated on-the-fly if it doesn't exist in source data
+    assert results[0]["_source"]["Slug"] == {
+      "En": "place_bourges",
+      "He": u"מקום_בורג"
+    }
+
 
 ### constants
 
@@ -179,10 +198,6 @@ PLACES_BOURGES = {
     "PlaceParentId": 70345,
     "UserLexicon": None,
     "Attachments": [],
-    "Slug": {
-      "En": "place_bourges",
-      "He": u"מקום_בורג"
-    },
     "Header": {
       "En": "BOURGES",
       "He": u"בורג'"
@@ -556,10 +571,6 @@ PHOTO_BRICKS = {
       }
     ],
     "UnitTypeDesc": "Photo",
-    "Slug": {
-      "En": "image_building-blocks-for-housing-projects-israel-1950s",
-      "He": "תמונה_לבנים-למפעל-בנייה-למגורים-ישראל-שנות-1960"
-    },
     "PeriodStartDate": "19600000|",
     "PIctureReceivedIds": "122329|",
     "PeriodDateTypeCode": "4|",

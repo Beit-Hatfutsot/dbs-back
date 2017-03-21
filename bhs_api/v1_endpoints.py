@@ -413,7 +413,7 @@ def general_search():
             abort(500, 'Sorry, the search cluster appears to be down')
         else:
             for item in rv['hits']['hits']:
-                enrich_item(item['_source'])
+                enrich_item(item['_source'], collection_name=item['_type'])
         return humanify(rv)
 
 @v1_endpoints.route('/wsearch')

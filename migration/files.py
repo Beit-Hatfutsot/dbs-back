@@ -45,7 +45,6 @@ def upload_file(file_path, bucket, new_filename=None, thumb_bucket=None):
             logging.error('Credentials file {} was not found.'.format(boto_cred_file))
 
         return None
-
     if thumb_bucket:
         file_obj.seek(0)
         im = Image.open(file_obj)
@@ -58,6 +57,7 @@ def upload_file(file_path, bucket, new_filename=None, thumb_bucket=None):
         # save the thumbnail
         thumbnail.seek(0)
         new_key.set_contents_from_file(thumbnail)
+        new_key.make_public()
 
     file_obj.close()
     return str(dest_uri)
