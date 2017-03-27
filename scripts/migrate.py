@@ -9,6 +9,7 @@ from decimal import Decimal
 import datetime
 import calendar
 import time
+from functools import partial
 
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
@@ -64,6 +65,7 @@ def parse_args():
                         help='file path to a gedcom file. works only when -i XXX -c genTrees is used')
     parser.add_argument('--lasthours',
                         help="migrate all content changed in the last LASTHOURS")
+    parser.add_argument('--dryrun', help="don't update data, just print what will be done")
 
     return parser.parse_args()
 
@@ -302,13 +304,14 @@ def parse_doc(doc, collection_name):
     return collection_procedure_map[collection_name](doc)
 
 
-def parse_n_update(row, collection_name):
+def parse_n_update(row, collection_name, dryrun=False):
     doc = parse_doc(row, collection_name)
     id_field = get_collection_id_field(collection_name)
     logger.info('{}:Updating {}: {}, updated {}'.format(
         collection_name, id_field, doc[id_field],
         doc.get('UpdateDate', '?')))
-    update_row.delay(doc, collection_name)
+    if not dryrun:
+        update_row.delay(doc, collection_name)
     return doc
 
 
@@ -324,7 +327,8 @@ def get_file_descriptors(tree, gedcom_path):
 
 def migrate_trees(cursor, on_save=None, treenum=None, gedcom_path=None):
     ''' get command line arguments and sql query and initiated update_tree
-        and update_row celery tasks returns how many people migrated
+        and update_row celery tasks.
+        returns how many people migrated
     '''
     count = 0
 
@@ -349,7 +353,11 @@ def migrate_trees(cursor, on_save=None, treenum=None, gedcom_path=None):
 
         logger.info('>>> migrating tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
-        Gedcom2Persons(gedcom, row['GenTreeNumber'], file_id, parse_n_update if not on_save else on_save)
+        if not on_save:
+            on_save = partial(parse_n_update, dryrun=dryrun)
+        elif dryrun:
+            raise Exception("dryrun is not supported with on_save")
+        Gedcom2Persons(g, row['GenTreeNumber'], file_id, on_save)
         logger.info('<<< migrated tree {}, path {}'
                     .format(row['GenTreeNumber'], file_name))
         count += 1
@@ -386,20 +394,30 @@ if __name__ == '__main__':
     for collection_name, query in queries.items():
         # family trees are a special case
         if collection_name == 'genTrees':
-            cursor = sqlClient.execute(query, **args)
-            count = migrate_trees(cursor, **args)
+            tree_nums = [args.unitid] if args.unitid else None
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
+            count = migrate_trees(sql_cursor, args.unitid, args.gedcom_path, dryrun=args.dryrun)
             if not count:
                 logger.info('{}:Skipping'.format(collection_name))
             continue
 
-        for row in sqlClient.execute(query, **args):
-            doc = parse_n_update(row, collection_name)
-            # collect all the photos
-            pictures = doc.get('Pictures', None)
-            if pictures:
-                for pic in pictures:
-                    if 'PictureId' in pic:
-                        photos_to_update.append(pic['PictureId'])
+        if args.unitid:
+            sql_cursor = sqlClient.execute(query, unit_ids=[args.unitid])
+        else:
+            sql_cursor = sqlClient.execute(query, since=since, until=until)
+
+        if sql_cursor:
+            for row in sql_cursor:
+                doc = parse_n_update(row, collection_name, dryrun=args.dryrun)
+                # collect all the photos
+                pictures = doc.get('Pictures', None)
+                if pictures:
+                    for pic in pictures:
+                        if 'PictureId' in pic:
+                            photos_to_update.append(pic['PictureId'])
+        else:
+            logger.warn('failed getting updated units {}:{}'
+                        .format(collection_name, ','.join(units)))
 
         # TODO:
         # rsync_media(collection_name)
@@ -411,9 +429,9 @@ if __name__ == '__main__':
                                           unit_ids=photos_to_update,
                                           )
         for row in photos_cursor:
-            upload_photo(row, conf)
+            upload_photo(row, conf, dryrun=args.dryrun)
 
-    if since_file:
+    if since_file and not args.dryrun:
         since_file.seek(0)
         since_file.write(str(until))
         since_file.close()
