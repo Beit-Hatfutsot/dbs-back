@@ -29,7 +29,7 @@ def push_code(rev='HEAD', virtualenv=True, requirements=True, cur_date=None):
         if requirements:
             with prefix('. env/bin/activate'):
                 run('pip install -r requirements.txt')
-    run('rm -f /tmp/api-*')
+    run('rm -rf /tmp/api-*')
     run('mv /tmp/latest-api-{} /tmp/api-{}'.format(cur_date, cur_date))
 
 def push_conf():
