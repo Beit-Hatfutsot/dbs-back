@@ -42,6 +42,7 @@ def deploy():
     push_code()
     restart()
 
+@hosts('bhs-infra')
 def deploy_migrate(reset_requirements=False):
     cur_date = run("date +%d.%m.%y-%H:%M:%S")
     if files.exists("api/env") and not reset_requirements:
@@ -94,4 +95,3 @@ def pull_mongo(dbname):
 def update_related(db):
     with cd('api'), prefix('. env/bin/activate'):
         run('python batch_related.py --db {}'.format(db))
-
