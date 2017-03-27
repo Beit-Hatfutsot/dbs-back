@@ -370,7 +370,8 @@ def create_slug(document, collection_name):
     slugify = Slugify(translate=None, safe_chars='_')
     for lang, val in headers:
         if val:
-            collection_slug = collection_slug_map[collection_name][lang]
-            slug = slugify('_'.join([collection_slug, val.lower()]))
-            ret[lang] = slug.encode('utf8')
+            collection_slug = collection_slug_map[collection_name].get(lang)
+            if collection_slug:
+                slug = slugify('_'.join([collection_slug, val.lower()]))
+                ret[lang] = slug.encode('utf8')
     return ret

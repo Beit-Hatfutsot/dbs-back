@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from elasticsearch import Elasticsearch
-from scripts.dump_mongo_to_es import MongoToEsDumper
+from scripts.elasticsearch_create_index import ElasticsearchCreateIndexCommand
 from copy import deepcopy
 import os
 
@@ -19,7 +19,7 @@ def index_doc(app, collection, doc):
 
 def index_docs(app, collections, reuse_db=False):
     if not reuse_db or not app.es.indices.exists(app.es_data_db_index_name):
-        MongoToEsDumper(es=app.es, es_index_name=app.es_data_db_index_name, mongo_db=None).create_es_index(delete_existing=True)
+        ElasticsearchCreateIndexCommand().create_es_index(es=app.es, es_index_name=app.es_data_db_index_name, delete_existing=True)
         for collection, docs in collections.items():
             for doc in docs:
                 index_doc(app, collection, doc)
