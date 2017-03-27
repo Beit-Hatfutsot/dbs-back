@@ -28,13 +28,14 @@ def add_children(elem, prefix, props):
 
 class Gedcom2Persons:
 
-    def __init__(self, gedcom, tree_num, file_id, onsave):
+    def __init__(self, gedcom, tree_num, file_id, onsave, dryrun=False):
         ''' main import function, receieve a parsed gedcom '''
 
         self.gedcom = gedcom
         self.tree_num = tree_num
         self.file_id = file_id
         self.onsave = onsave
+        self.dryrun=dryrun
 
         form = ''
         ver = '?'
