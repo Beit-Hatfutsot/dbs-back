@@ -1,6 +1,8 @@
-# -- coding: utf8
+# -*- coding: utf-8 -*-
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import NotFoundError
+from scripts.dump_mongo_to_es import MongoToEsDumper
+from copy import deepcopy
+import os
 
 
 ### environment setup functions
@@ -9,19 +11,31 @@ from elasticsearch.exceptions import NotFoundError
 def given_invalid_elasticsearch_client(app):
     app.es = Elasticsearch("192.0.2.0", timeout=0.000000001)
 
+def index_doc(app, collection, doc):
+    doc = deepcopy(doc)
+    doc.get("Header", {}).setdefault("He_lc", doc.get("Header", {}).get("He", "").lower())
+    doc.get("Header", {}).setdefault("En_lc", doc.get("Header", {}).get("En", "").lower())
+    app.es.index(app.es_data_db_index_name, collection, doc)
+
+def index_docs(app, collections, reuse_db=False):
+    if not reuse_db or not app.es.indices.exists(app.es_data_db_index_name):
+        MongoToEsDumper(es=app.es, es_index_name=app.es_data_db_index_name, mongo_db=None).create_es_index(delete_existing=True)
+        for collection, docs in collections.items():
+            for doc in docs:
+                index_doc(app, collection, doc)
+        app.es.indices.refresh(app.es_data_db_index_name)
+
 def given_local_elasticsearch_client_with_test_data(app):
     app.es = Elasticsearch("localhost")
-    app.es_data_db_index_name = index_name = "bh_dbs_back_pytest"
-    try:
-        app.es.indices.delete(index_name)
-    except NotFoundError:
-        pass
-    app.es.index(index_name, "places", PLACES_BOURGES)
-    app.es.index(index_name, "places", PLACES_BOZZOLO)
-    app.es.index(index_name, "photoUnits", PHOTOS_BOYS_PRAYING)
-    app.es.index(index_name, "photoUnits", PHOTO_BRICKS)
-    app.es.indices.refresh(index_name)
-
+    app.es_data_db_index_name = "bh_dbs_back_pytest"
+    reuse_db = os.environ.get("REUSE_DB", "") == "1"
+    index_docs(app, {
+        "places": [PLACES_BOURGES, PLACES_BOZZOLO],
+        "photoUnits": [PHOTO_BRICKS, PHOTOS_BOYS_PRAYING],
+        "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
+        "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
+        "movies": [MOVIES_MIDAGES, MOVIES_SPAIN]
+    }, reuse_db)
 
 ### custom assertions
 
@@ -57,6 +71,25 @@ def assert_search_results(res, num_expected):
         assert hit["_index"] == "bh_dbs_back_pytest"
         yield hit
 
+def assert_search_hit_ids(client, search_params, expected_ids, ignore_order=False):
+    hit_ids = [hit["_source"].get("Id", hit["_source"].get("id"))
+               for hit
+               in assert_search_results(client.get(u"/v1/search?{}".format(search_params)),
+                                        len(expected_ids))]
+    if not ignore_order:
+        assert hit_ids == expected_ids
+    else:
+        assert {id:id for id in hit_ids} == {id:id for id in expected_ids}
+
+def assert_suggest_response(client, collection, string,
+                            expected_http_status_code=200, expected_error_message=None, expected_json=None):
+    res = client.get(u"/v1/suggest/{}/{}".format(collection, string))
+    assert res.status_code == expected_http_status_code
+    if expected_error_message is not None:
+        assert expected_error_message in res.data
+    if expected_json is not None:
+        print(res.json)
+        assert expected_json == res.json
 
 ### utility functions
 
@@ -87,31 +120,112 @@ def test_general_search_single_result(client, app):
         assert hit["_type"] == "places"
         assert hit["_source"]["Header"]["En"] == "BOURGES"
 
-def test_multiple_search_results_with_sorting(client, app):
+def test_general_search(client, app):
     given_local_elasticsearch_client_with_test_data(app)
-
-    # general search, sort=rel
-    results = [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&sort=rel"), 3)]
-    assert 312757 in results and 187521 in results and 187559 in results
+    assert_search_hit_ids(client, u"q=יהודים&sort=rel", [312757, 187521, 187559, 340727, 240790, 262366], ignore_order=True)
     # sort=abc - query is in hebrew, ordered on the hebrew headers
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&sort=abc"), 3)] == [187559, 187521, 312757]
+    # 187559 = בוצולו
+    # 187521 = בורג
+    # 240790 = דוד, פרדיננד
+    # 340727 = דרעי
+    # 312757 = נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950s
+    # 262366 = רגעים עם יהודי ספרד (אנגלית)
+    assert_search_hit_ids(client, u"q=יהודים&sort=abc", [187559, 187521, 240790, 340727, 312757, 262366])
     # sort=abc - query is in english, ordered on the english headers
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=jews&sort=abc"), 3)] == [187521, 187559, 312757]
+    # 187521 = BOURGES
+    # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
+    # 187559 = BOZZOLO
+    # 240790 = David, Ferdinand
+    # 340727 = DEREI
+    # 262367 = Jewish Communities in the Middle Ages: Babylonia; Spain; Ashkenaz (Hebrew)
+    assert_search_hit_ids(client, u"q=jews&sort=abc", [187521, 312757, 187559, 240790, 340727, 262367])
 
-    # places search, sort=rel
-    results = [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&collection=places"), 2)]
-    assert 187521 in results and 187559 in results
+def test_places_search(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_search_hit_ids(client, u"q=יהודים&collection=places", [187521, 187559], ignore_order=True)
     # sort=abc - query is in hebrew, ordered on the hebrew headers
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=יהודים&collection=places&sort=abc"), 2)] == [187559, 187521]
+    # 187559 = בוצולו
+    # 187521 = בורג
+    assert_search_hit_ids(client, u"q=יהודים&collection=places&sort=abc", [187559, 187521])
     # sort=abc - query is in english, ordered on the english headers
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=jews&collection=places&sort=abc"), 2)] == [187521, 187559]
+    # 187521 = BOURGES
+    # 187559 = BOZZOLO
+    assert_search_hit_ids(client, u"q=jews&collection=places&sort=abc", [187521, 187559])
 
-    # images search, sort=year
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=Photo&collection=photoUnits&sort=year"), 2)] == [303772, 312757]
+def test_images_search(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    # 303772 = Building Blocks for Housing Projects, Israel 1950s
+    # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
+    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [303772, 312757])
     # alphabetical english
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=Photo&collection=photoUnits&sort=abc"), 2)] == [312757, 303772]
+    # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
+    # 303772 = Building Blocks for Housing Projects, Israel 1950s
+    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=abc", [312757, 303772])
     # alphabetical hebrew
-    assert [hit["_source"]["id"] for hit in assert_search_results(client.get(u"/v1/search?q=זוננפלד&collection=photoUnits&sort=abc"), 2)] == [303772, 312757]
+    # 393772 - לבנים למפעל בנייה למגורים, ישראל שנות 1960
+    # 312757 = נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950
+    assert_search_hit_ids(client, u"q=זוננפלד&collection=photoUnits&sort=abc", [303772, 312757])
+
+def test_family_names_search(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    # 341018 = אדרהי
+    # 340727 = דרעי
+    assert_search_hit_ids(client, u"q=משפחה&collection=familyNames&sort=abc", [341018, 340727])
+
+def test_personalities_search(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    # 240790 = David, Ferdinand
+    # 240792 = Davydov, Karl Yulyevich
+    assert_search_hit_ids(client, u"q=Leipzig&collection=personalities&sort=abc", [240790, 240792])
+
+def test_movies_search(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    # 262367 = Jewish Communities in the Middle Ages: Babylonia; Spain; Ashkenaz (Hebrew)
+    assert_search_hit_ids(client, u"q=jews&collection=movies&sort=abc", [262367])
+
+def test_invalid_suggest(client, app):
+    given_invalid_elasticsearch_client(app)
+    assert_suggest_response(client, u"places", u"mos",
+                            500, expected_error_message="unexpected exception getting completion data: ConnectionError")
+
+def test_general_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"*", u"bo",
+                            200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": []},
+                                                "contains": {},
+                                                "starts_with": {"places": [u'Bourges', u'Bozzolo'],
+                                                                               # notice that suggest captilizes all letters
+                                                                "photoUnits": ['Boys Praying At The Synagogue Of Mosad Aliyah, Israel 1963'],
+                                                                "familyNames": [], "personalities": [], "movies": []}})
+
+def test_places_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"places", u"bo",
+                            200, expected_json={"phonetic": [], "contains": [], "starts_with": ["Bourges", "Bozzolo"]})
+
+def test_images_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"photoUnits", u"נער",
+                            200, expected_json={u'phonetic': [], u'contains': [],
+                                                u'starts_with': [u'נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950']})
+
+def test_family_names_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"familyNames", u"דר",
+                            200, expected_json={u'phonetic': [], u'contains': [],
+                                                u'starts_with': [u'דרעי']})
+
+def test_personalities_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"personalities", u"dav",
+                            200, expected_json={u'phonetic': [], u'contains': [],
+                                                u'starts_with': [u'David, Ferdinand', u'Davydov, Karl Yulyevich']})
+
+def test_movies_suggest(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    assert_suggest_response(client, u"movies", u"liv",
+                            200, expected_json={u'phonetic': [], u'contains': [],
+                                                u'starts_with': [u'Living Moments In Jewish Spain (English)']})
 
 def test_search_result_without_slug(client, app):
     given_local_elasticsearch_client_with_test_data(app)
@@ -158,7 +272,7 @@ PLACES_BOURGES = {
     "dm_soundex": [
       "795400"
     ],
-    "id": 187521,
+    "Id": 187521,
     "UpdateUser": "simona",
     "PrevPictureFileNames": "139836.jpg,",
     "PrevPicturePaths": "Photos\\445411a5-f570-4c39-a9fc-1638a38f0b9d.jpg,",
@@ -200,7 +314,9 @@ PLACES_BOURGES = {
     "Attachments": [],
     "Header": {
       "En": "BOURGES",
-      "He": u"בורג'"
+      "He": u"בורג'",
+      "En_lc": "bourges",
+      "He_lc": u"בורג'"
     },
     "ForPreview": False
 }
@@ -222,7 +338,7 @@ PLACES_BOZZOLO = {
     "dm_soundex": [
       "748000"
     ],
-    "id": 187559,
+    "Id": 187559,
     "UpdateUser": "archive1",
     "PrevPictureFileNames": None,
     "PrevPicturePaths": None,
@@ -268,7 +384,9 @@ PLACES_BOZZOLO = {
     },
     "Header": {
       "En": "BOZZOLO",
-      "He": "בוצולו"
+      "He": u"בוצולו",
+      "En_lc": "bozzolo",
+      "He_lc": u"בוצולו"
     },
     "ForPreview": False
 }
@@ -361,7 +479,7 @@ PHOTOS_BOYS_PRAYING = {
     "UpdateDate": "2012-10-29T11:47:00",
     "OldPictureNumbers": "|||||",
     "OldUnitId": None,
-    "id": 312757,
+    "Id": 312757,
     "UpdateUser": "Zippi",
     "PictureLocations": "Box 31 (30x40)|Box 30 (30x40)|Box 72 (30x40)|Box 30 (30x40)|Box 31 (30x40)|",
     "UnitDisplayStatus": 3,
@@ -463,7 +581,9 @@ PHOTOS_BOYS_PRAYING = {
     },
     "Header": {
       "En": "Boys praying at the synagogue of Mosad Aliyah, Israel 1963",
-      "He": "נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950"
+      "He": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950",
+      "En_lc": "boys praying at the synagogue of mosad aliyah, israel 1963",
+      "He_lc": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950"
     },
     "PeriodTypeDesc": {
       "En": "Period|",
@@ -536,7 +656,7 @@ PHOTO_BRICKS = {
     "UpdateDate": "2013-04-10T11:31:00",
     "OldPictureNumbers": "|||",
     "OldUnitId": None,
-    "id": 303772,
+    "Id": 303772,
     "UpdateUser": "Zippi",
     "PictureLocations": "Box 14|Box 14|Box 14|",
     "UnitDisplayStatus": 3,
@@ -634,7 +754,9 @@ PHOTO_BRICKS = {
     },
     "Header": {
       "En": "Building Blocks for Housing Projects, Israel 1950s",
-      "He": "לבנים למפעל בנייה למגורים, ישראל שנות 1960"
+      "He": u"לבנים למפעל בנייה למגורים, ישראל שנות 1960",
+      "En_lc": "building blocks for housing projects, israel 1950s",
+      "He_lc": u"לבנים למפעל בנייה למגורים, ישראל שנות 1960"
     },
     "PeriodTypeDesc": {
       "En": "Period|",
@@ -644,3 +766,526 @@ PHOTO_BRICKS = {
     "Resolutions": "100|100|100|",
     "LocationCode": "SON.14/276|SON.14/328|SON.14/274|"
   }
+
+FAMILY_NAMES_DERI = {
+          "LocationInMuseum" : None,
+          "Pictures" : [ ],
+          "PictureUnitsIds" : None,
+          "UpdateDate" : "2012-11-30T10:21:00",
+          "OldUnitId" : "FM016294.HTM",
+          "dm_soundex" : [
+            "390000"
+          ],
+          "UpdateUser" : "Haim - Family Names (2012)",
+          "UnitDisplayStatus" : 2,
+          "PrevPicturePaths" : None,
+          "TS" : "000000000001897e",
+          "UnitType" : 6,
+          "UnitTypeDesc" : "Family Name",
+          "EditorRemarks" : "hasavot from Family Names",
+          "UnitStatus" : 3,
+          "RightsDesc" : "Full",
+          "Bibiliography" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitText1" : {
+            "En" : "DARI, DERI, DER'I, DEREHA, EDRY, EDERY, EDREHY\r\n\r\nSurnames derive from one of many different origins. Sometimes there may be more than one explanation for the same name. This family name is a toponymic (derived from a geographic name of a town, city, region or country). Surnames that are based on place names do not always testify to direct origin from that place, but may indicate an indirect relation between the name-bearer or his ancestors and the place, such as birth place, temporary residence, trade, or family-relatives.  The family name Deri is associated with the town of Der'a (Draa) in the province of Draa, southern Morocco.  This entire area is one of the oldest sites of Jewish settlement in North Africa, dating from well before the Arab invasions.  The name (and variants) is recorded as a Jewish family name in the following examples:  in the 9th century, Mosheh Ha-Rofe Ben Abraham Edery, who was born in Draa, was a renowned Karaite poet; in the 13th century, Isaac Daray, and his son Jacob, of Barcelona, Spain, are mentioned in a legal document issued by Don Pedro III King of Aragon, dated October 14, 1285; in the 17th century, Mosheh Ben Khoulief Edery was a rabbi in Debdou, Morocco (1607); in the 18th century, Abraham Bar Messod Edery (born 1771?) was a rabbi in Baizza, a village near Marrakech, Morocco; Rabbi Mosheh de Isaac Edrehi from Mogador, Morocco, was a prolific author, kabbalist and professor of languages at Etz Hayyim school in London, England (1792) and in the high school of the Sephardi community of Amsterdam, Holland; Reuben Edery was a rabbi and 'dayan' (\"religious judge\") in Tetouan, Morocco, in 19th century; Rabbi David Edery from Morocco was member of the rabbinical tribunal of Safed, Eretz Israel. His name is mentioned in the introduction to 'Vayomer Yitshak' by Rabbi Isaac Benghalid (1872); David Edery (died 1963 in Tangiers, Morocco) was head of the graduates association of the Alliance Israelite.  In the 20th century, Dari is documented with the Israeli Knesset member Rafael Edry, born 1937 in Casablanca, Morocco; and with Arye Machluf Dari, Knesset member during the 1990s and head of the Shas movement. jews",
+            "He" : "DARI, DERI, DER'I, DEREHA, EDRY, EDERY, EDREHY\r\n\r\nשמות משפחה נובעים מכמה מקורות שונים. לעיתים לאותו שם קיים יותר מהסבר אחד. שם משפחה זה הוא מסוג השמות הטופונימיים (שם הנגזר משם של מקום כגון עיירה, עיר, מחוז או ארץ). שמות אלו, אשר נובעים משמות של מקומות, לא בהכרח מעידים על קשר היסטורי ישיר לאותו מקום, אבל יכולים להצביע על קשר בלתי ישיר בין נושא השם או אבותיו לבין מקום לידה, מגורים ארעיים, אזור מסחר או קרובי משפחה.\r\n\r\nשם המשפחה דרעי קשור בשמה של העיירה דרע אשר בעמק הדרע, דרום מרוקו.  איזור זה הוא אחד המקומות העתיקים להתיישבות יהודית בצפון אפריקה, זמן רב לפני הכיבוש הערבי.  שם משפחה זה וצורותיו מתועדים כשמות משפחה יהודיים בדוגמאות הבאות:  במאה ה-9, M משה הרופא בן אברהם אדרעי, אשר נולד בדרע, היה פייטן קראי מפורסם; במאה ה-13, יצחק דראי ובנו יעקוב מברצלוניה, ספרד, מוזכרים במסמך משפטי של דון פדרו ה-3, מלך ארגון, מ-14 באוקטובר 1285; במאה ה-17, משה בן חוליאף אדרי שימש כרב בדבדו, מרוקו (1607); במאה ה-18, אברהם בר מסעוד אדרעי (נולד ב-1771?) שימש כרב בכפר באיזה ליד מרקש, מרוקו;  הרב משה דה יצחק אדרהי ממוגדור, מרוקו, היה מקובל, סופר פורה ומורה לשפות בבית הספר \"עץ חיים\" בלונדון, אנגליה (1792) ובבית הספר של הקהילה הספרדית באמסטרדם, הולנד; הרב ראובן אדרעי היה דיין בטטואן, מרוקו, במאה ה-19; הרב דויד אדרעי ממרוקו היה דיין בבית הדין של צפת, ארץ ישראל: שמו מוזכר במבוא לספר \"ויאמר יצחק\" מאת הרב יצחק בנגליד (1872); דויד אדרעי (נפטר בטנג'יר, מרוקו, בשנת 1963)  שימש כיו\"ר של אגודת בוגרי בתי הספר של \"כל ישראל חברים\" (\"כי\"ח\").\r\n\r\nבמאה ה-20,דרעי מתועד  עם ח\"כ רפאל אדרעי (נולד בקסבלנקה, מרוקו, בשנת 1937); ועם ח\"כ אריה מחלוף דרעי, יו\"ר תנועת ש\"ס בשנות ה-1990. יהודים"
+          },
+          "UnitText2" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitPlaces" : [ ],
+          "DisplayStatusDesc" : "Museum only",
+          "PrevPictureFileNames" : None,
+          "RightsCode" : 1,
+          "UnitId" : 77321,
+          "IsValueUnit" : True,
+          "StatusDesc" : "Completed",
+          "UserLexicon" : None,
+          "Attachments" : [ ],
+          "Slug" : {
+            "En" : "familyname_deri",
+            "He" : "שםמשפחה_דרעי"
+          },
+          "Header" : {
+            "En" : "DER'I",
+            "He" : "דרעי",
+
+              "En_lc": "der'i",
+              "He_lc": "דרעי"
+          },
+          "ForPreview" : False,
+          "Id" : 340727
+        }
+
+FAMILY_NAMES_EDREHY = {
+          "LocationInMuseum" : None,
+          "Pictures" : [ ],
+          "PictureUnitsIds" : None,
+          "UpdateDate" : "2012-11-30T10:21:00",
+          "OldUnitId" : "FM016296.HTM",
+          "dm_soundex" : [
+            "039500"
+          ],
+          "UpdateUser" : "Haim - Family Names (2012)",
+          "UnitDisplayStatus" : 2,
+          "PrevPicturePaths" : None,
+          "TS" : "0000000000018980",
+          "UnitType" : 6,
+          "UnitTypeDesc" : "Family Name",
+          "EditorRemarks" : "hasavot from Family Names",
+          "UnitStatus" : 3,
+          "RightsDesc" : "Full",
+          "Bibiliography" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitText1" : {
+            "En" : "DARI, DERI, DEREHA, EDRY, EDERY, EDREHY\r\n\r\nSurnames derive from one of many different origins. Sometimes there may be more than one explanation for the same name. This family name is a toponymic (derived from a geographic name of a town, city, region or country). Surnames that are based on place names do not always testify to direct origin from that place, but may indicate an indirect relation between the name-bearer or his ancestors and the place, such as birth place, temporary residence, trade, or family-relatives.  The family name Edrehy is associated with the town of Der'a (Draa) in the province of Draa, south Morocco.  This entire area is one of the oldest sites of Jewish settlement in North Africa, dating from well before the Arab invasions.  The name (and variants) is recorded as a Jewish family name in the following examples:  in the 9th century, Mosheh Ha-Rofe Ben Abraham Edery, who was born in Draa, was a renowned Karaite poet; in the 13th century, Isaac Daray, and his son Jacob, of Barcelona, Spain, are mentioned in a legal document issued by Don Pedro III King of Aragon, dated October 14, 1285; in the 17th century, Mosheh Ben Khoulief Edery was a rabbi in Debdou, Morocco (1607); in the 18th century, Abraham Bar Messod Edery (born 1771?) was a rabbi in Baizza, a village near Marrakech, Morocco; Rabbi Mosheh de Isaac Edrehi from Mogador, Morocco, was a prolific author, kabbalist and professor of languages at Etz Hayyim school in London, England (1792) and in the high school of the Sephardi community of Amsterdam, Holland; Reuben Edery was a rabbi and 'dayan' (\"religious judge\") in Tetouan, Morocco, in 19th century; Rabbi David Edery from Morocco was member of the rabbinical tribunal of Safed, Eretz Israel. His name is mentioned in the introduction to 'Vayomer Yitshak' by Rabbi Isaac Benghalid (1872); David Edery (died 1963 in Tangiers, Morocco) was head of the graduates association of Alliance Israelite.  In the 20th century, Dari is documented with the Israeli Knesset member Rafael Edry, born 1937 in Casablanca, Morocco; and with Arye Machluf Dari, Knesset member during the 1990s and head of the Shas movement.  In the 20th century, Edery is recorded as a Jewish family name with Albert, Marcel, Mordechai, Nissim, Rosa, Annete and Haim Edery, who died in the tragic Egoz incident. The ship Egoz, carrying immigrants from Morocco to Israel, had been chartered by the Jewish underground in Morocco. It sank with the loss of 44 passengers on January 10, 1961.",
+            "He" : "DARI, DERI, DEREHA, EDRY, EDERY, EDREHY\r\n\r\nשמות משפחה נובעים מכמה מקורות שונים. לעיתים לאותו שם קיים יותר מהסבר אחד. שם משפחה זה הוא מסוג השמות הטופונימיים (שם הנגזר משם של מקום כגון עיירה, עיר, מחוז או ארץ). שמות אלו, אשר נובעים משמות של מקומות, לא בהכרח מעידים על קשר היסטורי ישיר לאותו מקום, אבל יכולים להצביע על קשר בלתי ישיר בין נושא השם או אבותיו לבין מקום לידה, מגורים ארעיים, אזור מסחר או קרובי משפחה.  שם המשפחה אדרעי קשור בשמה של העיירה דרעה, במחוז דרעה, דרום מרוקו.\r\n\r\nאיזור זה הוא אחד המקומות העתיקים להתיישבות יהודית בצפון אפריקה, זמן רב לפני הכיבוש הערבי.  שם משפחה זה וצורותיו מתועדים כשמות משפחה יהודיים בדוגמאות הבאות:  במאה ה-9, משה הרופא בן אברהם אדרעי, אשר נולד בדרע, היה פייטן קראי מפורסם; במאה ה-13, יצחק דראי ובנו יעקוב מברצלוניה, ספרד, מוזכרים במסמך משפטי של דון פדרו ה-3, מלך ארגון, מ-14 באוקטובר 1285; במאה ה-17, משה בן חוליאף אדרי שימש כרב בדבדו, מרוקו (1607); במאה ה-18, אברהם בר מסעוד אדרעי (נולד ב-1771?) שימש כרב בכפר באיזה ליד מרקש, מרוקו;  הרב משה דה יצחק אדרהי ממוגדור, מרוקו, היה מקובל, סופר פורה ומורה לשפות בבית הספר \"עץ חיים\" בלונדון, אנגליה (1792) ובבית הספר של הקהילה הספרדית באמסטרדם, הולנד; הרב ראובן אדרעי היה דיין בטטואן, מרוקו, במאה ה-19; הרב דויד אדרעי ממרוקו היה דיין בבית הדין של צפת, ארץ ישראל: שמו מוזכר במבוא לספר \"ויאמר יצחק\" מאת הרב יצחק בנגליד (1872); דויד אדרעי (נפטר בטנג'יר, מרוקו, בשנת 1963) שימש כיו\"ר אגודת בוגרי בית הספר \"כל ישראל חברים\" (\"כי\"ח\").\r\n\r\nבמאה ה-20, Dari מתועד  עם ח\"כ רפאל אדרעי (נולד בקסבלנקה, מרוקו, בשנת 1937); ועם ח\"כ אריה מחלוף דרעי, יו\"ר תנועת ש\"ס בשנות ה-1990.\r\n\r\nבמאה ה-20, אדרעי מתועד כשם משפחה יהודי עם אלברט, מסל, מרדכי, נסים, רוזה, אנט וחיים אדרעי, אשר נספו  באסון אניית \"אגוז\".  האוניה \"אגוז\", אשר אורגנה ע\"י המחתרת הציונית במרוקו, הייתה ברכה לישראל עם עולים ממרוקו. האניה \"אגוז\" טבעה בים התיכון ב-10 בינואר 1961 -44 עולים מצאו את מותם באירוע טרגי זה."
+          },
+          "UnitText2" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitPlaces" : [ ],
+          "DisplayStatusDesc" : "Museum only",
+          "PrevPictureFileNames" : None,
+          "RightsCode" : 1,
+          "UnitId" : 77323,
+          "IsValueUnit" : True,
+          "StatusDesc" : "Completed",
+          "UserLexicon" : None,
+          "Attachments" : [ ],
+          "Slug" : {
+            "En" : "familyname_edrehy",
+            "He" : "שםמשפחה_אדרהי"
+          },
+          "Header" : {
+            "En" : "EDREHY",
+            "He" : "אדרהי",
+
+              "En_lc": "edrehy",
+              "He_lc": "אדרהי"
+          },
+          "ForPreview" : False,
+          "Id" : 341018
+        }
+
+PERSONALITIES_DAVIDOV = {
+          "PeriodDateTypeDesc" : {
+            "En" : "Date|Date|",
+            "He" : "תאריך מדויק|תאריך מדויק|"
+          },
+          "FirstName" : {
+            "He" : "Karl Yulyevich"
+          },
+          "Title" : {
+            "He" : "Cellist"
+          },
+          "LocationInMuseum" : None,
+          "Pictures" : [ ],
+          "PictureUnitsIds" : None,
+          "related" : [
+            "place_st-petersburg-leningrad-petrograd",
+            "place_moscow",
+            "place_kuldiga-goldingen"
+          ],
+          "Expr2" : "דוידוב",
+          "Expr1" : "קרל יולייביץ'",
+          "UpdateDate" : "2015-02-05T09:04:00",
+          "OldUnitId" : "1497",
+          "IsMainCreatorType" : "1|0|",
+          "PersonTypeCodesDesc" : {
+            "En" : "צ'לן|מלחין|",
+            "He" : "Cellist|Composer|"
+          },
+          "NickName" : {
+            "He" : None
+          },
+          "id" : 240792,
+          "UpdateUser" : "simona",
+          "UnitDisplayStatus" : 2,
+          "UnitText2" : {
+            "En" : None,
+            "He" : None
+          },
+          "PrevPicturePaths" : None,
+          "TS" : "\u0000\u0000\u0000\u0000\u00004ٓ",
+          "FamilyNameIds" : None,
+          "UnitPlaces" : [
+            {
+              "PlaceIds" : "70751"
+            },
+            {
+              "PlaceIds" : "70910"
+            },
+            {
+              "PlaceIds" : "72071"
+            },
+            {
+              "PlaceIds" : "73578"
+            }
+          ],
+          "PictureSources" : None,
+          "UnitTypeDesc" : "Personality",
+          "PeriodStartDate" : "18380315|18890226|",
+          "Slug" : {
+            "En" : "luminary_davydov-karl-yulyevich",
+            "He" : "אישיות_דוידוב-קרל-יולייביץ"
+          },
+          "PeriodDateTypeCode" : "2|2|",
+          "RightsDesc" : "Full",
+          "Bibiliography" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitText1" : {
+            "En" : "Davydov, Karl Yulyevich (1838-1889) , cellist and composer. Born in Goldingen, Kurland (Latvia) (then part of the Russian Empire), he first studied mathematics at Moscow University and graduated in 1858. Between 1859-1862 he lived in Leipzig, Germany, where he performed as soloist, chamber musician and principle cellist of the Gewandhaus Orchestra, and taught at the Leipzig Conservatory. In 1862 he returned to Russia, became director of the St. Petersburg Conservatory (1876-1887) and joined the quartet of the Russian Music Society, with Leopold Auer as his partner. He eventually succeeded Anton Rubinstein as conductor of the conservatory’s orchestra, with which he traveled extensively on concert tours abroad. Davydov’s works include many compositions for the cello. He died in Moscow, Russia.",
+            "He" : "דוידוב, קרל יולייביץ' (1838-1889) , צ'לן ומלחין. נולד בגולדינגן, קורלנד (לטביה). השלים לימודי מתמטיקה באוניברסיטה של מוסקבה ב-1858. בשנים 1862-1859 התגורר בלייפציג, הופיע כסולן, ניגן בתזמורת הקאמרית והיה צ'לן ראשי של תזמורת הגוואנדהאוס. כמו כן, לימד בקונסרבטוריון של לייפציג. ב-1862 חזר לרוסיה ומונה למנהל הקונסרבטוריון של סנט פטרסבורג (1887-1876) והצטרף לרביעיית האגודה למוסיקה רוסית, שבמסגרתה ניגן יחד עם ליאופולד אאואר. דוידוב ירש את מקומו של אנטון רובינשטיין כמנצח התזמורת של הקונסרבטוריון, ואתה יצא למסע הופעות נרחב בחו\"ל. בין יצירותיו, יצירות רבות לצ'לו. הוא נפטר במוסקבה, רוסיה."
+          },
+          "PersonTypeIds" : "1|2|",
+          "MiddleName" : {
+            "He" : None
+          },
+          "UnitStatus" : 3,
+          "LastName" : {
+            "He" : "Davydov"
+          },
+          "PeriodDesc" : {
+            "En" : "15/03/1838|26/02/1889|",
+            "He" : "15/03/1838|26/02/1889|"
+          },
+          "PersonTypeCodes" : "130|140|",
+          "PrevPictureFileNames" : None,
+          "RightsCode" : 1,
+          "PeriodTypeCode" : "1|2|",
+          "UnitId" : 93968,
+          "IsValueUnit" : True,
+          "StatusDesc" : "Completed",
+          "DisplayStatusDesc" : "Museum only",
+          "UserLexicon" : None,
+          "EditorRemarks" : "Music - Persons",
+          "Attachments" : [ ],
+          "PeriodEndDate" : "18380315|18890226|",
+          "PeriodNum" : "1|2|",
+          "UnitType" : 8,
+          "OtherNames" : {
+            "He" : None
+          },
+          "Header" : {
+            "En" : "Davydov, Karl Yulyevich",
+            "He" : "דוידוב, קרל יולייביץ'",
+
+              "En_lc": "davydov, karl yulyevich",
+              "He_lc": "דוידוב, קרל יולייביץ'"
+          },
+          "PeriodTypeDesc" : {
+            "En" : "Date of birth|Date of death|",
+            "He" : "לידה|פטירה|"
+          },
+          "PersonalityId" : 93968,
+          "ForPreview" : False
+        }
+
+PERSONALITIES_FERDINAND = {
+          "PeriodDateTypeDesc" : {
+            "En" : "Date|Date|",
+            "He" : "תאריך מדויק|תאריך מדויק|"
+          },
+          "FirstName" : {
+            "He" : "Ferdinand"
+          },
+          "Title" : {
+            "He" : "Violinist"
+          },
+          "LocationInMuseum" : None,
+          "Pictures" : [ ],
+          "PictureUnitsIds" : None,
+          "related" : [
+            "place_hamburg"
+          ],
+          "Expr2" : "דוד",
+          "Expr1" : "פרדיננד",
+          "UpdateDate" : "2015-02-05T09:02:00",
+          "OldUnitId" : "1496",
+          "IsMainCreatorType" : "0|1|",
+          "PersonTypeCodesDesc" : {
+            "En" : "מלחין|כנר|",
+            "He" : "Composer|Violinist|"
+          },
+          "NickName" : {
+            "He" : None
+          },
+          "id" : 240790,
+          "UpdateUser" : "simona",
+          "UnitDisplayStatus" : 2,
+          "UnitText2" : {
+            "En" : None,
+            "He" : None
+          },
+          "PrevPicturePaths" : None,
+          "TS" : "\u0000\u0000\u0000\u0000\u00004ك",
+          "FamilyNameIds" : None,
+          "UnitPlaces" : [
+            {
+              "PlaceIds" : "71540"
+            },
+            {
+              "PlaceIds" : "98670"
+            }
+          ],
+          "PictureSources" : None,
+          "UnitTypeDesc" : "Personality",
+          "PeriodStartDate" : "18100119|18730714|",
+          "Slug" : {
+            "En" : "luminary_david-ferdinand",
+            "He" : "אישיות_דוד-פרדיננד"
+          },
+          "PeriodDateTypeCode" : "2|2|",
+          "RightsDesc" : "Full",
+          "Bibiliography" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitText1" : {
+            "En" : "David, Ferdinand (1810-1873) , violinist and composer. Born in Hamburg, Germany, the son of a wealthy merchant, he studied with the best violin teachers. In 1835 he was appointed concertmaster of the Leipzig Gewandhaus Orchestra under Mendelssohn, who was his life-long friend. In 1845 he premiered Mendelssohn’s Violin Concerto in Leipzig. From 1843 he taught violin at the Leipzig Academy. Among his students were A.Wilhelm and  J. Joachim. David’s compositions include 5 violin concertos, 2 symphonies, the opera HANS WACHT (1852), works for violin and songs. He also arranged several works by J.S.Bach. Ferdinand David died in Klosters, Switzerland. jews",
+            "He" : "דוד, פרדיננד (1810-1873) , כנר ומלחין. נולד בהמבורג, גרמניה, כבנו של סוחר עשיר ולמד אצל טובי המורים לכינור. ב-1835 מונה למנהל הקונצרטים של תזמורת הגוואנדהאוס בלייפציג בניצוחו של מנדלסון, שהיה חברו במשך כל חייו. ב-1845 ביצע לראשונה בלייפציג את הקונצ'רטו לכינור מאת מנדלסון. מ-1843 לימד דוד כינור באקדמיה של לייפציג. עם תלמידיו נמנו א' וילהלמי ויוסף יואכים. דוד הלחין, בין היתר, חמישה קונצרטים לכינור, שתי סימפוניות, את האופרה הנס ואכט (1853), יצירות לכינור ושירים. כמו כן, ערך יצירות אחדות מאת יוהן סבסטיאן באך. נפטר בקלוסטר, שווייץ. יהודים"
+          },
+          "PersonTypeIds" : "1|2|",
+          "MiddleName" : {
+            "He" : None
+          },
+          "UnitStatus" : 3,
+          "LastName" : {
+            "He" : "David"
+          },
+          "PeriodDesc" : {
+            "En" : "19/01/1810|14/07/1873|",
+            "He" : "19/01/1810|14/07/1873|"
+          },
+          "PersonTypeCodes" : "140|248|",
+          "PrevPictureFileNames" : None,
+          "RightsCode" : 1,
+          "PeriodTypeCode" : "1|2|",
+          "UnitId" : 93967,
+          "IsValueUnit" : True,
+          "StatusDesc" : "Completed",
+          "DisplayStatusDesc" : "Museum only",
+          "UserLexicon" : None,
+          "EditorRemarks" : "Music - Persons",
+          "Attachments" : [ ],
+          "PeriodEndDate" : "18100119|18730714|",
+          "PeriodNum" : "1|2|",
+          "UnitType" : 8,
+          "OtherNames" : {
+            "He" : None
+          },
+          "Header" : {
+            "En" : "David, Ferdinand",
+            "He" : "דוד, פרדיננד",
+              "En_lc": "david, ferdinand",
+              "He_lc": "דוד, פרדיננד"
+          },
+          "PeriodTypeDesc" : {
+            "En" : "Date of birth|Date of death|",
+            "He" : "לידה|פטירה|"
+          },
+          "PersonalityId" : 93967,
+          "ForPreview" : False
+        }
+
+MOVIES_MIDAGES = {
+          "ReceiveDate" : None,
+          "RelatedSources" : None,
+          "VersionTypeCode" : "1|",
+          "MovieReceiveTypeDescHebrew" : "הפקת בית התפוצות",
+          "LocationInMuseum" : None,
+          "Pictures" : [
+            {
+              "PictureId" : "F11D8D91-B6F1-4693-AAE1-CC74F673F96A",
+              "IsPreview" : "1"
+            }
+          ],
+          "PictureUnitsIds" : "1620|",
+          "ColorDesc" : {
+            "En" : None,
+            "He" : None
+          },
+          "VersionLanguageDesc" : "Hebrew|",
+          "UpdateDate" : "2013-10-21T12:31:00",
+          "OldUnitId" : "664000001047",
+          "id" : 262367,
+          "IsPrimaryVersion" : "0|",
+          "UpdateUser" : "simona",
+          "UnitDisplayStatus" : 2,
+          "MoviePath" : "Movies\\B39_h_crop.mpg",
+          "PrevPicturePaths" : "Photos\\00000444.scn\\00112000.JPG|",
+          "LanguageId" : "1|",
+          "TS" : "00000000001748a0",
+          "VersionLanguageHebDesc" : "עברית|",
+          "CatalogCodes" : "B39_h|",
+          "UnitType" : 9,
+          "ProductionYear" : None,
+          "MovieVersionTypeDescEnglish" : "Hebrew|",
+          "UnitTypeDesc" : "Film",
+          "RelatedExhibitions" : None,
+          "EditorRemarks" : "Hasavot - Movies",
+          "RelatedPlaces" : "66070|66654|113054|",
+          "DisplayStatusDesc" : "Museum only",
+          "RightsDesc" : "Full",
+          "FormatDesc" : "Beta-SP-PAL|",
+          "Bibiliography" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitText1" : {
+            "En" : "The story of the three main Jewish communities in the Middle-Ages:\nThe Jews of Babylonia and Their Spiritual Contribution; \nThe Jews of Spain from Peak to Decline ; \nThe Jews of Ashkenaz in the Shadow of the Cross\n",
+            "He" : " סיפורם של שלוש הקהילות הגדולות בימי הביניים.\nיהודי בבל ויצירתם הרוחנית; \nיהודי ספרד -בין גאות ושפל; \nיהודי אשכנז בצל הצלב\n\t"
+          },
+          "UnitText2" : {
+            "En" : None,
+            "He" : None
+          },
+          "SectionHeader" : None,
+          "UnitPlaces" : [ ],
+          "MovieVersionTypeDescHebrew" : "עברית |",
+          "UnitStatus" : 3,
+          "SectionEndMinute" : None,
+          "FormatId" : "1|",
+          "PrevPictureFileNames" : "00112000.JPG|",
+          "RightsCode" : 1,
+          "UnitId" : 111554,
+          "SectionStartMinute" : None,
+          "IsValueUnit" : True,
+          "StatusDesc" : "Completed",
+          "Minutes" : 30,
+          "RelatedPersonalitys" : None,
+          "MovieFileId" : "d2c835aa-db76-4311-a006-9dace4618b92",
+          "UserLexicon" : "56319|56423|93507|93518|93586|",
+          "Attachments" : [ ],
+          "MovieReceiveTypeDescEnglish" : "Beth Hatefutsoth Production",
+          "ColorType" : None,
+          "ProductionCompany" : {
+            "En" : "Beth Hatefutsoth",
+            "He" : "בית התפוצות"
+          },
+          "SectionId" : None,
+          "DistributionCompany" : {
+            "En" : None,
+            "He" : None
+          },
+          "Slug" : {
+            "En" : "video_jewish-communities-in-the-middle-ages-babylonia-spain-ashkenaz-hebrew",
+            "He" : "וידאו_קהילות-יהודיות-בימי-הביניים-בבל-ספרד-אשכנז-עברית"
+          },
+          "Header" : {
+            "En" : "Jewish Communities in the Middle Ages: Babylonia; Spain; Ashkenaz (Hebrew)",
+            "He" : "קהילות יהודיות בימי הביניים:  בבל; ספרד; אשכנז (עברית)"
+          },
+          "VersionId" : "1|",
+          "FormatCode" : "1|",
+          "RelatedPics" : "1620|",
+          "MovieFileName" : "B39_h.mpg",
+          "ForPreview" : False,
+          "ReceiveType" : 4
+        }
+
+MOVIES_SPAIN = {
+          "ReceiveDate" : None,
+          "RelatedSources" : None,
+          "VersionTypeCode" : "2|",
+          "MovieReceiveTypeDescHebrew" : "הפקת בית התפוצות",
+          "LocationInMuseum" : None,
+          "Pictures" : [
+            {
+              "PictureId" : "0249382A-4DEC-44E2-A36F-6A65549E6D33",
+              "IsPreview" : "1"
+            }
+          ],
+          "PictureUnitsIds" : "552|",
+          "ColorDesc" : {
+            "En" : None,
+            "He" : None
+          },
+          "VersionLanguageDesc" : "English|",
+          "UpdateDate" : "2013-10-21T12:31:00",
+          "OldUnitId" : "664000001046",
+          "id" : 262366,
+          "IsPrimaryVersion" : "0|0|",
+          "UpdateUser" : "simona",
+          "UnitDisplayStatus" : 2,
+          "MoviePath" : "Movies\\B38_e_crop.mpg",
+          "PrevPicturePaths" : "Photos\\00000706.scn\\00004600.JPG|",
+          "LanguageId" : "0|",
+          "TS" : "000000000017489c",
+          "VersionLanguageHebDesc" : "אנגלית|",
+          "CatalogCodes" : "B38_e||",
+          "UnitType" : 9,
+          "ProductionYear" : 1992,
+          "MovieVersionTypeDescEnglish" : "English|",
+          "UnitTypeDesc" : "Film",
+          "RelatedExhibitions" : None,
+          "EditorRemarks" : "Hasavot - Movies",
+          "RelatedPlaces" : "113054|",
+          "DisplayStatusDesc" : "Museum only",
+          "RightsDesc" : "Full",
+          "FormatDesc" : "Beta-SP-PAL|Beta-SP-NTSC|",
+          "Bibiliography" : {
+            "En" : None,
+            "He" : None
+          },
+          "UnitText1" : {
+            "En" : "Jewish life in medieval Spain as depicted in Jewish illuminated manuscripts of the time. \nProduced in 1992",
+            "He" : "אורחות חיים של היהודים בספרד בימי הביניים, כפי שבאים לידי ביטוי באיורים של כתבי יד מהתקופה. \nהופק ב – 1992. יהודים"
+          },
+          "UnitText2" : {
+            "En" : None,
+            "He" : None
+          },
+          "SectionHeader" : None,
+          "UnitPlaces" : [ ],
+          "MovieVersionTypeDescHebrew" : "אנגלית|",
+          "UnitStatus" : 3,
+          "SectionEndMinute" : None,
+          "FormatId" : "1|2|",
+          "PrevPictureFileNames" : "00004600.JPG|",
+          "RightsCode" : 1,
+          "UnitId" : 111553,
+          "SectionStartMinute" : None,
+          "IsValueUnit" : True,
+          "StatusDesc" : "Completed",
+          "Minutes" : 8,
+          "RelatedPersonalitys" : None,
+          "MovieFileId" : "47403d87-9271-4ec8-b879-b7cde2ba8f91",
+          "UserLexicon" : "49342|49387|49388|",
+          "Attachments" : [ ],
+          "MovieReceiveTypeDescEnglish" : "Beth Hatefutsoth Production",
+          "ColorType" : None,
+          "ProductionCompany" : {
+            "En" : "Beth Hatefutsoth",
+            "He" : "בית התפוצות"
+          },
+          "SectionId" : None,
+          "DistributionCompany" : {
+            "En" : None,
+            "He" : None
+          },
+          "Slug" : {
+            "En" : "video_living-moments-in-jewish-spain-english",
+            "He" : "וידאו_רגעים-עם-יהודי-ספרד-אנגלית"
+          },
+          "Header" : {
+            "En" : "Living Moments in Jewish Spain (English)",
+            "He" : "רגעים עם יהודי ספרד (אנגלית)"
+          },
+          "VersionId" : "1|",
+          "FormatCode" : "1|2|",
+          "RelatedPics" : "552|",
+          "MovieFileName" : "B38_e.mpg",
+          "ForPreview" : False,
+          "ReceiveType" : 4
+        }
