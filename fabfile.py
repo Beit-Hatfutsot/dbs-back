@@ -40,14 +40,13 @@ def deploy():
     push_code()
     restart()
 
-def deploy_migrate():
+def deploy_migrate(reset_requirements=False):
     cur_date = run("date +%d.%m.%y-%H:%M:%S")
-    if files.exists("api/env"):
+    if files.exists("api/env") and not reset_requirements:
         api_env_backup_path="/tmp/api-env-{}".format(cur_date)
         run("cp -r api/env/ {}/".format(api_env_backup_path))
     else:
         api_env_backup_path=None
-    print("api_env_backup_path={}".format(api_env_backup_path))
     push_code(virtualenv=False, requirements=False, cur_date=cur_date)
     with cd("api"):
         if api_env_backup_path:
