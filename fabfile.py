@@ -19,7 +19,7 @@ def push_code(rev='HEAD', virtualenv=True, requirements=True, cur_date=None):
         cur_date = run("date +%d.%m.%y-%H:%M:%S")
     local('git archive -o /tmp/api.tar.gz '+rev)
     put('/tmp/api.tar.gz', '/tmp')
-    run('mv api /tmp/api-{}'.format(cur_date))
+    run('mv api /tmp/latest-api-{}'.format(cur_date))
     run('mkdir api')
     with cd("api"):
         run('tar xzf /tmp/api.tar.gz')
@@ -29,6 +29,8 @@ def push_code(rev='HEAD', virtualenv=True, requirements=True, cur_date=None):
         if requirements:
             with prefix('. env/bin/activate'):
                 run('pip install -r requirements.txt')
+    run('rm -f /tmp/api-*')
+    run('mv /tmp/latest-api-{} /tmp/api-{}'.format(cur_date, cur_date))
 
 def push_conf():
     with cd("api"):
