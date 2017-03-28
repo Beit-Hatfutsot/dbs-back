@@ -30,10 +30,10 @@ def get_show_metadata(doc):
 
 def doc_show_filter(doc):
     show_metadata = get_show_metadata(doc)
-    return ((show_metadata['StatusDesc'] == 'Completed'
-             and show_metadata['RightsDesc'] == 'Full'
-             and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
-                                                                                 and show_metadata["UnitText1"].get("He")))
+    return bool((show_metadata['StatusDesc'] == 'Completed'
+                 and show_metadata['RightsDesc'] == 'Full'
+                 and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
+                                                                                     and show_metadata["UnitText1"].get("He")))
 
 
 class Slug:

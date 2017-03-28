@@ -26,6 +26,26 @@ THE_TESTER = {
     'DisplayStatusDesc':  'free',
 }
 
+
+class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
+    def _parse_args(self):
+        return type("MockArgs", (object,), {"key": None,
+                                            "collection": None,
+                                            "debug": True,
+                                            "add_to_es": True})
+
+
+def given_ensure_required_metadata_ran(app):
+    MockEnsureRequiredMetadataCommand(app=app).main()
+    app.es.indices.refresh(app.es_data_db_index_name)
+
+
+def es_search(app, collection_name, query):
+    return [h["_source"] for h in app.es.search(index=app.es_data_db_index_name,
+                                                doc_type=collection_name, q=query)["hits"]["hits"]]
+
+
+
 def test_update_doc(mocker, app):
     ''' This function tests the simplest case for
         migration.tasks.update_doc function
@@ -164,19 +184,34 @@ def test_update_place(mocker, app):
 def test_ensure_metadata(app, mock_db):
     app.data_db = mock_db
     given_local_elasticsearch_client_with_test_data(app)
-    search = lambda q: [h["_source"] for h in app.es.search(index=app.es_data_db_index_name, doc_type="personalities", q=q)["hits"]["hits"]]
-    assert search("UnitId:1") == []
-    class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
-        def _parse_args(self):
-            return type("MockArgs", (object,), {"key": None,
-                                                "collection": None,
-                                                "debug": True,
-                                                "add_to_es": True})
-    MockEnsureRequiredMetadataCommand(app=app).main()
-    app.es.indices.refresh(app.es_data_db_index_name)
-    assert search("UnitId:1") == [{u'DisplayStatusDesc': u'free',
-                                   u'RightsDesc': u'Full',
-                                   u'Slug': {u'En': u'personality_tester', u'He': u'\u05d0\u05d9\u05e9\u05d9\u05d5\u05ea_\u05d1\u05d5\u05d3\u05e7'},
-                                   u'StatusDesc': u'Completed',
-                                   u'UnitId': 1,
-                                   u'UnitText1': {u'En': u'tester', u'He': u'\u05d1\u05d5\u05d3\u05e7'}}]
+    assert es_search(app, "personalities", "UnitId:1") == []
+    assert es_search(app, "personalities", "UnitId:2") == []
+    assert es_search(app, "places", "UnitId:3") == []
+    given_ensure_required_metadata_ran(app)
+    # new item in mongo - added to ES (because add_to_es parameter is enabled in these tests)
+    assert es_search(app, "personalities", "UnitId:1") == [{u'DisplayStatusDesc': u'free',
+                                                            u'RightsDesc': u'Full',
+                                                            u'Slug': {u'En': u'personality_tester',
+                                                                      u'He': u'\u05d0\u05d9\u05e9\u05d9\u05d5\u05ea_\u05d1\u05d5\u05d3\u05e7'},
+                                                            u'StatusDesc': u'Completed',
+                                                            u'UnitId': 1,
+                                                            u'UnitText1': {u'En': u'tester',
+                                                                           u'He': u'\u05d1\u05d5\u05d3\u05e7'}}]
+    # modifying slug in mongo - should update slug in ES
+    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:2")] == ["personality_another-tester"]
+    mock_db["personalities"].update_one({"UnitId": 2}, {"$set": {"Slug.En": "personality_another-tester-modified"}})
+    given_ensure_required_metadata_ran(app)
+    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:2")] == ["personality_another-tester-modified"]
+    # changing item rights in ES - will fix them when updating from mongo
+    app.es.update(index=app.es_data_db_index_name, doc_type="places", id=3, body={"doc": {"StatusDesc": "PARTIAL"}})
+    app.es.indices.refresh()
+    assert [h["StatusDesc"] for h in es_search(app, "places", "UnitId:3")] == ["PARTIAL"]
+    given_ensure_required_metadata_ran(app)
+    assert [h["StatusDesc"] for h in es_search(app, "places", "UnitId:3")] == ["Completed"]
+    # setting item rights to private - should delete item in ES
+    assert len(es_search(app, "places", "UnitId:3")) == 1
+    mock_db["places"].update_one({"UnitId": 3}, {"$set": {"StatusDesc": "PRIVATE"}})
+    given_ensure_required_metadata_ran(app)
+    assert len(es_search(app, "places", "UnitId:3")) == 0
+
+

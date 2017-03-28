@@ -51,8 +51,8 @@ class EnsureRequiredMetadataCommand(object):
                 # need to copy the relevant metadata for deciding whether to show the item
                 updates.update(get_show_metadata(src_item))
         if len(updates) > 0:
-            es_item["_source"].update(updates)
-            self.app.es.update(index=self.app.es_data_db_index_name, doc_type=collection_name, id=es_item["_id"], body=es_item["_source"])
+            self.app.es.update(index=self.app.es_data_db_index_name, doc_type=collection_name,
+                               id=es_item["_id"], body={"doc": updates})
             return self.UPDATED_METADATA, "updated {} keys in elasticsearch ({}={})".format(len(updates), id_field, item_key)
         else:
             return self.NO_UPDATE_NEEDED, "item has correct metadata, no update needed: ({}={})".format(id_field, item_key)
