@@ -44,7 +44,7 @@ def test_update_doc(mocker, app):
             body = body,
             doc_type = 'personalities',
             id=doc['_id'],
-            index = 'db',
+            index = 'bhdata',
         )
         assert doc['related'] == ['place_some']
 
@@ -63,7 +63,7 @@ def test_updated_doc(mocker, app):
             body = es_body,
             doc_type = 'personalities',
             id=id,
-            index = 'db',
+            index = 'bhdata',
         )
         elasticsearch.Elasticsearch.index.reset_mock()
         updated_tester = THE_TESTER.copy()
@@ -76,7 +76,7 @@ def test_updated_doc(mocker, app):
             body = updated_tester,
             doc_type = 'personalities',
             id=id,
-            index = 'db',
+            index = 'bhdata',
         )
 
 def test_update_photo(mocker):

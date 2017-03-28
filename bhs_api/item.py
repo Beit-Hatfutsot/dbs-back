@@ -427,3 +427,5 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
                 del item['_id']
                 es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=item)
                 return True, "indexed successfully, by resorting to ES index function for {}:{} with {}".format(collection_name, doc_id, e)
+    else:
+        return True, "item should not be shown - so not indexed"
