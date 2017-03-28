@@ -18,9 +18,9 @@ class EnsureRequiredMetadataCommand(object):
     DELETED_ITEM = 3
     NO_UPDATE_NEEDED = 4
 
-    def __init__(self):
+    def __init__(self, app=None):
         self.args = self._parse_args()
-        self.app, self.conf = create_app()
+        self.app, self.conf = create_app() if not app else (app, app.conf)
 
     def _parse_args(self):
         parser = ArgumentParser()

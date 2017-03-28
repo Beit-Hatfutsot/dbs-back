@@ -4,6 +4,8 @@ import elasticsearch
 import requests
 from migration.tasks import update_doc, update_tree
 from migration.files import upload_file
+from test_search import given_local_elasticsearch_client_with_test_data
+from scripts.ensure_required_metadata import EnsureRequiredMetadataCommand
 
 first_tree = dict(num=100,
                     file_id='1',
@@ -157,3 +159,24 @@ def test_update_place(mocker, app):
 
     doc =  collection.find_one({'UnitId':2000})
     assert doc['geometry'] == 'geo'
+
+
+def test_ensure_metadata(app, mock_db):
+    app.data_db = mock_db
+    given_local_elasticsearch_client_with_test_data(app)
+    search = lambda q: [h["_source"] for h in app.es.search(index=app.es_data_db_index_name, doc_type="personalities", q=q)["hits"]["hits"]]
+    assert search("UnitId:1") == []
+    class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
+        def _parse_args(self):
+            return type("MockArgs", (object,), {"key": None,
+                                                "collection": None,
+                                                "debug": True,
+                                                "add_to_es": True})
+    MockEnsureRequiredMetadataCommand(app=app).main()
+    app.es.indices.refresh(app.es_data_db_index_name)
+    assert search("UnitId:1") == [{u'DisplayStatusDesc': u'free',
+                                   u'RightsDesc': u'Full',
+                                   u'Slug': {u'En': u'personality_tester', u'He': u'\u05d0\u05d9\u05e9\u05d9\u05d5\u05ea_\u05d1\u05d5\u05d3\u05e7'},
+                                   u'StatusDesc': u'Completed',
+                                   u'UnitId': 1,
+                                   u'UnitText1': {u'En': u'tester', u'He': u'\u05d1\u05d5\u05d3\u05e7'}}]
