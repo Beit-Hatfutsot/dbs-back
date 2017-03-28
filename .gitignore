@@ -12,3 +12,4 @@ dump/
 /pytestdebug.log
 /.eggs
 /*.egg-info
+nohup.out
