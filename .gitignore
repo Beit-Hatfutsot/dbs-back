@@ -13,3 +13,4 @@ dump/
 /.eggs
 /*.egg-info
 nohup.out
+error.log
