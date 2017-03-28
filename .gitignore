@@ -14,3 +14,5 @@ dump/
 /*.egg-info
 nohup.out
 error.log
+htmlcov
+.coverage
