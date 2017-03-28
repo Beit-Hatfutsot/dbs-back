@@ -10,3 +10,6 @@ dump/
 /.ipynb_checkpoints
 /*.ipynb
 /pytestdebug.log
+/.eggs
+/*.egg-info
+nohup.out
