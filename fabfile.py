@@ -43,7 +43,7 @@ def deploy():
     restart()
 
 @hosts('bhs-infra')
-def deploy_migrate(reset_requirements=False):
+def deploy_infra(reset_requirements=False):
     cur_date = run("date +%d.%m.%y-%H:%M:%S")
     if files.exists("api/env") and not reset_requirements:
         api_env_backup_path="/tmp/env-api-{}".format(cur_date)
