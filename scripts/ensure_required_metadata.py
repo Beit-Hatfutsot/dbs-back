@@ -108,10 +108,18 @@ class EnsureRequiredMetadataCommand(object):
         else:
             raise Exception("invalid item key")
 
-    def _process_collection(self, collection_name):
-        self._info("processing collection {}".format(collection_name))
+    def _process_collection(self, collection_name, key):
+        if key:
+            self._info("processing collection {} key {}".format(collection_name, key))
+        else:
+            self._info("processing collection {}".format(collection_name))
         errors, num_processed_keys, num_actions = [], 0, {}
-        for item in self.app.data_db[collection_name].find():
+        if key:
+            items = self.app.data_db[collection_name].find({get_collection_id_field(collection_name): key})
+        else:
+            items = self.app.data_db[collection_name].find()
+        item = None
+        for item in items:
             code, msg = self._process_item(collection_name, item)
             self._debug(msg)
             if code:
@@ -123,7 +131,10 @@ class EnsureRequiredMetadataCommand(object):
                 errors.append(msg)
                 sys.stdout.write("E")
                 sys.stdout.flush()
-        print("")
+        if item is None:
+            self._info("no items found in mongo")
+        else:
+            print("")
         self._info("total {} items were processed:".format(num_processed_keys+len(errors)))
         if len(errors) > 0:
             self._info("{} errors (see error.log for details)".format(len(errors)))
@@ -148,7 +159,7 @@ class EnsureRequiredMetadataCommand(object):
             raise Exception("cannot use key param without specifying a specific collection this key relates to")
         else:
             for collection_name in collection_names:
-                self._process_collection(collection_name)
+                self._process_collection(collection_name, key)
 
 
 if __name__ == '__main__':
