@@ -19,12 +19,9 @@ import boto
 import gcs_oauth2_boto_plugin
 from PIL import Image
 
-from bhs_api.utils import get_conf
+from bhs_api.utils import get_migrate_conf
 
-conf = get_conf(
-		set(['photos_bucket_name',
-                     'thumbnails_bucket_name']),
-               '/etc/bhs/migrate_config.yaml' )
+conf = get_migrate_conf(('photos_bucket_name', 'thumbnails_bucket_name'))
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)-15s %(message)s',

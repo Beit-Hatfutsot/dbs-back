@@ -21,6 +21,11 @@ from bson.binary import Binary, BINARY_SUBTYPE
 from werkzeug import Response
 
 DEFAULT_CONF_FILE = '/etc/bhs/app_server.yaml'
+DEFAULT_ENV_CONF_FILE = "/etc/bhs/app_server.yaml.{BH_ENV}"  # BH_ENV will be repalaced with the environment (dev|prd)
+
+DEFAULT_MIGRATE_CONF_FILE = "/etc/bhs/migrate_config.yaml"
+DEFAULT_ENV_MIGRATE_CONF_FILE = "/etc/bhs/migrate_config.yaml.{BH_ENV}"  # BH_ENV will be replaced with the environment (dev|prd)
+
 SEARCHABLE_COLLECTIONS = ('places',
                           'familyNames',
                           'photoUnits',
@@ -82,24 +87,31 @@ def get_oid(id_str):
         return None
 
 
+def get_migrate_conf(must_have_keys):
+    return get_conf(must_have_keys=must_have_keys, config_file=DEFAULT_MIGRATE_CONF_FILE, env_config_file=DEFAULT_ENV_MIGRATE_CONF_FILE, with_pardir_fallback=False)
+
+
 def get_conf(must_have_keys=DEAFULT_CONF_REQUIRED_KEYS,
-             config_file=DEFAULT_CONF_FILE):
+             config_file=DEFAULT_CONF_FILE,
+             env_config_file=DEFAULT_ENV_CONF_FILE,
+             with_pardir_fallback=True):
     ''' Read a configuration file, ensure all the `must_have_keys` are present
         and return a config dict.
         The file is read from `config_file` and if it's not there and it's a
         default request, `conf/app_server.yaml` is used.
     '''
-    try:
+    if os.path.exists(config_file):
+        # this will load either the default conf file if it exists or the given config_file parameter
         fh = open(config_file)
-    except IOError as e:
-        if config_file == DEFAULT_CONF_FILE:
-            fh = open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                os.pardir,
-                                                'conf',
-                                                'app_server.yaml'))
-        else:
-            raise e
-
+    elif os.environ.get("BH_ENV") and os.path.exists(env_config_file.format(BH_ENV=os.environ["BH_ENV"])):
+        # environment is set in BH_ENV and corresponding conf file exists
+        fh = open(env_config_file.format(BH_ENV=os.environ["BH_ENV"]))
+    elif with_pardir_fallback and os.path.exists(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, 'conf', 'app_server.yaml')):
+        # legacy fallback
+        # TODO: check if needed
+        fh = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, 'conf', 'app_server.yaml'))
+    else:
+        raise Exception("Could not find a conf file")
 
     conf = yaml.load(fh)
     if not conf:
