@@ -7,14 +7,33 @@ from flask import current_app
 from slugify import Slugify
 from bhs_api import phonetic
 from bhs_api.fsearch import clean_person
+from bhs_api.utils import uuids_to_str
 
-SHOW_FILTER = {
-                'StatusDesc': 'Completed',
-                'RightsDesc': 'Full',
-                'DisplayStatusDesc':  {'$nin': ['Internal Use']},
-                '$or':
-                    [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
-                }
+
+SHOW_FILTER = {'StatusDesc': 'Completed',
+               'RightsDesc': 'Full',
+               'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                                                                         {'UnitText1.He': {'$nin': [None, '']}}]}
+
+
+def get_show_metadata(doc):
+    if SHOW_FILTER != {'StatusDesc': 'Completed', 'RightsDesc': 'Full', 'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]}:
+        raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
+    else:
+        return {
+            "StatusDesc": doc.get('StatusDesc'),
+            "RightsDesc": doc.get('RightsDesc'),
+            "DisplayStatusDesc": doc.get("DisplayStatusDesc"),
+            "UnitText1": doc.get("UnitText1", {})
+        }
+
+
+def doc_show_filter(doc):
+    show_metadata = get_show_metadata(doc)
+    return bool((show_metadata['StatusDesc'] == 'Completed'
+                 and show_metadata['RightsDesc'] == 'Full'
+                 and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
+                                                                                     and show_metadata["UnitText1"].get("He")))
 
 
 class Slug:
@@ -375,3 +394,38 @@ def create_slug(document, collection_name):
                 slug = slugify('_'.join([collection_slug, val.lower()]))
                 ret[lang] = slug.encode('utf8')
     return ret
+
+def get_doc_id(collection_name, doc):
+    doc_id_field = get_collection_id_field(collection_name)
+    return doc.get(doc_id_field)
+
+
+def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db=None, app=None):
+    app = current_app if not app else app
+    es_index_name = app.es_data_db_index_name if not es_index_name else es_index_name
+    es = app.es if not es else es
+    data_db = app.data_db if not data_db else data_db
+    # index only the docs that are publicly available
+    if doc_show_filter(doc):
+        body = doc.copy()
+        if '_id' in body:
+            del body['_id']
+        doc_id = get_doc_id(collection_name, doc)
+        if is_new:
+            uuids_to_str(body)
+            es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
+            return True, "indexed successfully"
+        else:
+            try:
+                es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body={"doc": body})
+                return True, "indexed successfully"
+            except elasticsearch.exceptions.NotFoundError as e:
+                # So it's in the DB, passes the SHOW_FILTER and not found in ES
+                # weird, but that's what we have.
+                # let's index it.
+                item = data_db[collection_name].find_one({'_id': doc_id})
+                del item['_id']
+                es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=item)
+                return True, "indexed successfully, by resorting to ES index function for {}:{} with {}".format(collection_name, doc_id, e)
+    else:
+        return True, "item should not be shown - so not indexed"

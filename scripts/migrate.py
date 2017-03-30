@@ -19,25 +19,14 @@ from migration.migration_sqlclient import MigrationSQLClient
 from migration.tasks import update_row
 from migration.files import upload_photo
 from migration.family_trees import Gedcom2Persons
-from bhs_api.utils import get_conf, create_thumb, get_unit_type
+from bhs_api.utils import get_migrate_conf, create_thumb, get_unit_type
 from bhs_api import phonetic
 from bhs_api.item import get_collection_id_field
 
 
-conf = get_conf(set(['queries_repo_path',
-                     'sql_server',
-                     'sql_user',
-                     'sql_password',
-                     'collections_to_migrate',
-                     'sql_db',
-                     'photos_mount_point',
-                     'movies_mount_point',
-                     'gentree_mount_point',
-                     'gentree_bucket_name',
-                     'photos_bucket_name',
-                     'movies_bucket_name']),
-                    os.path.join('/etc/bhs/'
-                             'migrate_config.yaml'))
+conf = get_migrate_conf(('queries_repo_path', 'sql_server', 'sql_user', 'sql_password',
+                         'collections_to_migrate', 'sql_db', 'photos_mount_point', 'movies_mount_point',
+                         'gentree_mount_point', 'gentree_bucket_name', 'photos_bucket_name', 'movies_bucket_name'))
 
 sqlClient = MigrationSQLClient(conf.sql_server, conf.sql_user, conf.sql_password, conf.sql_db)
 

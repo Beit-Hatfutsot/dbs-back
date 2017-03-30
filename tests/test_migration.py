@@ -4,6 +4,8 @@ import elasticsearch
 import requests
 from migration.tasks import update_doc, update_tree
 from migration.files import upload_file
+from test_search import given_local_elasticsearch_client_with_test_data
+from scripts.ensure_required_metadata import EnsureRequiredMetadataCommand
 
 first_tree = dict(num=100,
                     file_id='1',
@@ -23,6 +25,26 @@ THE_TESTER = {
     'RightsDesc': 'Full',
     'DisplayStatusDesc':  'free',
 }
+
+
+class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
+    def _parse_args(self):
+        return type("MockArgs", (object,), {"key": None,
+                                            "collection": None,
+                                            "debug": True,
+                                            "add_to_es": True})
+
+
+def given_ensure_required_metadata_ran(app):
+    MockEnsureRequiredMetadataCommand(app=app).main()
+    app.es.indices.refresh(app.es_data_db_index_name)
+
+
+def es_search(app, collection_name, query):
+    return [h["_source"] for h in app.es.search(index=app.es_data_db_index_name,
+                                                doc_type=collection_name, q=query)["hits"]["hits"]]
+
+
 
 def test_update_doc(mocker, app):
     ''' This function tests the simplest case for
@@ -44,7 +66,7 @@ def test_update_doc(mocker, app):
             body = body,
             doc_type = 'personalities',
             id=doc['_id'],
-            index = 'db',
+            index = 'bhdata',
         )
         assert doc['related'] == ['place_some']
 
@@ -63,7 +85,7 @@ def test_updated_doc(mocker, app):
             body = es_body,
             doc_type = 'personalities',
             id=id,
-            index = 'db',
+            index = 'bhdata',
         )
         elasticsearch.Elasticsearch.index.reset_mock()
         updated_tester = THE_TESTER.copy()
@@ -76,7 +98,7 @@ def test_updated_doc(mocker, app):
             body = updated_tester,
             doc_type = 'personalities',
             id=id,
-            index = 'db',
+            index = 'bhdata',
         )
 
 def test_update_photo(mocker):
@@ -157,3 +179,39 @@ def test_update_place(mocker, app):
 
     doc =  collection.find_one({'UnitId':2000})
     assert doc['geometry'] == 'geo'
+
+
+def test_ensure_metadata(app, mock_db):
+    app.data_db = mock_db
+    given_local_elasticsearch_client_with_test_data(app)
+    assert es_search(app, "personalities", "UnitId:1") == []
+    assert es_search(app, "personalities", "UnitId:2") == []
+    assert es_search(app, "places", "UnitId:3") == []
+    given_ensure_required_metadata_ran(app)
+    # new item in mongo - added to ES (because add_to_es parameter is enabled in these tests)
+    assert es_search(app, "personalities", "UnitId:1") == [{u'DisplayStatusDesc': u'free',
+                                                            u'RightsDesc': u'Full',
+                                                            u'Slug': {u'En': u'personality_tester',
+                                                                      u'He': u'\u05d0\u05d9\u05e9\u05d9\u05d5\u05ea_\u05d1\u05d5\u05d3\u05e7'},
+                                                            u'StatusDesc': u'Completed',
+                                                            u'UnitId': 1,
+                                                            u'UnitText1': {u'En': u'tester',
+                                                                           u'He': u'\u05d1\u05d5\u05d3\u05e7'}}]
+    # modifying slug in mongo - should update slug in ES
+    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:2")] == ["personality_another-tester"]
+    mock_db["personalities"].update_one({"UnitId": 2}, {"$set": {"Slug.En": "personality_another-tester-modified"}})
+    given_ensure_required_metadata_ran(app)
+    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:2")] == ["personality_another-tester-modified"]
+    # changing item rights in ES - will fix them when updating from mongo
+    app.es.update(index=app.es_data_db_index_name, doc_type="places", id=3, body={"doc": {"StatusDesc": "PARTIAL"}})
+    app.es.indices.refresh()
+    assert [h["StatusDesc"] for h in es_search(app, "places", "UnitId:3")] == ["PARTIAL"]
+    given_ensure_required_metadata_ran(app)
+    assert [h["StatusDesc"] for h in es_search(app, "places", "UnitId:3")] == ["Completed"]
+    # setting item rights to private - should delete item in ES
+    assert len(es_search(app, "places", "UnitId:3")) == 1
+    mock_db["places"].update_one({"UnitId": 3}, {"$set": {"StatusDesc": "PRIVATE"}})
+    given_ensure_required_metadata_ran(app)
+    assert len(es_search(app, "places", "UnitId:3")) == 0
+
+
