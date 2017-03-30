@@ -147,3 +147,7 @@ def run_script(bh_env, script, args_str):
                         run("PYTHONPATH=. env/bin/python scripts/{}.py {}".format(script, args_str))
     else:
         abort("\n".join(errors))
+
+def fetch_file(bh_env, remote_file, local_file):
+    with settings(host_string=_get_bh_env_host_string(bh_env)):
+        get(remote_file, local_file)
