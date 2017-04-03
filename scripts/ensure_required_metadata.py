@@ -8,6 +8,7 @@ from bhs_api.item import doc_show_filter, update_es, get_show_metadata
 import sys
 from datetime import datetime
 from traceback import print_exc
+import elasticsearch.helpers
 
 
 class EnsureRequiredMetadataCommand(object):
@@ -84,12 +85,16 @@ class EnsureRequiredMetadataCommand(object):
             else:
                 return self.NO_UPDATE_NEEDED, "item should not be shown and doesn't exist in ES - no action needed ({}={})".format(id_field, item_key)
 
-    def _process_item(self, collection_name, item):
+    def _process_mongo_item(self, collection_name, mongo_item):
+        """
+        process and update a single mongo item
+         returns tuple (code, msg, processed_key)
+        """
         id_field = get_collection_id_field(collection_name)  # the name of the field which stores the key for this item
-        item_key = item.get(id_field, None)  # the current item's key (AKA id)
+        item_key = mongo_item.get(id_field, None)  # the current item's key (AKA id)
         if item_key:
-            self._debug("processing item {}".format(item_key))
-            show_item = doc_show_filter(item)  # should this item be shown or not?
+            self._debug("processing mongo item {}".format(item_key))
+            show_item = doc_show_filter(mongo_item)  # should this item be shown or not?
             # search for corresponding items in elasticsearch - based on the item's collection and key
             res = self.app.es.search(index=self.app.es_data_db_index_name, doc_type=collection_name, q="{}:{}".format(id_field, item_key))
             hits = res.get("hits", {}).get("hits", [])
@@ -100,42 +105,82 @@ class EnsureRequiredMetadataCommand(object):
             else:
                 es_item = None
             try:
-                return self._update_item(id_field, item_key, show_item, len(hits) > 0, item, collection_name, es_item)
+                return self._update_item(id_field, item_key, show_item, len(hits) > 0, mongo_item, collection_name, es_item) + (item_key,)
             except Exception, e:
                 if self.args.debug:
                     print_exc()
-                return self.ERROR, "error while processing {} ({}={}): {}".format(collection_name, id_field, item_key, e)
+                return self.ERROR, "error while processing {} ({}={}): {}".format(collection_name, id_field, item_key, e), None
         else:
-            raise Exception("invalid item key")
+            raise Exception("invalid mongo item key")
 
-    def _process_collection(self, collection_name, key):
-        if key:
-            self._info("processing collection {} key {}".format(collection_name, key))
+    def _process_elasticsearch_item(self, collection_name, item, processed_mongo_keys):
+        id_field = get_collection_id_field(collection_name)  # the name of the field which stores the key for this item
+        item_key = item.get("_source", {}).get(id_field, None)  # the current item's key (AKA id)
+        if item_key:
+            self._debug("processing elasticsearch item {}".format(item_key))
+            if item_key in processed_mongo_keys:
+                return self.NO_UPDATE_NEEDED, "elasticsearch item exists in mongo - it would have been updated from mongo side", item_key
+            else:
+                self.app.es.delete(index=self.app.es_data_db_index_name, doc_type=collection_name, id = item["_id"])
+                return self.DELETED_ITEM, "deleted an item which exists in elastic but not in mongo", item_key
         else:
-            self._info("processing collection {}".format(collection_name))
-        errors, num_processed_keys, num_actions = [], 0, {}
-        if key:
-            items = self.app.data_db[collection_name].find({get_collection_id_field(collection_name): key})
-        else:
-            items = self.app.data_db[collection_name].find()
-        item = None
-        for item in items:
-            code, msg = self._process_item(collection_name, item)
-            self._debug(msg)
-            if code:
-                num_processed_keys += 1
-                num_actions[code] = num_actions.get(code, 0)+1
+            raise Exception("invalid elasticsearch item key")
+
+    def _handle_process_item_results(self, num_actions, errors, results):
+        """
+        handles the results from process_mongo_item or process_elasticsearch_item functions
+        returns the number of processed keys
+        """
+        code, msg, processed_key = results
+        self._debug(msg)
+        if code:
+            num_actions[code] = num_actions.get(code, 0) + 1
+            if self.args.debug:
                 sys.stdout.write(".")
                 sys.stdout.flush()
-            else:
-                errors.append(msg)
-                sys.stdout.write("E")
-                sys.stdout.flush()
-        if item is None:
+            return processed_key
+        else:
+            errors.append(msg)
+            sys.stdout.write("E")
+            sys.stdout.flush()
+            return None
+
+    def _process_mongo_items(self, collection_name, errors, key, num_actions, processed_keys):
+        num_processed_keys = 0
+        items = self.app.data_db[collection_name].find(*[{get_collection_id_field(collection_name): key}] if key else [])
+        for item in items:
+            processed_key = self._handle_process_item_results(num_actions, errors, self._process_mongo_item(collection_name, item))
+            if processed_key:
+                processed_keys.append(processed_key)
+            num_processed_keys += 1
+        if num_processed_keys == 0:
             self._info("no items found in mongo")
         else:
-            print("")
-        self._info("total {} items were processed:".format(num_processed_keys+len(errors)))
+            self._info("processed {} mongo items".format(num_processed_keys))
+        return num_processed_keys
+
+    def _process_elasticsearch_items(self, collection_name, errors, key, num_actions, processed_mongo_keys, processed_elasticsearch_keys):
+        num_processed_keys = 0
+        items = elasticsearch.helpers.scan(self.app.es, index=self.app.es_data_db_index_name, doc_type=collection_name, scroll=u"3h",
+                                           query={"query": {"match": {get_collection_id_field(collection_name): key}}} if key else None)
+        for item in items:
+            processed_key = self._handle_process_item_results(num_actions, errors, self._process_elasticsearch_item(collection_name, item, processed_mongo_keys))
+            if processed_key:
+                processed_elasticsearch_keys.append(processed_key)
+            num_processed_keys += 1
+        if num_processed_keys == 0:
+            self._info("no items found in elasticsearch")
+        else:
+            self._info("processed {} elasticsearch items".format(num_processed_keys))
+        return num_processed_keys
+
+
+    def _process_collection(self, collection_name, key):
+        self._info("processing collection {}{}".format(collection_name, " key {}".format(key) if key else ""))
+        errors, processed_mongo_keys, processed_elasticsearch_keys, num_actions = [], [], [], {}
+        self._process_mongo_items(collection_name, errors, key, num_actions, processed_mongo_keys)
+        self._process_elasticsearch_items(collection_name, errors, key, num_actions, processed_mongo_keys, processed_elasticsearch_keys)
+        self._info("total {} items were processed:".format(len(processed_mongo_keys) + len(processed_elasticsearch_keys) + len(errors)))
         if len(errors) > 0:
             self._info("{} errors (see error.log for details)".format(len(errors)))
             with open("error.log", "a") as f:
