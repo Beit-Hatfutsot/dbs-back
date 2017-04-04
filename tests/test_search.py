@@ -246,6 +246,19 @@ def test_search_result_without_slug(client, app):
       "He": u"מקום_בורג"
     }
 
+def test_search_missing_header_slug(client, app):
+    given_local_elasticsearch_client_with_test_data(app)
+    # update_es function sets item without header to _
+    # so this is how an item with missing hebrew header will look like in ES
+    assert PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG["Header"] == {'En': 'Davydov, Karl Yulyevich', 'He': '_'}
+    # these items will also no have a slug
+    assert PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG["Slug"] == {'En': 'luminary_davydov-karl-yulyevich'}
+    # search for these items
+    result = list(assert_search_results(client.get(u"/v1/search?q=karl+yulyevich"), 1))[0]["_source"]
+    assert result["Header"] == {'En': 'Davydov, Karl Yulyevich', 'He': '_',
+                                "En_lc": 'Davydov, Karl Yulyevich'.lower(), "He_lc": "_"}
+    assert result["Slug"] == {'En': 'luminary_davydov-karl-yulyevich'}
+
 
 ### constants
 
@@ -875,7 +888,7 @@ FAMILY_NAMES_EDREHY = {
           "Id" : 341018
         }
 
-PERSONALITIES_DAVIDOV = {
+PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG = PERSONALITIES_DAVIDOV = {
           "PeriodDateTypeDesc" : {
             "En" : "Date|Date|",
             "He" : "תאריך מדויק|תאריך מדויק|"
@@ -934,8 +947,7 @@ PERSONALITIES_DAVIDOV = {
           "UnitTypeDesc" : "Personality",
           "PeriodStartDate" : "18380315|18890226|",
           "Slug" : {
-            "En" : "luminary_davydov-karl-yulyevich",
-            "He" : "אישיות_דוידוב-קרל-יולייביץ"
+            "En" : "luminary_davydov-karl-yulyevich"
           },
           "PeriodDateTypeCode" : "2|2|",
           "RightsDesc" : "Full",
@@ -978,10 +990,7 @@ PERSONALITIES_DAVIDOV = {
           },
           "Header" : {
             "En" : "Davydov, Karl Yulyevich",
-            "He" : "דוידוב, קרל יולייביץ'",
-
-              "En_lc": "davydov, karl yulyevich",
-              "He_lc": "דוידוב, קרל יולייביץ'"
+            "He" : "_"
           },
           "PeriodTypeDesc" : {
             "En" : "Date of birth|Date of death|",

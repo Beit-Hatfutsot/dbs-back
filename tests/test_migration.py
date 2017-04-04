@@ -85,6 +85,8 @@ def test_updated_doc(mocker, app):
         expected_body = deepcopy(THE_TESTER)
         del expected_body["_id"]
         expected_body["Header"]["He"] = "_"
+        # no hebrew slug
+        expected_body["Slug"] = {"En": expected_body["Slug"]["En"]}
         elasticsearch.Elasticsearch.index.assert_called_once_with(
             body = expected_body,
             doc_type = "personalities",
