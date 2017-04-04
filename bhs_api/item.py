@@ -341,6 +341,7 @@ def get_collection_id_field(collection_name):
     doc_id = 'UnitId'
     if collection_name == 'photos':
         doc_id = 'PictureId'
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     elif collection_name == 'genTreeIndividuals':
         doc_id = 'ID'
     elif collection_name == 'persons':
@@ -368,6 +369,7 @@ def create_slug(document, collection_name):
         'photos': {'En': 'image',
                    'He': u'תמונה',
                   },
+        # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
         'genTreeIndividuals': {'En': 'person',
                                'He': u'אדם',
                               },
@@ -384,6 +386,9 @@ def create_slug(document, collection_name):
     try:
         headers = document['Header'].items()
     except KeyError:
+        # persons collection will be handled here as the cllection's docs don't have a Header
+        # it's the calling function responsibility to add a slug
+        # TODO: refactor to more specific logic, instead of relying on them not having a Header
         return
 
     ret = {}

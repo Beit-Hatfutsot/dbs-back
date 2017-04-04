@@ -89,7 +89,7 @@ class Gedcom2Persons:
         data['tree_num'] = self.meta['num']
         data['tree_size'] = self.meta['persons']
         data['tree_file_id'] = self.meta['file_id']
-        self.onsave(data, 'persons')
+        self.onsave(data)
 
     def flatten(self, node_or_nodes, full=False):
         ret = []
@@ -200,6 +200,7 @@ def sync_ftrees(db, bucket=None, files=None):
 
     # prepare the tree_num hash
     tree_nums  = {}
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     for i in db.genTreeIndividuals.map_reduce(
         Code("function() { emit (this.GenTreePath.split('/')[2].slice(0,-4), this.GTN) }"),
         Code("function(k, vs) {return vs[0]}"),

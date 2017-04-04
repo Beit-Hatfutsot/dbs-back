@@ -545,6 +545,7 @@ def get_changes(from_date, to_date):
     else:
         for doc in cursor:
             col, _id = doc['item_id'].split('.')
+            # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
             if col == 'genTreeIndividuals':
                 continue
             else:
