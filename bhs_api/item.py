@@ -8,6 +8,7 @@ from slugify import Slugify
 from bhs_api import phonetic
 from bhs_api.fsearch import clean_person
 from bhs_api.utils import uuids_to_str
+from copy import deepcopy
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -407,20 +408,20 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
     data_db = app.data_db if not data_db else data_db
     # index only the docs that are publicly available
     if doc_show_filter(doc):
-        body = doc.copy()
+        body = deepcopy(doc)
         if '_id' in body:
             del body['_id']
         doc_id = get_doc_id(collection_name, doc)
+        # elasticsearch uses the header for completion field
+        # this field does not support empty values, so we put a string with space here
+        # this is most likely wrong, but works for now
+        # TODO: figure out how to handle it properly, maybe items without header are invalid?
+        if "Header" in body:
+            for lang in ("He", "En"):
+                if body["Header"].get(lang) is None:
+                    body["Header"][lang] = '_'
         if is_new:
             uuids_to_str(body)
-            # elasticsearch uses the header for completion field
-            # this field does not support empty values, so we put a string with space here
-            # this is most likely wrong, but works for now
-            # TODO: figure out how to handle it properly, maybe items without header are invalid?
-            if "Header" in body:
-                for lang in ("He", "En"):
-                    if body["Header"].get(lang) is None:
-                        body["Header"][lang] = '_'
             es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
             return True, "indexed successfully"
         else:
