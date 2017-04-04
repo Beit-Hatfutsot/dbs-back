@@ -191,12 +191,12 @@ def test_invalid_suggest(client, app):
 def test_general_suggest(client, app):
     given_local_elasticsearch_client_with_test_data(app)
     assert_suggest_response(client, u"*", u"bo",
-                            200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": []},
+                            200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": [], "persons": []},
                                                 "contains": {},
                                                 "starts_with": {"places": [u'Bourges', u'Bozzolo'],
                                                                                # notice that suggest captilizes all letters
                                                                 "photoUnits": ['Boys Praying At The Synagogue Of Mosad Aliyah, Israel 1963'],
-                                                                "familyNames": [], "personalities": [], "movies": []}})
+                                                                "familyNames": [], "personalities": [], "movies": [], "persons": []}})
 
 def test_places_suggest(client, app):
     given_local_elasticsearch_client_with_test_data(app)

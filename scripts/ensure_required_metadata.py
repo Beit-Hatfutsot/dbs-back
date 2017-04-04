@@ -96,7 +96,13 @@ class EnsureRequiredMetadataCommand(object):
             self._debug("processing mongo item {}".format(item_key))
             show_item = doc_show_filter(mongo_item)  # should this item be shown or not?
             # search for corresponding items in elasticsearch - based on the item's collection and key
-            res = self.app.es.search(index=self.app.es_data_db_index_name, doc_type=collection_name, q="{}:{}".format(id_field, item_key))
+            body = {"query": {"match": {id_field: item_key}}}
+            try:
+                res = self.app.es.search(index=self.app.es_data_db_index_name, doc_type=collection_name, body=body)
+            except Exception, e:
+                self._info("exception processing mongo item from collection {} ({}={}): {}".format(collection_name, id_field, item_key, str(e)))
+                res = {}
+                # raise
             hits = res.get("hits", {}).get("hits", [])
             if len(hits) > 1:
                 raise Exception("more then 1 hit for item {}={}".format(id_field, item_key))

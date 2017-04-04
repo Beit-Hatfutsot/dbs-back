@@ -30,7 +30,8 @@ SEARCHABLE_COLLECTIONS = ('places',
                           'familyNames',
                           'photoUnits',
                           'personalities',
-                          'movies')
+                          'movies',
+                          'persons')
 DEAFULT_CONF_REQUIRED_KEYS = set([
     'secret_key',
     'mail_server',
