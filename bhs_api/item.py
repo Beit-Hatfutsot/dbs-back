@@ -413,6 +413,14 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
         doc_id = get_doc_id(collection_name, doc)
         if is_new:
             uuids_to_str(body)
+            # elasticsearch uses the header for completion field
+            # this field does not support empty values, so we put a string with space here
+            # this is most likely wrong, but works for now
+            # TODO: figure out how to handle it properly, maybe items without header are invalid?
+            if "Header" in body:
+                for lang in ("He", "En"):
+                    if body["Header"].get(lang) is None:
+                        body["Header"][lang] = '_'
             es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
             return True, "indexed successfully"
         else:

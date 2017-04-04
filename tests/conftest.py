@@ -75,7 +75,8 @@ def mock_db():
             'DisplayStatusDesc':  'free',
             'UnitText1': {'En': 'another tester',
                         'He': 'עוד בודק',
-                        }
+                        },
+             "Header": {"En": "Nava Schreiber, Daniella Luxemburg", "He": None}
             },
             ]:
         personalities.insert(i)
