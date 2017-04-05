@@ -195,7 +195,9 @@ def test_ensure_metadata(app, mock_db):
     assert es_search(app, "personalities", "UnitId:1") == []
     assert es_search(app, "personalities", "UnitId:2") == []
     assert es_search(app, "places", "UnitId:3") == []
-    assert es_search(app, "persons", "PID:I2") == []
+    assert es_search(app, "persons", "PID:I2") == []  # living person (in mongo)
+    assert es_search(app, "persons", "PID:I3") == []  # dead person (in mongo)
+    assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == ["I687"]  # living person in ES
     given_ensure_required_metadata_ran(app)
     # new item in mongo - added to ES (because add_to_es parameter is enabled in these tests)
     assert es_search(app, "personalities", "UnitId:1") == [{u'DisplayStatusDesc': u'free',
@@ -222,7 +224,9 @@ def test_ensure_metadata(app, mock_db):
     mock_db["places"].update_one({"UnitId": 3}, {"$set": {"StatusDesc": "PRIVATE"}})
     given_ensure_required_metadata_ran(app)
     assert len(es_search(app, "places", "UnitId:3")) == 0
-    # persons - added to ES
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I2")] == ["I2"]
-
-
+    # dead person - added to ES
+    assert [h["PID"] for h in es_search(app, "persons", "PID:I3")] == ["I3"]
+    # living person in mongo - not synced to ES
+    assert [h["PID"] for h in es_search(app, "persons", "PID:I2")] == []
+    # living person in ES - deleted
+    assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == []

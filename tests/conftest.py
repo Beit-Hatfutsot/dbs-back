@@ -89,6 +89,7 @@ def mock_db():
                       }]
     })
     persons = db.create_collection('persons')
+    # living person
     persons.insert({
             'name_lc': ['tester', 'de-tester'],
             'tree_num': 1,
@@ -99,6 +100,15 @@ def mock_db():
             'DisplayStatusDesc':  'free',
             'Slug': {'En': 'person_1;0.I2'},
         })
+    # dead person
+    persons.insert({
+        'name_lc': ['deady', 'deadead'],
+        'tree_num': 1,
+        'tree_version': 0,
+        'id': 'I3',
+        'Slug': {'En': 'person_1;0.I3'},
+        "deceased": True
+    })
     places = db.create_collection('places')
     places.insert({'Slug': {'En': 'place_some'},
                    'UnitId': 3,

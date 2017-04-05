@@ -25,18 +25,24 @@ def index_docs(app, collections, reuse_db=False):
                 index_doc(app, collection, doc)
         app.es.indices.refresh(app.es_data_db_index_name)
 
-def given_local_elasticsearch_client_with_test_data(app):
+def given_local_elasticsearch_client_with_test_data(app, session_id=None):
+    """
+    setup elasticsearch on localhost:9200 for testing on a testing index
+    if given session_id param and it is the same as previous session_id param - will not reindex the docs
+    """
     app.es = Elasticsearch("localhost")
     app.es_data_db_index_name = "bh_dbs_back_pytest"
-    reuse_db = os.environ.get("REUSE_DB", "") == "1"
-    index_docs(app, {
-        "places": [PLACES_BOURGES, PLACES_BOZZOLO],
-        "photoUnits": [PHOTO_BRICKS, PHOTOS_BOYS_PRAYING],
-        "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
-        "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
-        "movies": [MOVIES_MIDAGES, MOVIES_SPAIN],
-        "persons": [PERSON_EINSTEIN],
-    }, reuse_db)
+    if not session_id or session_id != getattr(given_local_elasticsearch_client_with_test_data, "_session_id", None):
+        given_local_elasticsearch_client_with_test_data._session_id = session_id
+        reuse_db = os.environ.get("REUSE_DB", "") == "1"
+        index_docs(app, {
+            "places": [PLACES_BOURGES, PLACES_BOZZOLO],
+            "photoUnits": [PHOTO_BRICKS, PHOTOS_BOYS_PRAYING],
+            "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
+            "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
+            "movies": [MOVIES_MIDAGES, MOVIES_SPAIN],
+            "persons": [PERSON_EINSTEIN, PERSON_LIVING],
+        }, reuse_db)
 
 ### custom assertions
 
@@ -110,11 +116,11 @@ def test_search_without_elasticsearch_should_return_error(client, app):
     assert_error_response(client.get('/v1/search?q=test'), 500, "Sorry, the search cluster appears to be down")
 
 def test_searching_for_nonexistant_term_should_return_no_results(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_no_results(client.get('/v1/search?q=testfoobarbazbaxINVALID'))
 
 def test_general_search_single_result(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # test data contains exactly 1 match for "BOURGES"
     res = client.get("/v1/search?q=BOURGES")
     for hit in assert_search_results(res, 1):
@@ -122,7 +128,7 @@ def test_general_search_single_result(client, app):
         assert hit["_source"]["Header"]["En"] == "BOURGES"
 
 def test_general_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_search_hit_ids(client, u"q=יהודים&sort=rel", [312757, 187521, 187559, 340727, 240790, 262366], ignore_order=True)
     # sort=abc - query is in hebrew, ordered on the hebrew headers
     # 187559 = בוצולו
@@ -142,7 +148,7 @@ def test_general_search(client, app):
     assert_search_hit_ids(client, u"q=jews&sort=abc", [187521, 312757, 187559, 240790, 340727, 262367])
 
 def test_places_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_search_hit_ids(client, u"q=יהודים&collection=places", [187521, 187559], ignore_order=True)
     # sort=abc - query is in hebrew, ordered on the hebrew headers
     # 187559 = בוצולו
@@ -154,7 +160,7 @@ def test_places_search(client, app):
     assert_search_hit_ids(client, u"q=jews&collection=places&sort=abc", [187521, 187559])
 
 def test_images_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 303772 = Building Blocks for Housing Projects, Israel 1950s
     # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
     assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [303772, 312757])
@@ -168,19 +174,19 @@ def test_images_search(client, app):
     assert_search_hit_ids(client, u"q=זוננפלד&collection=photoUnits&sort=abc", [303772, 312757])
 
 def test_family_names_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 341018 = אדרהי
     # 340727 = דרעי
     assert_search_hit_ids(client, u"q=משפחה&collection=familyNames&sort=abc", [341018, 340727])
 
 def test_personalities_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 240790 = David, Ferdinand
     # 240792 = Davydov, Karl Yulyevich
     assert_search_hit_ids(client, u"q=Leipzig&collection=personalities&sort=abc", [240790, 240792])
 
 def test_movies_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 262367 = Jewish Communities in the Middle Ages: Babylonia; Spain; Ashkenaz (Hebrew)
     assert_search_hit_ids(client, u"q=jews&collection=movies&sort=abc", [262367])
 
@@ -190,7 +196,7 @@ def test_invalid_suggest(client, app):
                             500, expected_error_message="unexpected exception getting completion data: ConnectionError")
 
 def test_general_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"*", u"bo",
                             200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": [], "persons": []},
                                                 "contains": {},
@@ -200,36 +206,36 @@ def test_general_suggest(client, app):
                                                                 "familyNames": [], "personalities": [], "movies": [], "persons": []}})
 
 def test_places_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"places", u"bo",
                             200, expected_json={"phonetic": [], "contains": [], "starts_with": ["Bourges", "Bozzolo"]})
 
 def test_images_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"photoUnits", u"נער",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950']})
 
 def test_family_names_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"familyNames", u"דר",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'דרעי']})
 
 def test_personalities_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"personalities", u"dav",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'David, Ferdinand', u'Davydov, Karl Yulyevich']})
 
 def test_movies_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"movies", u"liv",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'Living Moments In Jewish Spain (English)']})
 
 def test_search_result_without_slug(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
 
     assert "Slug" not in PHOTO_BRICKS
     results = list(assert_search_results(client.get(u"/v1/search?q=Blocks&collection=photoUnits&sort=abc"), 1))
@@ -248,7 +254,7 @@ def test_search_result_without_slug(client, app):
     }
 
 def test_search_missing_header_slug(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # update_es function sets item without header to _
     # so this is how an item with missing hebrew header will look like in ES
     assert PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG["Header"] == {'En': 'Davydov, Karl Yulyevich', 'He': '_'}
@@ -259,6 +265,19 @@ def test_search_missing_header_slug(client, app):
     assert result["Header"] == {'En': 'Davydov, Karl Yulyevich', 'He': '_',
                                 "En_lc": 'Davydov, Karl Yulyevich'.lower(), "He_lc": "_"}
     assert result["Slug"] == {'En': 'luminary_davydov-karl-yulyevich'}
+
+def test_search_persons(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    assert PERSON_EINSTEIN["name_lc"] == ["albert", "einstein"]
+    # searching without persons support - doesn't return persons
+    assert_no_results(client.get(u"/v1/search?q=einstein"))
+    # search with persons support - return persons as part of general search
+    result = list(assert_search_results(client.get(u"/v1/search?q=einstein&with_persons=1"), 1))[0]["_source"]
+    assert result["name_lc"] == ["albert", "einstein"]
+    # searching for collection persons - returns only persons results
+    result = list(assert_search_results(client.get(u"/v1/search?q=einstein&collection=persons"), 1))[0]["_source"]
+    assert result["name_lc"] == ["albert", "einstein"]
+    assert result["PID"] == "I686"
 
 
 ### constants
@@ -1351,4 +1370,10 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                    "BIRT_DATE" : "14.3.1879",
                    "BIRT_PLAC_lc" : "ulm a.d., germany",
                    "BIRT_PLAC_S" : "ZZ E086359 ZZ ",
-                   "deceased" : True}
+                   "deceased" : True,
+                   "Header": {
+                       "En": "Albert Einstein",
+                       "He": "Albert Einstein"
+                   },}
+
+PERSON_LIVING = {"PID" : "I687", "Slug" : { "En" : "person_1196;0.I687" }, "deceased" : False}

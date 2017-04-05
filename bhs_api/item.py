@@ -9,6 +9,7 @@ from bhs_api import phonetic
 from bhs_api.fsearch import clean_person
 from bhs_api.utils import uuids_to_str
 from copy import deepcopy
+from bhs_api.fsearch import is_living_person
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -17,24 +18,32 @@ SHOW_FILTER = {'StatusDesc': 'Completed',
                                                                          {'UnitText1.He': {'$nin': [None, '']}}]}
 
 
-def get_show_metadata(doc):
-    if SHOW_FILTER != {'StatusDesc': 'Completed', 'RightsDesc': 'Full', 'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]}:
-        raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
+def get_show_metadata(collection_name, doc):
+    if collection_name == "persons":
+        return {"deceased": doc.get("deceased"),
+                "birth_year": doc.get("birth_year")}
     else:
-        return {
-            "StatusDesc": doc.get('StatusDesc'),
-            "RightsDesc": doc.get('RightsDesc'),
-            "DisplayStatusDesc": doc.get("DisplayStatusDesc"),
-            "UnitText1": doc.get("UnitText1", {})
-        }
+        if SHOW_FILTER != {'StatusDesc': 'Completed',
+                           'RightsDesc': 'Full',
+                           'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                                                                                     {'UnitText1.He': {'$nin': [None, '']}}]}:
+            raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
+        else:
+            return {"StatusDesc": doc.get('StatusDesc'),
+                    "RightsDesc": doc.get('RightsDesc'),
+                    "DisplayStatusDesc": doc.get("DisplayStatusDesc"),
+                    "UnitText1": doc.get("UnitText1", {})}
 
 
-def doc_show_filter(doc):
-    show_metadata = get_show_metadata(doc)
-    return bool((show_metadata['StatusDesc'] == 'Completed'
-                 and show_metadata['RightsDesc'] == 'Full'
-                 and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
-                                                                                     and show_metadata["UnitText1"].get("He")))
+def doc_show_filter(collection_name, doc):
+    show_metadata = get_show_metadata(collection_name, doc)
+    if collection_name == "persons":
+        return not is_living_person(show_metadata["deceased"], show_metadata["birth_year"])
+    else:
+        return bool((show_metadata['StatusDesc'] == 'Completed'
+                     and show_metadata['RightsDesc'] == 'Full'
+                     and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
+                                                                                         and show_metadata["UnitText1"].get("He")))
 
 
 class Slug:
@@ -426,7 +435,7 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
     es = app.es if not es else es
     data_db = app.data_db if not data_db else data_db
     # index only the docs that are publicly available
-    if doc_show_filter(doc):
+    if doc_show_filter(collection_name, doc):
         body = deepcopy(doc)
         # the given doc might come either from mongo or from elasticsearch
         # here we try to get the doc id from one of them and save it in elasticsearch

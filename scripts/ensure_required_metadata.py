@@ -43,15 +43,15 @@ class EnsureRequiredMetadataCommand(object):
         updates = {}
         if es_item["_source"].get("Slug") != mongo_item.get("Slug"):
             updates["Slug"] = mongo_item.get("Slug")
-        src_show = doc_show_filter(mongo_item)
-        es_show = doc_show_filter(es_item["_source"])
+        src_show = doc_show_filter(collection_name, mongo_item)
+        es_show = doc_show_filter(collection_name, es_item["_source"])
         if es_show != src_show:
             if not src_show:
                 raise Exception("should not ensure metadata if mongo item should not be shown")
             else:
                 # src item should be shown - but according to es metadata it shouldn't be shown
                 # need to copy the relevant metadata for deciding whether to show the item
-                updates.update(get_show_metadata(mongo_item))
+                updates.update(get_show_metadata(collection_name, mongo_item))
         if len(updates) > 0:
             self.app.es.update(index=self.app.es_data_db_index_name, doc_type=collection_name,
                                id=es_item["_id"], body={"doc": updates})
@@ -101,7 +101,7 @@ class EnsureRequiredMetadataCommand(object):
         item_key = mongo_item.get(mongo_id_field, None)  # the current item's key (AKA id)
         if item_key:
             self._debug("processing mongo item {}".format(item_key))
-            show_item = doc_show_filter(mongo_item)  # should this item be shown or not?
+            show_item = doc_show_filter(collection_name, mongo_item)  # should this item be shown or not?
             # search for corresponding items in elasticsearch - based on the item's collection and key
             body = {"query": {"term": {elasticsearch_id_field: item_key}}}
             try:
