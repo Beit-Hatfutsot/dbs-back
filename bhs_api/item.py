@@ -337,7 +337,7 @@ def get_image_url(image_id, bucket):
     return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
 
 
-def get_collection_id_field(collection_name):
+def get_collection_id_field(collection_name, is_elasticsearch=False):
     doc_id = 'UnitId'
     if collection_name == 'photos':
         doc_id = 'PictureId'
@@ -345,7 +345,8 @@ def get_collection_id_field(collection_name):
     elif collection_name == 'genTreeIndividuals':
         doc_id = 'ID'
     elif collection_name == 'persons':
-        doc_id = 'id'
+        # elasticsearch cannot have "id" attribute
+        doc_id = "PID" if is_elasticsearch else "id"
     elif collection_name == 'synonyms':
         doc_id = '_id'
     elif collection_name == 'trees':
@@ -402,8 +403,21 @@ def create_slug(document, collection_name):
     return ret
 
 def get_doc_id(collection_name, doc):
-    doc_id_field = get_collection_id_field(collection_name)
-    return doc.get(doc_id_field)
+    mongo_id_field = get_collection_id_field(collection_name, is_elasticsearch=False)
+    elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
+    if mongo_id_field == elasticsearch_id_field:
+        return doc.get(mongo_id_field)
+    else:
+        mongo_id = doc.get(mongo_id_field)
+        elasticsearch_id = doc.get(elasticsearch_id_field)
+        if mongo_id == elasticsearch_id:
+            return mongo_id
+        elif elasticsearch_id is None:
+            return mongo_id
+        elif mongo_id is None:
+            return elasticsearch_id
+        else:
+            raise Exception("could not find doc_id for collection {} doc {}".format(collection_name, doc))
 
 
 def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db=None, app=None):
@@ -414,9 +428,17 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
     # index only the docs that are publicly available
     if doc_show_filter(doc):
         body = deepcopy(doc)
+        # the given doc might come either from mongo or from elasticsearch
+        # here we try to get the doc id from one of them and save it in elasticsearch
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
+        doc_id = get_doc_id(collection_name, doc)
+        body[elasticsearch_id_field] = doc_id
+        # _id field is internal to mongo
         if '_id' in body:
             del body['_id']
-        doc_id = get_doc_id(collection_name, doc)
+        # id field has special meaning in elasticsearch (it is copied to correct attribute above in the id_field handling
+        if 'id' in body:
+            del body['id']
         # elasticsearch uses the header for completion field
         # this field does not support empty values, so we put a string with space here
         # this is most likely wrong, but works for now

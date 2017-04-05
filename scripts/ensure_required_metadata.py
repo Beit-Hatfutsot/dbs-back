@@ -38,11 +38,12 @@ class EnsureRequiredMetadataCommand(object):
     def _info(self, msg):
         print(msg)
 
-    def _ensure_correct_item_required_metadata(self, id_field, item_key, src_item, collection_name, es_item):
+    def _ensure_correct_item_required_metadata(self, item_key, mongo_item, collection_name, es_item):
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
         updates = {}
-        if es_item["_source"].get("Slug") != src_item.get("Slug"):
-            updates["Slug"] = src_item.get("Slug")
-        src_show = doc_show_filter(src_item)
+        if es_item["_source"].get("Slug") != mongo_item.get("Slug"):
+            updates["Slug"] = mongo_item.get("Slug")
+        src_show = doc_show_filter(mongo_item)
         es_show = doc_show_filter(es_item["_source"])
         if es_show != src_show:
             if not src_show:
@@ -50,77 +51,83 @@ class EnsureRequiredMetadataCommand(object):
             else:
                 # src item should be shown - but according to es metadata it shouldn't be shown
                 # need to copy the relevant metadata for deciding whether to show the item
-                updates.update(get_show_metadata(src_item))
+                updates.update(get_show_metadata(mongo_item))
         if len(updates) > 0:
             self.app.es.update(index=self.app.es_data_db_index_name, doc_type=collection_name,
                                id=es_item["_id"], body={"doc": updates})
-            return self.UPDATED_METADATA, "updated {} keys in elasticsearch ({}={})".format(len(updates), id_field, item_key)
+            return self.UPDATED_METADATA, "updated {} keys in elasticsearch ({}={})".format(len(updates), elasticsearch_id_field, item_key)
         else:
-            return self.NO_UPDATE_NEEDED, "item has correct metadata, no update needed: ({}={})".format(id_field, item_key)
+            return self.NO_UPDATE_NEEDED, "item has correct metadata, no update needed: ({}={})".format(elasticsearch_id_field, item_key)
 
-    def _add_item(self, id_field, item_key, src_item, collection_name, es_item):
-        is_ok, msg = update_es(collection_name, src_item, is_new=True, app=self.app)
+    def _add_item(self, item_key, mongo_item, collection_name, es_item):
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
+        is_ok, msg = update_es(collection_name, mongo_item, is_new=True, app=self.app)
         if is_ok:
             self._debug(msg)
-            return self.ADDED_ITEM, "added item to es: ({}={})".format(id_field, item_key)
+            return self.ADDED_ITEM, "added item to es: ({}={})".format(elasticsearch_id_field, item_key)
         else:
-            return self.ERROR, "error adding item ({}={}): {}".format(id_field, item_key, msg)
+            return self.ERROR, "error adding item ({}={}): {}".format(elasticsearch_id_field, item_key, msg)
 
-    def _del_item(self, id_field, item_key, src_item, collection_name, es_item):
+    def _del_item(self, item_key, mongo_item, collection_name, es_item):
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
         self.app.es.delete(index=self.app.es_data_db_index_name, doc_type=collection_name, id=es_item["_id"])
-        return self.DELETED_ITEM, "deleted item: ({}={})".format(id_field, item_key)
+        return self.DELETED_ITEM, "deleted item: ({}={})".format(elasticsearch_id_field, item_key)
 
-    def _update_item(self, id_field, item_key, show_item, exists_in_elasticsearch, item, collection_name, es_item):
+    def _update_item(self, item_key, show_item, exists_in_elasticsearch, mongo_item, collection_name, es_item):
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
         if show_item:
             if exists_in_elasticsearch:
-                return self._ensure_correct_item_required_metadata(id_field, item_key, item, collection_name, es_item)
+                return self._ensure_correct_item_required_metadata(item_key, mongo_item, collection_name, es_item)
             elif self.args.add_to_es:
-                return self._add_item(id_field, item_key, item, collection_name, es_item)
+                return self._add_item(item_key, mongo_item, collection_name, es_item)
             else:
-                return self.ERROR, "could not find item in elasticsearch ({}={})".format(id_field, item_key)
+                return self.ERROR, "could not find item in elasticsearch ({}={})".format(elasticsearch_id_field, item_key)
         else:
             # item should not be shown
             if exists_in_elasticsearch:
-                return self._del_item(id_field, item_key, item, collection_name, es_item)
+                return self._del_item(item_key, mongo_item, collection_name, es_item)
             else:
-                return self.NO_UPDATE_NEEDED, "item should not be shown and doesn't exist in ES - no action needed ({}={})".format(id_field, item_key)
+                return self.NO_UPDATE_NEEDED, "item should not be shown and doesn't exist in ES - no action needed ({}={})".format(elasticsearch_id_field, item_key)
 
     def _process_mongo_item(self, collection_name, mongo_item):
         """
         process and update a single mongo item
          returns tuple (code, msg, processed_key)
         """
-        id_field = get_collection_id_field(collection_name)  # the name of the field which stores the key for this item
-        item_key = mongo_item.get(id_field, None)  # the current item's key (AKA id)
+        # the name of the field which stores the key for this item
+        # it is different
+        mongo_id_field = get_collection_id_field(collection_name, is_elasticsearch=False)
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
+        item_key = mongo_item.get(mongo_id_field, None)  # the current item's key (AKA id)
         if item_key:
             self._debug("processing mongo item {}".format(item_key))
             show_item = doc_show_filter(mongo_item)  # should this item be shown or not?
             # search for corresponding items in elasticsearch - based on the item's collection and key
-            body = {"query": {"match": {id_field: item_key}}}
+            body = {"query": {"term": {elasticsearch_id_field: item_key}}}
             try:
                 res = self.app.es.search(index=self.app.es_data_db_index_name, doc_type=collection_name, body=body)
             except Exception, e:
-                self._info("exception processing mongo item from collection {} ({}={}): {}".format(collection_name, id_field, item_key, str(e)))
+                self._info("exception processing mongo item from collection {} ({}={}): {}".format(collection_name, mongo_id_field, item_key, str(e)))
                 res = {}
                 # raise
             hits = res.get("hits", {}).get("hits", [])
             if len(hits) > 1:
-                raise Exception("more then 1 hit for item {}={}".format(id_field, item_key))
+                raise Exception("more then 1 hit for item {}={}".format(mongo_id_field, item_key))
             elif len(hits) == 1:
                 es_item = hits[0]
             else:
                 es_item = None
             try:
-                return self._update_item(id_field, item_key, show_item, len(hits) > 0, mongo_item, collection_name, es_item) + (item_key,)
+                return self._update_item(item_key, show_item, len(hits) > 0, mongo_item, collection_name, es_item) + (item_key,)
             except Exception, e:
                 if self.args.debug:
                     print_exc()
-                return self.ERROR, "error while processing {} ({}={}): {}".format(collection_name, id_field, item_key, e), None
+                return self.ERROR, "error while processing mongo item {} ({}={}): {}".format(collection_name, mongo_id_field, item_key, e), None
         else:
             raise Exception("invalid mongo item key")
 
     def _process_elasticsearch_item(self, collection_name, item, processed_mongo_keys):
-        id_field = get_collection_id_field(collection_name)  # the name of the field which stores the key for this item
+        id_field = get_collection_id_field(collection_name, is_elasticsearch=True)  # the name of the field which stores the key for this item
         item_key = item.get("_source", {}).get(id_field, None)  # the current item's key (AKA id)
         if item_key:
             self._debug("processing elasticsearch item {}".format(item_key))
@@ -168,7 +175,7 @@ class EnsureRequiredMetadataCommand(object):
     def _process_elasticsearch_items(self, collection_name, errors, key, num_actions, processed_mongo_keys, processed_elasticsearch_keys):
         num_processed_keys = 0
         items = elasticsearch.helpers.scan(self.app.es, index=self.app.es_data_db_index_name, doc_type=collection_name, scroll=u"3h",
-                                           query={"query": {"match": {get_collection_id_field(collection_name): key}}} if key else None)
+                                           query={"query": {"match": {get_collection_id_field(collection_name, is_elasticsearch=True): key}}} if key else None)
         for item in items:
             processed_key = self._handle_process_item_results(num_actions, errors, self._process_elasticsearch_item(collection_name, item, processed_mongo_keys))
             if processed_key:
