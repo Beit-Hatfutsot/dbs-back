@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 from traceback import print_exc
 import elasticsearch.helpers
+from itertools import chain, islice
 
 
 class EnsureRequiredMetadataCommand(object):
@@ -27,8 +28,10 @@ class EnsureRequiredMetadataCommand(object):
         parser = ArgumentParser()
         parser.add_argument('--collection', help="only run for a single collection")
         parser.add_argument('--key', help="only run for a single item key (AKA id) - requires specifying collection as well")
-        parser.add_argument('--add-to-es', action="store_true", help="add missing items to elasticsearch")
+        parser.add_argument('--add', action="store_true", help="add missing items to elasticsearch")
         parser.add_argument('--debug', action="store_true", help="show more debug logs")
+        parser.add_argument('--legacy', action="store_true", help="sync with legacy collections as well (for development/testing purposes only)")
+        parser.add_argument('--limit', type=int, help="process up to LIMIT results - good for development / testing")
         return parser.parse_args()
 
     def _debug(self, msg):
@@ -78,7 +81,7 @@ class EnsureRequiredMetadataCommand(object):
         if show_item:
             if exists_in_elasticsearch:
                 return self._ensure_correct_item_required_metadata(item_key, mongo_item, collection_name, es_item)
-            elif self.args.add_to_es:
+            elif self.args.add:
                 return self._add_item(item_key, mongo_item, collection_name, es_item)
             else:
                 return self.ERROR, "could not find item in elasticsearch ({}={})".format(elasticsearch_id_field, item_key)
@@ -99,6 +102,8 @@ class EnsureRequiredMetadataCommand(object):
         mongo_id_field = get_collection_id_field(collection_name, is_elasticsearch=False)
         elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
         item_key = mongo_item.get(mongo_id_field, None)  # the current item's key (AKA id)
+        if self.args.legacy and not item_key and collection_name == "persons":
+            item_key = mongo_item.get("ID", None)
         if item_key:
             self._debug("processing mongo item {}".format(item_key))
             show_item = doc_show_filter(collection_name, mongo_item)  # should this item be shown or not?
@@ -124,7 +129,7 @@ class EnsureRequiredMetadataCommand(object):
                     print_exc()
                 return self.ERROR, "error while processing mongo item {} ({}={}): {}".format(collection_name, mongo_id_field, item_key, e), None
         else:
-            raise Exception("invalid mongo item key")
+            raise Exception("invalid mongo item key for collection {} mongo_id_field {}: {}".format(collection_name, mongo_id_field, mongo_item))
 
     def _process_elasticsearch_item(self, collection_name, item, processed_mongo_keys):
         id_field = get_collection_id_field(collection_name, is_elasticsearch=True)  # the name of the field which stores the key for this item
@@ -139,11 +144,12 @@ class EnsureRequiredMetadataCommand(object):
         else:
             raise Exception("invalid elasticsearch item key")
 
-    def _handle_process_item_results(self, num_actions, errors, results):
+    def _handle_process_item_results(self, num_actions, errors, results, collection_name):
         """
         handles the results from process_mongo_item or process_elasticsearch_item functions
         returns the number of processed keys
         """
+        # collection_name param is used in tests/test_migration.py
         code, msg, processed_key = results
         self._debug(msg)
         if code:
@@ -158,11 +164,31 @@ class EnsureRequiredMetadataCommand(object):
             sys.stdout.flush()
             return None
 
+    def _filter_legacy_mongo_genTreeIndividuals_items(self, items):
+        for item in items:
+            yield item
+
+    def _limit(self, items):
+        if self.args.limit:
+            return islice(items, 0, self.args.limit)
+        else:
+            return items
+
+    def _get_mongo_items(self, collection_name, key):
+        items = self._limit(self.app.data_db[collection_name].find(*[{get_collection_id_field(collection_name): key}] if key else []))
+        if collection_name == "genTreeIndividuals":
+            items = self._limit(self._filter_legacy_mongo_genTreeIndividuals_items(items))
+        return items
+
     def _process_mongo_items(self, collection_name, errors, key, num_actions, processed_keys):
         num_processed_keys = 0
-        items = self.app.data_db[collection_name].find(*[{get_collection_id_field(collection_name): key}] if key else [])
+        items = self._get_mongo_items(collection_name, key)
+        if self.args.legacy and collection_name == "persons":
+            # persons data used to be in genTreeIndividuals, in legacy mode we process those items as well
+            self._info("processing legacy genTreeIndividuals items as well")
+            items = chain(items, self._get_mongo_items("genTreeIndividuals", key))
         for item in items:
-            processed_key = self._handle_process_item_results(num_actions, errors, self._process_mongo_item(collection_name, item))
+            processed_key = self._handle_process_item_results(num_actions, errors, self._process_mongo_item(collection_name, item), collection_name)
             if processed_key:
                 processed_keys.append(processed_key)
             num_processed_keys += 1
@@ -176,8 +202,9 @@ class EnsureRequiredMetadataCommand(object):
         num_processed_keys = 0
         items = elasticsearch.helpers.scan(self.app.es, index=self.app.es_data_db_index_name, doc_type=collection_name, scroll=u"3h",
                                            query={"query": {"match": {get_collection_id_field(collection_name, is_elasticsearch=True): key}}} if key else None)
+        items = self._limit(items)
         for item in items:
-            processed_key = self._handle_process_item_results(num_actions, errors, self._process_elasticsearch_item(collection_name, item, processed_mongo_keys))
+            processed_key = self._handle_process_item_results(num_actions, errors, self._process_elasticsearch_item(collection_name, item, processed_mongo_keys), collection_name)
             if processed_key:
                 processed_elasticsearch_keys.append(processed_key)
             num_processed_keys += 1

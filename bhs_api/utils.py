@@ -108,8 +108,7 @@ def get_conf(must_have_keys=DEAFULT_CONF_REQUIRED_KEYS,
         # environment is set in BH_ENV and corresponding conf file exists
         fh = open(env_config_file.format(BH_ENV=os.environ["BH_ENV"]))
     elif with_pardir_fallback and os.path.exists(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, 'conf', 'app_server.yaml')):
-        # legacy fallback
-        # TODO: check if needed
+        # fallback to local file for development
         fh = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, 'conf', 'app_server.yaml'))
     else:
         raise Exception("Could not find a conf file")

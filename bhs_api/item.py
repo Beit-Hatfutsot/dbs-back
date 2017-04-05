@@ -448,6 +448,8 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
         # id field has special meaning in elasticsearch (it is copied to correct attribute above in the id_field handling
         if 'id' in body:
             del body['id']
+        if "thumbnail" in body and "data" in body["thumbnail"]:
+            del body["thumbnail"]["data"]
         # elasticsearch uses the header for completion field
         # this field does not support empty values, so we put a string with space here
         # this is most likely wrong, but works for now

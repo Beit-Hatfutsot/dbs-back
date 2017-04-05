@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from bhs_api import create_app
 import IPython
 

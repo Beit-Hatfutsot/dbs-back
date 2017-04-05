@@ -30,6 +30,7 @@ ftree_bucket_url: https://storage.googleapis.com/bhs-familytrees
 video_bucket_url: https://storage.googleapis.com/bhs-videos
 # elastic search
 elasticsearch_host: localhost
+elasticsearch_data_index:
 # redis
 redis_host: localhost
 redis_port: 6379

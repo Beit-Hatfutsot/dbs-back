@@ -30,16 +30,30 @@ THE_TESTER = {
 
 
 class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
+
+    def _handle_process_item_results(self, num_actions, errors, results, collection_name):
+        if not hasattr(self, "process_item_results"):
+            self.process_item_results = []
+        code, msg, processed_key = results
+        self.process_item_results.append((collection_name,
+                                          {False: "ERROR",  1: "UPDATED_METADATA", 2: "ADDED_ITEM", 3: "DELETED_ITEM", 4: "NO_UPDATE_NEEDED"}[code],
+                                          processed_key))
+        return super(MockEnsureRequiredMetadataCommand, self)._handle_process_item_results(num_actions, errors, results, collection_name)
+
     def _parse_args(self):
         return type("MockArgs", (object,), {"key": None,
                                             "collection": None,
                                             "debug": True,
-                                            "add_to_es": True})
+                                            "add": True,
+                                            "limit": None,
+                                            "legacy": False})
 
 
 def given_ensure_required_metadata_ran(app):
-    MockEnsureRequiredMetadataCommand(app=app).main()
+    command = MockEnsureRequiredMetadataCommand(app=app)
+    command.main()
     app.es.indices.refresh(app.es_data_db_index_name)
+    return getattr(command, "process_item_results", [])
 
 
 def es_search(app, collection_name, query):
@@ -198,8 +212,32 @@ def test_ensure_metadata(app, mock_db):
     assert es_search(app, "persons", "PID:I2") == []  # living person (in mongo)
     assert es_search(app, "persons", "PID:I3") == []  # dead person (in mongo)
     assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == ["I687"]  # living person in ES
-    given_ensure_required_metadata_ran(app)
-    # new item in mongo - added to ES (because add_to_es parameter is enabled in these tests)
+    assert set(given_ensure_required_metadata_ran(app)) == {('places', 'ADDED_ITEM', 3),
+                                                            ('places', 'DELETED_ITEM', 71255),
+                                                            ('places', 'DELETED_ITEM', 71236),
+                                                            ('familyNames', 'DELETED_ITEM', 77321),
+                                                            ('familyNames', 'DELETED_ITEM', 77323),
+                                                            ('photoUnits', 'DELETED_ITEM', 140068),
+                                                            ('photoUnits', 'DELETED_ITEM', 137523),
+                                                            ('personalities', 'ADDED_ITEM', 1),
+                                                            ('personalities', 'ADDED_ITEM', 2),
+                                                            ('personalities', 'DELETED_ITEM', 93967),
+                                                            ('personalities', 'DELETED_ITEM', 93968),
+                                                            ('movies', 'DELETED_ITEM', 111554),
+                                                            ('movies', 'DELETED_ITEM', 111553),
+                                                            ('persons', 'NO_UPDATE_NEEDED', 'I2'),
+                                                            ('persons', 'ADDED_ITEM', 'I3'),
+                                                            ('persons', 'DELETED_ITEM', u'I687'),
+                                                            ('persons', 'DELETED_ITEM', u'I686')}
+    # running again - to make sure it searches items properly in ES
+    # items deleted in previous results - don't appear now
+    # items added / no update needed in previous results - all have no_update_needed now
+    assert set(given_ensure_required_metadata_ran(app)) == {('places', 'NO_UPDATE_NEEDED', 3),
+                                                            ('personalities', 'NO_UPDATE_NEEDED', 1),
+                                                            ('personalities', 'NO_UPDATE_NEEDED', 2),
+                                                            ('persons', 'NO_UPDATE_NEEDED', 'I2'),
+                                                            ('persons', 'NO_UPDATE_NEEDED', 'I3')}
+    # new item in mongo - added to ES (because add parameter is enabled in these tests)
     assert es_search(app, "personalities", "UnitId:1") == [{u'DisplayStatusDesc': u'free',
                                                             u'RightsDesc': u'Full',
                                                             u'Slug': {u'En': u'personality_tester',

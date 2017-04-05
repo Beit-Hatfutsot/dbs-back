@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from bhs_api import create_app
 import elasticsearch
 from bhs_api.utils import SEARCHABLE_COLLECTIONS
+from bhs_api.item import get_collection_id_field
 
 
 class ElasticsearchCreateIndexCommand(object):
@@ -61,6 +62,8 @@ class ElasticsearchCreateIndexCommand(object):
                 "path": "_type"
             }]
         }
+        for collection_name, mapping in body["mappings"].items():
+            mapping["properties"][get_collection_id_field(collection_name, is_elasticsearch=True)] = {"type": "keyword"}
         return body
 
     def create_es_index(self, es, es_index_name, delete_existing=False):
