@@ -108,6 +108,8 @@ class EnsureRequiredMetadataCommand(object):
             self._debug("processing mongo item {}".format(item_key))
             show_item = doc_show_filter(collection_name, mongo_item)  # should this item be shown or not?
             # search for corresponding items in elasticsearch - based on the item's collection and key
+            # we don't rely on elasticsearch natural id field because we want to support legacy elasticsearch documents
+            # also, to prevent duplicates
             body = {"query": {"term": {elasticsearch_id_field: item_key}}}
             try:
                 res = self.app.es.search(index=self.app.es_data_db_index_name, doc_type=collection_name, body=body)
@@ -157,6 +159,8 @@ class EnsureRequiredMetadataCommand(object):
             if self.args.debug:
                 sys.stdout.write(".")
                 sys.stdout.flush()
+            elif num_actions[code] == 1 or num_actions[code]%1000 == 0:
+                self._info("processed {} items with code {}: {}".format(num_actions[code], code, msg))
             return processed_key
         else:
             errors.append(msg)

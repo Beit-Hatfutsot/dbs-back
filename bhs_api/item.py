@@ -449,6 +449,8 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
         if 'id' in body:
             del body['id']
         if "thumbnail" in body and "data" in body["thumbnail"]:
+            # no need to have thumbnail data in elasticsearch
+            # TODO: ensure we only store and use thumbnail from filesystem
             del body["thumbnail"]["data"]
         # elasticsearch uses the header for completion field
         # this field does not support empty values, so we put a string with space here
