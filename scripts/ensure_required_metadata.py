@@ -41,11 +41,21 @@ class EnsureRequiredMetadataCommand(object):
     def _info(self, msg):
         print(msg)
 
+    def _get_item_header_updates(self, collection_name, mongo_item, es_item):
+        updates = {}
+        if collection_name == "persons":
+            name = " ".join(mongo_item["name"]) if isinstance(mongo_item["name"], list) else mongo_item["name"]
+            item_header = {"En": name, "He": name}
+            if es_item.get("Header", {}) != item_header:
+                updates["Header"] = item_header
+        return updates
+
     def _ensure_correct_item_required_metadata(self, item_key, mongo_item, collection_name, es_item):
         elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
         updates = {}
         if es_item["_source"].get("Slug") != mongo_item.get("Slug"):
             updates["Slug"] = mongo_item.get("Slug")
+        updates.update(self._get_item_header_updates(collection_name, mongo_item, es_item))
         src_show = doc_show_filter(collection_name, mongo_item)
         es_show = doc_show_filter(collection_name, es_item["_source"])
         if es_show != src_show:

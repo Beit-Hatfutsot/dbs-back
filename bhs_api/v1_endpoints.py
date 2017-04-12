@@ -20,6 +20,7 @@ import elasticsearch
 import pymongo
 import jinja2
 import requests
+import traceback
 
 from bhs_api import SEARCH_CHUNK_SIZE
 from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
@@ -77,10 +78,6 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False):
     elif sort == "year" and collection == "photoUnits":
         body["sort"] = [{"UnitPeriod.PeriodStartDate.keyword": "asc"}, "_score"]
     try:
-        try:
-            collection = collection.split(',')
-        except:
-            pass
         current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collections, json.dumps(body)))
         results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
@@ -449,20 +446,21 @@ def get_suggestions(collection,string):
     '''
     rv = {}
     try:
+        unlistify_item = lambda i: " ".join(i) if isinstance(i, (tuple, list)) else i
         if collection == "*":
             rv['starts_with'], rv['phonetic'] = get_completion_all_collections(string)
             rv['contains'] = {}
             # make all the words in the suggestion start with a capital letter
-            rv = {k: {kk: [i.title() for i in vv] for kk, vv in v.items()} for k, v in rv.items()}
+            rv = {k: {kk: [unlistify_item(i).title() for i in vv] for kk, vv in v.items()} for k, v in rv.items()}
             return humanify(rv)
         else:
             rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
             rv['contains'] = []
             # make all the words in the suggestion start with a capital letter
-            rv = {k: [i.title() for i in v] for k, v in rv.items()}
+            rv = {k: [unlistify_item(i).title() for i in v] for k, v in rv.items()}
             return humanify(rv)
     except Exception, e:
-        return humanify({"error": "unexpected exception getting completion data: {}".format(e)}, 500)
+        return humanify({"error": "unexpected exception getting completion data: {}".format(e), "traceback": traceback.format_exc()}, 500)
 
 
 
