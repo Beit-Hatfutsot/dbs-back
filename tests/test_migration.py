@@ -209,9 +209,9 @@ def test_ensure_metadata(app, mock_db):
     assert es_search(app, "personalities", "UnitId:1") == []
     assert es_search(app, "personalities", "UnitId:2") == []
     assert es_search(app, "places", "UnitId:3") == []
-    assert es_search(app, "persons", "PID:I2") == []  # living person (in mongo)
-    assert es_search(app, "persons", "PID:I3") == []  # dead person (in mongo)
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == ["I687"]  # living person in ES
+    assert es_search(app, "persons", "person_id:I2") == []  # living person (in mongo)
+    assert es_search(app, "persons", "person_id:I3") == []  # dead person (in mongo)
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I687")] == ["I687"]  # living person in ES
     assert set(given_ensure_required_metadata_ran(app)) == {('places', 'ADDED_ITEM', 3),
                                                             ('places', 'DELETED_ITEM', 71255),
                                                             ('places', 'DELETED_ITEM', 71236),
@@ -225,18 +225,18 @@ def test_ensure_metadata(app, mock_db):
                                                             ('personalities', 'DELETED_ITEM', 93968),
                                                             ('movies', 'DELETED_ITEM', 111554),
                                                             ('movies', 'DELETED_ITEM', 111553),
-                                                            ('persons', 'NO_UPDATE_NEEDED', 'I2'),
-                                                            ('persons', 'ADDED_ITEM', 'I3'),
-                                                            ('persons', 'DELETED_ITEM', u'I687'),
-                                                            ('persons', 'DELETED_ITEM', u'I686')}
+                                                            ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I2')),
+                                                            ('persons', 'ADDED_ITEM', (1, 0, 'I3')),
+                                                            ('persons', 'DELETED_ITEM', (1933, 0, 'I687')),
+                                                            ('persons', 'DELETED_ITEM', (1196, 0, 'I686'))}
     # running again - to make sure it searches items properly in ES
     # items deleted in previous results - don't appear now
     # items added / no update needed in previous results - all have no_update_needed now
     assert set(given_ensure_required_metadata_ran(app)) == {('places', 'NO_UPDATE_NEEDED', 3),
                                                             ('personalities', 'NO_UPDATE_NEEDED', 1),
                                                             ('personalities', 'NO_UPDATE_NEEDED', 2),
-                                                            ('persons', 'NO_UPDATE_NEEDED', 'I2'),
-                                                            ('persons', 'NO_UPDATE_NEEDED', 'I3')}
+                                                            ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I2')),
+                                                            ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I3'))}
     # new item in mongo - added to ES (because add parameter is enabled in these tests)
     assert es_search(app, "personalities", "UnitId:1") == [{u'DisplayStatusDesc': u'free',
                                                             u'RightsDesc': u'Full',
@@ -263,8 +263,8 @@ def test_ensure_metadata(app, mock_db):
     given_ensure_required_metadata_ran(app)
     assert len(es_search(app, "places", "UnitId:3")) == 0
     # dead person - added to ES
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I3")] == ["I3"]
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I3")] == ["I3"]
     # living person in mongo - not synced to ES
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I2")] == []
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I2")] == []
     # living person in ES - deleted
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == []
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I687")] == []

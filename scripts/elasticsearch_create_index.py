@@ -63,7 +63,12 @@ class ElasticsearchCreateIndexCommand(object):
             }]
         }
         for collection_name, mapping in body["mappings"].items():
-            mapping["properties"][get_collection_id_field(collection_name, is_elasticsearch=True)] = {"type": "keyword"}
+            if collection_name == "persons":
+                mapping["properties"].update({"tree_num": {"type": "integer"},
+                                              "tree_version": {"type": "integer"},
+                                              "person_id": {"type": "keyword"}})
+            else:
+                mapping["properties"][get_collection_id_field(collection_name)] = {"type": "keyword"}
         return body
 
     def create_es_index(self, es, es_index_name, delete_existing=False):

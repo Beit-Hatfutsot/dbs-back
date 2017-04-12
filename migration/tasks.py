@@ -221,7 +221,11 @@ def update_doc(collection, document):
                               tree_num,
                               i,
                               id)}
-        update_collection(collection, query, document)
+        created = update_collection(collection, query, document)
+        if MIGRATE_ES == '1':
+            is_ok, msg = update_es(collection.name, document, created)
+            if not is_ok:
+                current_app.logger.error(msg)
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:

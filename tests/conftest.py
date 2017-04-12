@@ -95,6 +95,7 @@ def mock_db():
             'tree_num': 1,
             'tree_version': 0,
             'id': 'I2',
+            "name": ["hoomy", "cookie"],
             'StatusDesc': 'Completed',
             'RightsDesc': 'Full',
             'DisplayStatusDesc':  'free',
@@ -106,6 +107,7 @@ def mock_db():
         'tree_num': 1,
         'tree_version': 0,
         'id': 'I3',
+        "name": ["rookie", "bloopy"],
         'Slug': {'En': 'person_1;0.I3'},
         "deceased": True
     })

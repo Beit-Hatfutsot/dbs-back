@@ -3,6 +3,7 @@ from elasticsearch import Elasticsearch
 from scripts.elasticsearch_create_index import ElasticsearchCreateIndexCommand
 from copy import deepcopy
 import os
+from bhs_api.item import get_doc_id
 
 
 ### environment setup functions
@@ -15,7 +16,11 @@ def index_doc(app, collection, doc):
     doc = deepcopy(doc)
     doc.get("Header", {}).setdefault("He_lc", doc.get("Header", {}).get("He", "").lower())
     doc.get("Header", {}).setdefault("En_lc", doc.get("Header", {}).get("En", "").lower())
-    app.es.index(app.es_data_db_index_name, collection, doc)
+    if collection == "persons":
+        doc_id = "{}_{}_{}".format(doc["tree_num"], doc["tree_version"], doc["person_id"])
+    else:
+        doc_id = get_doc_id(collection, doc)
+    app.es.index(index=app.es_data_db_index_name, doc_type=collection, body=doc, id=doc_id)
 
 def index_docs(app, collections, reuse_db=False):
     if not reuse_db or not app.es.indices.exists(app.es_data_db_index_name):
@@ -277,7 +282,7 @@ def test_search_persons(client, app):
     # searching for collection persons - returns only persons results
     result = list(assert_search_results(client.get(u"/v1/search?q=einstein&collection=persons"), 1))[0]["_source"]
     assert result["name_lc"] == ["albert", "einstein"]
-    assert result["PID"] == "I686"
+    assert result["person_id"] == "I686"
 
 
 ### constants
@@ -1323,7 +1328,7 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                    "OCCU" : "Physicist",
                    "sex" : "M",
                    "DEAT_PLAC_S" : "ZZ E796536 E796436 ZZ ",
-                   "PID" : "I686",
+                   "person_id" : "I686",
                    "partners" : [{"id" : "I687", "name" : [ "Mileva", "Maric" ],
                                   "children": [{"id": "I835", "partners": [], "name" : [ "Lieserl", "Maric" ], "deceased" : True, "sex" : "F" },
                                                {"id": "I836", "name" : [ "Hans Albert", "Einstein" ],
@@ -1376,4 +1381,4 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                        "He": "Albert Einstein"
                    },}
 
-PERSON_LIVING = {"PID" : "I687", "Slug" : { "En" : "person_1196;0.I687" }, "deceased" : False}
+PERSON_LIVING = {"person_id" : "I687", "Slug" : { "En" : "person_1196;0.I687" }, "deceased" : False, "tree_num": 1933, "tree_version": 0, "name": ["mookie", "shooki"]}
