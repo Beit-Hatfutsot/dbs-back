@@ -215,6 +215,8 @@ def update_doc(collection, document):
         document['tree_version'] = i
         query['tree_version'] = i
 
+        # we have to create it here as at the moment create_slug function requires Header to create slug
+        # TODO: move this logic to create_slug function
         document['Slug'] = {'En': 'person_{};{}.{}'.format(
                               tree_num,
                               i,

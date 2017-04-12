@@ -56,7 +56,7 @@ def gedcom_2_persons(gedcom):
     tree_num = None
     file_id = None
     saved_data = []
-    on_save = lambda data, collection: saved_data.append(data)
+    on_save = lambda data: saved_data.append(data)
     Gedcom2Persons(gedcom, tree_num, file_id, on_save)
     return saved_data
 
@@ -68,7 +68,8 @@ def test_migrate_trees(mocker):
         {"GenTreeNumber": 666, "UpdateDate": datetime(1970, 8, 17, 21, 10, 38), "GenTreePath": "T666.ged"}
     ]
     saved_docs = []
-    def on_save(row, collection_name):
+    def on_save(row):
+        collection_name = "persons"
         doc = parse_doc(row, collection_name)
         id_field = get_collection_id_field(collection_name)
         saved_docs.append((row, collection_name, id_field, doc))

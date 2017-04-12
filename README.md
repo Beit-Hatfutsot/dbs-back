@@ -100,6 +100,64 @@ Once the worker is listening, run in a separate window:
 
     $ python scripts/migrate.py --lasthours 200
 
+#### elasticsearch <-> mongo sync and management
+
+Unofortunately we currently have 2 databases which need to be synced.
+
+Generally, mongo is used for showing the item page, elasticsearch is used for searching
+
+##### syncing from mongo to elasticsearch
+
+* ensure_required_metadata command can do that
+  * it doesn't update all fields, only required ones like permissions / slug
+  * you can add the optional --add parameter which will copy documents from mongo to elastic
+* how to run it
+  * `PYTHONPATH=. scripts/ensure_required_metadata.py --add`
+* for development you can also add --legacy parameter which will copy from old mongo collections as well (**don't use in production!**)
+
+##### (re)indexing elasticsearch
+
+* Create the new index with a unique name
+  * you can name it however you want, in this example it's named with current date which is usually pretty good
+  * `scripts/elasticsearch_create_index.py --index bhdata-`date +%Y-%m-%d``
+* copy the documents from the old index to the new index
+  * simplest is to use reindex api - good enought for dev but it has some limitations
+    * this command copies from `bhdata` to `bhdata-(CURRENT_DATE)`
+    * `curl -X POST localhost:9200/_reindex --data '{"source":{"index":"bhdata"},"dest":{"index":"bhdata-'`date +%Y-%m-%d`'"}}'`
+  * see [devops elasticsearch documentation](https://github.com/Beit-Hatfutsot/beit-hatfutsot-devops/blob/master/databases/ELASTICSEARCH.md#re-indexing) for more advanced methods
+* create (or modify) an alias that points to the new index
+  * if this is your first time, delete the old bhdata index and create an alias
+    * `curl -X DELETE localhost:9200/bhdata`
+    * `curl -X PUT localhost:9200/bhdata-`date +%Y-%m-%d`/_alias/bhdata`
+  * if you already have an alias
+    * remove the old alias and add the new alias in a single operation
+    * `curl -X POST localhost:9200/_aliases --data '{"actions":[{"remove":{"index":"*","alias":"bhdata"}},{"add":{"index":"bhdata-'`date +%Y-%m-%d`'","alias":"bhdata"}}]}'`
+  * you can use this command to see which aliases are configured:
+    * `curl -X GET localhost:9200/_aliases?pretty`
+
+#### getting a copy of dev/prod db to run locally
+
+* creating the dump
+  * only run if needed, there should already be some existing dumps for you to use
+  * `gcloud compute ssh mongo1`
+  * `sudo mongodump --out=/data/dump-dev-`date +%Y-%m-%d` --gzip --db=mojp-dev`
+* downloading the dump
+  * `gcloud compute copy-files mongo1:/data/dump-`date +%Y-%m-%d` ~/`
+* restoring the dump on your local mongo
+  * `mongorestore --gzip --drop ~/dump-`date +%Y-%m-%d``
+* point your settings to this new DB
+  * if you haven't done so already - copy dbs-back/conf/app_server.yaml to /etc/bhs
+    * `sudo mkdir -p /etc/bhs && sudo chown -R $USER /etc/bhs`
+    * `cp conf/app_server.yaml /etc/bhs/`
+  * edit /etc/bhs/app_server.yaml
+    * set data_db_name to the new db name
+    * make sure elasticsearch_data_index points to the correct ES index name
+* create mongo index
+  * `PYTHONPATH=. scripts/mongo_create_index.py`
+* ensure elasticsearch has latest index (see above regarding (re)indexing elasticsearch)
+* sync mongo to elasticsearch
+  * `PYTHONPATH=. scripts/ensure_required_metadata.py --add`
+
 ## Contributing
 
 Contributions from both Jews and Gentiles are welcomed! We even have a
@@ -116,7 +174,7 @@ Once you have an issue, just follow these simple steps:
 ### Updating the docs
 
 If you've made any changes to the API please update the docs.
-The documentation leaves in the `/docs` folder. We are using *API Blueprint*,
+The documentation lives in the `/docs` folder. We are using *API Blueprint*,
 a markdown based format,  and [aglio](https://github.com/danielgtaylor/aglio)
 to render it to HTML. Once you've updated the docs you'll have to regenerate
 the html file::

@@ -51,9 +51,15 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 '''
 
 
-def es_search(q, size, collection=None, from_=0, sort=None):
-    # body = {"query": { "match" : { "_all": {"query": q, "operator": "and"} }}}
-    body = {"query": { "query_string" : {
+def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False):
+    if collection:
+        # if user requested specific collections - we don't filter for persons (that's what user asked for!)
+        collections = collection.split(",")
+    else:
+        # we consider the with_persons to decide whether to include persons collection or not
+        collections = [collection for collection in SEARCHABLE_COLLECTIONS
+                                  if with_persons or collection != "persons"]
+    body = {"query": {"query_string": {
         "fields": ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He'],
         "query": q,
         "default_operator": "and"
@@ -75,9 +81,8 @@ def es_search(q, size, collection=None, from_=0, sort=None):
             collection = collection.split(',')
         except:
             pass
-        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collection, json.dumps(body)))
-        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body,
-                            doc_type=collection, size=size, from_=from_)
+        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collections, json.dumps(body)))
+        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
         current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
         return None
@@ -367,10 +372,13 @@ def save_user_content():
 @v1_endpoints.route('/search')
 def general_search():
     args = request.args
-    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None}
+    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None, "with_persons": False}
     for param in parameters.keys():
         if param in args:
-            parameters[param] = args[param]
+            if param == "with_persons":
+                parameters[param] = args[param].lower() in ["1", "yes", "true"]
+            else:
+                parameters[param] = args[param]
     if not parameters['q']:
         abort(400, 'You must specify a search query')
     else:
@@ -545,6 +553,7 @@ def get_changes(from_date, to_date):
     else:
         for doc in cursor:
             col, _id = doc['item_id'].split('.')
+            # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
             if col == 'genTreeIndividuals':
                 continue
             else:

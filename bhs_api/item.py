@@ -9,6 +9,7 @@ from bhs_api import phonetic
 from bhs_api.fsearch import clean_person
 from bhs_api.utils import uuids_to_str
 from copy import deepcopy
+from bhs_api.fsearch import is_living_person
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -17,24 +18,32 @@ SHOW_FILTER = {'StatusDesc': 'Completed',
                                                                          {'UnitText1.He': {'$nin': [None, '']}}]}
 
 
-def get_show_metadata(doc):
-    if SHOW_FILTER != {'StatusDesc': 'Completed', 'RightsDesc': 'Full', 'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]}:
-        raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
+def get_show_metadata(collection_name, doc):
+    if collection_name == "persons":
+        return {"deceased": doc.get("deceased"),
+                "birth_year": doc.get("birth_year")}
     else:
-        return {
-            "StatusDesc": doc.get('StatusDesc'),
-            "RightsDesc": doc.get('RightsDesc'),
-            "DisplayStatusDesc": doc.get("DisplayStatusDesc"),
-            "UnitText1": doc.get("UnitText1", {})
-        }
+        if SHOW_FILTER != {'StatusDesc': 'Completed',
+                           'RightsDesc': 'Full',
+                           'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                                                                                     {'UnitText1.He': {'$nin': [None, '']}}]}:
+            raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
+        else:
+            return {"StatusDesc": doc.get('StatusDesc'),
+                    "RightsDesc": doc.get('RightsDesc'),
+                    "DisplayStatusDesc": doc.get("DisplayStatusDesc"),
+                    "UnitText1": doc.get("UnitText1", {})}
 
 
-def doc_show_filter(doc):
-    show_metadata = get_show_metadata(doc)
-    return bool((show_metadata['StatusDesc'] == 'Completed'
-                 and show_metadata['RightsDesc'] == 'Full'
-                 and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
-                                                                                     and show_metadata["UnitText1"].get("He")))
+def doc_show_filter(collection_name, doc):
+    show_metadata = get_show_metadata(collection_name, doc)
+    if collection_name == "persons":
+        return not is_living_person(show_metadata["deceased"], show_metadata["birth_year"])
+    else:
+        return bool((show_metadata['StatusDesc'] == 'Completed'
+                     and show_metadata['RightsDesc'] == 'Full'
+                     and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
+                                                                                         and show_metadata["UnitText1"].get("He")))
 
 
 class Slug:
@@ -337,14 +346,16 @@ def get_image_url(image_id, bucket):
     return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
 
 
-def get_collection_id_field(collection_name):
+def get_collection_id_field(collection_name, is_elasticsearch=False):
     doc_id = 'UnitId'
     if collection_name == 'photos':
         doc_id = 'PictureId'
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     elif collection_name == 'genTreeIndividuals':
         doc_id = 'ID'
     elif collection_name == 'persons':
-        doc_id = 'id'
+        # elasticsearch cannot have "id" attribute
+        doc_id = "PID" if is_elasticsearch else "id"
     elif collection_name == 'synonyms':
         doc_id = '_id'
     elif collection_name == 'trees':
@@ -368,6 +379,7 @@ def create_slug(document, collection_name):
         'photos': {'En': 'image',
                    'He': u'תמונה',
                   },
+        # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
         'genTreeIndividuals': {'En': 'person',
                                'He': u'אדם',
                               },
@@ -384,6 +396,9 @@ def create_slug(document, collection_name):
     try:
         headers = document['Header'].items()
     except KeyError:
+        # persons collection will be handled here as the cllection's docs don't have a Header
+        # it's the calling function responsibility to add a slug
+        # TODO: refactor to more specific logic, instead of relying on them not having a Header
         return
 
     ret = {}
@@ -397,8 +412,21 @@ def create_slug(document, collection_name):
     return ret
 
 def get_doc_id(collection_name, doc):
-    doc_id_field = get_collection_id_field(collection_name)
-    return doc.get(doc_id_field)
+    mongo_id_field = get_collection_id_field(collection_name, is_elasticsearch=False)
+    elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
+    if mongo_id_field == elasticsearch_id_field:
+        return doc.get(mongo_id_field)
+    else:
+        mongo_id = doc.get(mongo_id_field)
+        elasticsearch_id = doc.get(elasticsearch_id_field)
+        if mongo_id == elasticsearch_id:
+            return mongo_id
+        elif elasticsearch_id is None:
+            return mongo_id
+        elif mongo_id is None:
+            return elasticsearch_id
+        else:
+            raise Exception("could not find doc_id for collection {} doc {}".format(collection_name, doc))
 
 
 def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db=None, app=None):
@@ -407,11 +435,23 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
     es = app.es if not es else es
     data_db = app.data_db if not data_db else data_db
     # index only the docs that are publicly available
-    if doc_show_filter(doc):
+    if doc_show_filter(collection_name, doc):
         body = deepcopy(doc)
+        # the given doc might come either from mongo or from elasticsearch
+        # here we try to get the doc id from one of them and save it in elasticsearch
+        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
+        doc_id = get_doc_id(collection_name, doc)
+        body[elasticsearch_id_field] = doc_id
+        # _id field is internal to mongo
         if '_id' in body:
             del body['_id']
-        doc_id = get_doc_id(collection_name, doc)
+        # id field has special meaning in elasticsearch (it is copied to correct attribute above in the id_field handling
+        if 'id' in body:
+            del body['id']
+        if "thumbnail" in body and "data" in body["thumbnail"]:
+            # no need to have thumbnail data in elasticsearch
+            # TODO: ensure we only store and use thumbnail from filesystem
+            del body["thumbnail"]["data"]
         # elasticsearch uses the header for completion field
         # this field does not support empty values, so we put a string with space here
         # this is most likely wrong, but works for now

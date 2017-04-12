@@ -1,4 +1,5 @@
 // js script to remove details of the living
+// TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
 db.genTreeIndividuals.update({GTN: 3372, "tree.deceased": false},
        {"$set": {BD:"",BP:"",MD:"",MP:""},
         "$unset": {"tree.BIRT_DATE":1, "tree.MARR_PLAC":1,

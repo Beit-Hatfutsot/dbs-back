@@ -75,7 +75,7 @@ def create_app(testing=False, live=False):
 
     # Create the elasticsearch connection
     app.es = elasticsearch.Elasticsearch(conf.elasticsearch_host)
-    app.es_data_db_index_name = app.data_db.name
+    app.es_data_db_index_name = conf.elasticsearch_data_index if getattr(conf, "elasticsearch_data_index") else app.data_db.name
 
     # Add the user's endpoints
     from bhs_api.user import user_endpoints

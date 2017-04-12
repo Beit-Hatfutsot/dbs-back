@@ -20,14 +20,15 @@ if __name__ == '__main__':
     fromdb = app.client_data_db[args.fromdb]
     trees = app.data_db.trees
 
-    '''
-    old_trees = fromdb.genTreeIndividuals.map_reduce(                       
-        Code("function() {emit (this.GTN, this.tree.meta.num_nodes)}"),
-        Code("function(k, vs) {return vs[0]}"),
-        "treeSizes",
-	query = {'tree': {'$exists': True}})
-    	
-    '''
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
+    # '''
+    # old_trees = fromdb.genTreeIndividuals.map_reduce(
+    #     Code("function() {emit (this.GTN, this.tree.meta.num_nodes)}"),
+    #     Code("function(k, vs) {return vs[0]}"),
+    #     "treeSizes",
+    # query = {'tree': {'$exists': True}})
+    #
+    # '''
     old_trees = list(fromdb.treeSizes.find())
 
     to_mig = []
