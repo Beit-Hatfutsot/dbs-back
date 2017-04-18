@@ -460,7 +460,7 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
             es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
             return True, "indexed successfully (inserted)"
         else:
-            es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body={"doc": body})
+            es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
             return True, "indexed successfully (updated)"
     else:
         return True, "item should not be shown - so not indexed"

@@ -231,7 +231,7 @@ def update_doc(collection, document):
     else:
         doc_id = get_doc_id(collection.name, document)
         if doc_id:
-            query = {'_id': doc_id}
+            query = {get_collection_id_field(collection): doc_id}
             created = update_collection(collection, query, document)
             if MIGRATE_ES == '1':
                 is_ok, msg = update_es(collection.name, document, created)
