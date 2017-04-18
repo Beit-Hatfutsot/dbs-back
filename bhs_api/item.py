@@ -418,11 +418,11 @@ def get_doc_id(collection_name, doc):
     id_field = get_collection_id_field(collection_name)
     return doc[id_field]
 
-def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db=None, app=None):
+
+def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=None):
     app = current_app if not app else app
     es_index_name = app.es_data_db_index_name if not es_index_name else es_index_name
     es = app.es if not es else es
-    data_db = app.data_db if not data_db else data_db
     # index only the docs that are publicly available
     if doc_show_filter(collection_name, doc):
         body = deepcopy(doc)

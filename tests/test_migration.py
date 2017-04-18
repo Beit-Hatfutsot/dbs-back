@@ -46,7 +46,8 @@ class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
                                             "debug": True,
                                             "add": True,
                                             "limit": None,
-                                            "legacy": False})
+                                            "legacy": False,
+                                            "index": None})
 
 
 def given_ensure_required_metadata_ran(app):

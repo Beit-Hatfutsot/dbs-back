@@ -32,6 +32,7 @@ class EnsureRequiredMetadataCommand(object):
         parser.add_argument('--debug', action="store_true", help="show more debug logs")
         parser.add_argument('--legacy', action="store_true", help="sync with legacy collections as well (for development/testing purposes only)")
         parser.add_argument('--limit', type=int, help="process up to LIMIT results - good for development / testing")
+        parser.add_argument('--index', help="use this Elasticsearch index instead of the index from configuration")
         return parser.parse_args()
 
     def _debug(self, msg):
@@ -71,7 +72,7 @@ class EnsureRequiredMetadataCommand(object):
                 # need to copy the relevant metadata for deciding whether to show the item
                 updates.update(get_show_metadata(collection_name, mongo_item))
         if len(updates) > 0:
-            self.app.es.update(index=self.app.es_data_db_index_name,
+            self.app.es.update(index=self._get_elasticsearch_index_name(),
                                doc_type=collection_name,
                                id=self._get_elasticsearch_doc_id_from_item_key(collection_name, item_key),
                                body={"doc": updates})
@@ -80,7 +81,7 @@ class EnsureRequiredMetadataCommand(object):
             return self.NO_UPDATE_NEEDED, "item has correct metadata, no update needed: ({})".format(self._get_item_log_identifier(item_key, collection_name))
 
     def _add_item(self, item_key, mongo_item, collection_name, es_item):
-        is_ok, msg = update_es(collection_name, mongo_item, is_new=True, app=self.app)
+        is_ok, msg = update_es(collection_name, mongo_item, is_new=True, app=self.app, es_index_name=self._get_elasticsearch_index_name())
         if is_ok:
             self._debug(msg)
             return self.ADDED_ITEM, "added item to es: ({})".format(self._get_item_log_identifier(item_key, collection_name))
@@ -88,7 +89,7 @@ class EnsureRequiredMetadataCommand(object):
             return self.ERROR, "error adding item ({}): {}".format(self._get_item_log_identifier(item_key, collection_name), msg)
 
     def _del_item(self, item_key, mongo_item, collection_name, es_item):
-        self.app.es.delete(index=self.app.es_data_db_index_name, doc_type=collection_name, id=self._get_elasticsearch_doc_id_from_item_key(collection_name, item_key))
+        self.app.es.delete(index=self._get_elasticsearch_index_name(), doc_type=collection_name, id=self._get_elasticsearch_doc_id_from_item_key(collection_name, item_key))
         return self.DELETED_ITEM, "deleted item: ({})".format(self._get_item_log_identifier(item_key, collection_name))
 
     def _update_item(self, item_key, show_item, exists_in_elasticsearch, mongo_item, collection_name, es_item):
@@ -162,7 +163,7 @@ class EnsureRequiredMetadataCommand(object):
             show_item = doc_show_filter(collection_name, mongo_item)  # should this item be shown or not?
             body = {"query": self._get_elasticsearch_item_key_query(collection_name, item_key)}
             try:
-                res = self.app.es.search(index=self.app.es_data_db_index_name, doc_type=collection_name, body=body)
+                res = self.app.es.search(index=self._get_elasticsearch_index_name(), doc_type=collection_name, body=body)
             except Exception as e:
                 self._info("exception processing mongo item from collection {} ({}): {}".format(collection_name, self._get_item_log_identifier(item_key, collection_name), str(e)))
                 res = {}
@@ -190,7 +191,7 @@ class EnsureRequiredMetadataCommand(object):
             if item_key in processed_mongo_item_keys:
                 return self.NO_UPDATE_NEEDED, "elasticsearch item exists in mongo - it would have been updated from mongo side", item_key
             else:
-                self.app.es.delete(index=self.app.es_data_db_index_name, doc_type=collection_name, id=self._get_elasticsearch_doc_id_from_item_key(collection_name, item_key))
+                self.app.es.delete(index=self._get_elasticsearch_index_name(), doc_type=collection_name, id=self._get_elasticsearch_doc_id_from_item_key(collection_name, item_key))
                 return self.DELETED_ITEM, "deleted an item which exists in elastic but not in mongo", item_key
         else:
             raise Exception("invalid elasticsearch item key for collection {}, elasticsearch item: {}".format(collection_name, es_item))
@@ -259,9 +260,9 @@ class EnsureRequiredMetadataCommand(object):
                 raise NotImplementedError("no support for updating specific persons")
             else:
                 body = {"query": self._get_elasticsearch_item_key_query(collection_name, key)}
-                items = elasticsearch.helpers.scan(self.app.es, index=self.app.es_data_db_index_name, doc_type=collection_name, scroll=u"3h", query=body)
+                items = elasticsearch.helpers.scan(self.app.es, index=self._get_elasticsearch_index_name(), doc_type=collection_name, scroll=u"3h", query=body)
         else:
-            items = elasticsearch.helpers.scan(self.app.es, index=self.app.es_data_db_index_name, doc_type=collection_name, scroll=u"3h")
+            items = elasticsearch.helpers.scan(self.app.es, index=self._get_elasticsearch_index_name(), doc_type=collection_name, scroll=u"3h")
         items = self._limit(items)
         for item in items:
             processed_key = self._handle_process_item_results(num_actions, errors, self._process_elasticsearch_item(collection_name, item, processed_mongo_keys), collection_name)
@@ -273,6 +274,12 @@ class EnsureRequiredMetadataCommand(object):
         else:
             self._info("processed {} elasticsearch items".format(num_processed_keys))
         return num_processed_keys
+
+    def _get_elasticsearch_index_name(self):
+        if self.args.index:
+            return self.args.index
+        else:
+            return self.app.es_data_db_index_name
 
     def _process_collection(self, collection_name, key):
         self._info("processing collection {}{}".format(collection_name, " key {}".format(key) if key else ""))
