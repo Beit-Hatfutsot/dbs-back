@@ -64,9 +64,13 @@ class ElasticsearchCreateIndexCommand(object):
         }
         for collection_name, mapping in body["mappings"].items():
             if collection_name == "persons":
+                # persons specific mappings
                 mapping["properties"].update({"tree_num": {"type": "integer"},
                                               "tree_version": {"type": "integer"},
-                                              "person_id": {"type": "keyword"}})
+                                              "person_id": {"type": "keyword"},
+                                              "birth_year": {"type": "integer"},
+                                              "death_year": {"type": "integer"},
+                                              "marriage_years": {"type": "integer"}})
             else:
                 mapping["properties"][get_collection_id_field(collection_name)] = {"type": "keyword"}
         return body

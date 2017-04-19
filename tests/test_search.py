@@ -52,16 +52,12 @@ def given_local_elasticsearch_client_with_test_data(app, session_id=None):
 ### custom assertions
 
 
-def assert_error_response(res, expected_status_code, expected_error):
+def assert_error_response(res, expected_status_code, expected_error_startswith):
     assert res.status_code == expected_status_code
-    assert res.data == """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
-<title>{status_code} {status_msg}</title>
-<h1>{status_msg}</h1>
-<p>{error}</p>
-""".format(error=expected_error, status_code=expected_status_code, status_msg="Bad Request" if expected_status_code == 400 else "Internal Server Error")
+    assert res.json["error"].startswith(expected_error_startswith)
 
 def assert_common_elasticsearch_search_results(res):
-    assert res.status_code == 200
+    assert res.status_code == 200, "invalid status, json response: {}".format(res.json)
     hits = res.json["hits"]
     shards = res.json["_shards"]
     assert shards["successful"] > 0
@@ -118,7 +114,7 @@ def test_search_without_parameters_should_return_error(client):
 
 def test_search_without_elasticsearch_should_return_error(client, app):
     given_invalid_elasticsearch_client(app)
-    assert_error_response(client.get('/v1/search?q=test'), 500, "Sorry, the search cluster appears to be down")
+    assert_error_response(client.get('/v1/search?q=test'), 500, "Error connecting to Elasticsearch")
 
 def test_searching_for_nonexistant_term_should_return_no_results(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
@@ -283,6 +279,38 @@ def test_search_persons(client, app):
     result = list(assert_search_results(client.get(u"/v1/search?q=einstein&collection=persons"), 1))[0]["_source"]
     assert result["name_lc"] == ["albert", "einstein"]
     assert result["person_id"] == "I686"
+
+def test_advanced_search_persons(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    is_einstein_result = lambda url: list(assert_search_results(client.get(url), 1))[0]["_source"]["name_lc"] == ["albert", "einstein"]
+    assert_error_message = lambda url, msg: assert_error_response(client.get(url), 500, msg)
+    assert PERSON_EINSTEIN["name_lc"] == ["albert", "einstein"]
+
+    # death year params
+    assert PERSON_EINSTEIN["death_year"] == 1955
+    assert is_einstein_result(u"/v1/search?collection=persons&yod=1955")
+    assert is_einstein_result(u"/v1/search?collection=persons&yod=1953&yod_t=pmyears&yod_v=2")
+    assert is_einstein_result(u"/v1/search?collection=persons&yod=1957&yod_t=pmyears&yod_v=2")
+    assert_error_message(u"/v1/search?collection=persons&yod=foobar", "invalid value for yod (death_year): foobar")
+    assert_error_message(u"/v1/search?collection=persons&yod=1957&yod_t=invalid", "invalid value for yod_t (death_year): invalid")
+    assert_error_message(u"/v1/search?collection=persons&yod=1957&yod_t=pmyears&yod_v=foo", "invalid value for yod_v (death_year): foo")
+
+    # birth year params
+    assert PERSON_EINSTEIN["birth_year"] == 1879
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1879")
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1877&yob_t=pmyears&yob_v=2")
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1881&yob_t=pmyears&yob_v=2")
+    assert_error_message(u"/v1/search?collection=persons&yob=foobar", "invalid value for yob (birth_year): foobar")
+    assert_error_message(u"/v1/search?collection=persons&yob=1877&yob_t=invalid", "invalid value for yob_t (birth_year): invalid")
+    assert_error_message(u"/v1/search?collection=persons&yob=1877&yob_t=pmyears&yob_v=foo", "invalid value for yob_v (birth_year): foo")
+
+    # multiple params
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1877&yob=1881&yob_t=pmyears&yob_v=2&yod=1955")
+    assert_error_message(u"/v1/search?collection=persons&yod=123&&yob=1877&yob_t=pmyears&yob_v=foo", "invalid value for yob_v (birth_year): foo")
+    assert_no_results(client.get(u"/v1/search?collection=persons&yob=1879&yod=1953"))
+
+
+
 
 
 ### constants

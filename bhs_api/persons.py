@@ -19,6 +19,18 @@ LIVING_PERSON_WHITELISTED_KEYS = ["partners",
                                   "deceased",
                                   "tree_version"]
 
+PERSONS_SEARCH_REQUIRES_ONE_OF = ["first", "last", "sex", "pob", "pom", "pod", "yob", "yom", "yod", "treenum"]
+PERSONS_SEARCH_DEFAULT_PARAMETERS = {"first": None, "first_t": "exact",
+                                     "last": None, "last_t": "exact",
+                                     "sex": None,
+                                     "pob": None, "pob_t": "exact",
+                                     "pom": None, "pom_t": "exact",
+                                     "pod": None, "pod_t": "exact",
+                                     "yob": None, "yob_t": "exact", "yob_v": None,
+                                     "yom": None, "yom_t": "exact", "yom_v": None,
+                                     "yod": None, "yod_t": "exact", "yod_v": None,
+                                     "treenum": None,}
+
 
 def is_living_person(is_deceased, birth_year):
     if is_deceased:
