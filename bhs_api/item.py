@@ -428,7 +428,12 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=Non
         body = deepcopy(doc)
         # adjust attributes for elasticsearch
         if collection_name == "persons":
-            body.setdefault("person_id", body.get("id", body.get("ID")))
+            body["person_id"] = body.get("id", body.get("ID"))
+            body["first_name_lc"] = body["name_lc"][0]
+            body["last_name_lc"] = body["name_lc"][1]
+            # maps all known SEX values to normalized gender value
+            body["gender"] = {"F": "F", "M": "M",
+                              None: "U", "": "U", "U": "U", "?": "U", "P": "U"}[body.get("SEX", "").strip()]
         # _id field is internal to mongo
         if '_id' in body:
             del body['_id']

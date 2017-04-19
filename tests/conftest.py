@@ -109,7 +109,8 @@ def mock_db():
         'id': 'I3',
         "name": ["rookie", "bloopy"],
         'Slug': {'En': 'person_1;0.I3'},
-        "deceased": True
+        "deceased": True,
+        "BIRT_PLAC": "London"
     })
     places = db.create_collection('places')
     places.insert({'Slug': {'En': 'place_some'},

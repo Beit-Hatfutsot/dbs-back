@@ -262,3 +262,6 @@ def test_ensure_metadata(app, mock_db):
     assert [h["person_id"] for h in es_search(app, "persons", "person_id:I2")] == []
     # living person in ES - deleted
     assert [h["person_id"] for h in es_search(app, "persons", "person_id:I687")] == []
+    # person has first_name / last_name fields (added during migration process for elasticsearch indexing)
+    assert [h["first_name_lc"] for h in es_search(app, "persons", "person_id:I3")] == ["deady"]
+    assert [h["last_name_lc"] for h in es_search(app, "persons", "person_id:I3")] == ["deadead"]

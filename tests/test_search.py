@@ -288,6 +288,7 @@ def test_advanced_search_persons(client, app):
 
     # death year params
     assert PERSON_EINSTEIN["death_year"] == 1955
+    assert_no_results(client.get(u"/v1/search?collection=persons&yod=1910"))
     assert is_einstein_result(u"/v1/search?collection=persons&yod=1955")
     assert is_einstein_result(u"/v1/search?collection=persons&yod=1953&yod_t=pmyears&yod_v=2")
     assert is_einstein_result(u"/v1/search?collection=persons&yod=1957&yod_t=pmyears&yod_v=2")
@@ -297,6 +298,7 @@ def test_advanced_search_persons(client, app):
 
     # birth year params
     assert PERSON_EINSTEIN["birth_year"] == 1879
+    assert_no_results(client.get(u"/v1/search?collection=persons&yob=1910"))
     assert is_einstein_result(u"/v1/search?collection=persons&yob=1879")
     assert is_einstein_result(u"/v1/search?collection=persons&yob=1877&yob_t=pmyears&yob_v=2")
     assert is_einstein_result(u"/v1/search?collection=persons&yob=1881&yob_t=pmyears&yob_v=2")
@@ -304,13 +306,47 @@ def test_advanced_search_persons(client, app):
     assert_error_message(u"/v1/search?collection=persons&yob=1877&yob_t=invalid", "invalid value for yob_t (birth_year): invalid")
     assert_error_message(u"/v1/search?collection=persons&yob=1877&yob_t=pmyears&yob_v=foo", "invalid value for yob_v (birth_year): foo")
 
+    # marriage years params
+    assert PERSON_EINSTEIN["marriage_years"] == [1923, 1934]
+    assert_no_results(client.get(u"/v1/search?collection=persons&yom=1910"))
+    assert is_einstein_result(u"/v1/search?collection=persons&yom=1923")
+    assert is_einstein_result(u"/v1/search?collection=persons&yom=1936&yom_t=pmyears&yom_v=2")
+    assert is_einstein_result(u"/v1/search?collection=persons&yom=1932&yom_t=pmyears&yom_v=2")
+    assert_error_message(u"/v1/search?collection=persons&yom=foobar", "invalid value for yom (marriage_years): foobar")
+    assert_error_message(u"/v1/search?collection=persons&yom=1877&yom_t=invalid", "invalid value for yom_t (marriage_years): invalid")
+    assert_error_message(u"/v1/search?collection=persons&yom=1877&yom_t=pmyears&yom_v=foo", "invalid value for yom_v (marriage_years): foo")
+
     # multiple params
     assert is_einstein_result(u"/v1/search?collection=persons&yob=1877&yob=1881&yob_t=pmyears&yob_v=2&yod=1955")
     assert_error_message(u"/v1/search?collection=persons&yod=123&&yob=1877&yob_t=pmyears&yob_v=foo", "invalid value for yob_v (birth_year): foo")
     assert_no_results(client.get(u"/v1/search?collection=persons&yob=1879&yod=1953"))
 
+    # text params
+    for param, attr, val, exact, starts, like in (("first", "first_name_lc", "albert", "albert", "alber", "alebrt"),
+                                                  ("last", "last_name_lc", "einstein", "einstein", "einste", "einstien"),
+                                                  ("pob", "BIRT_PLAC_lc", "ulm a.d., germany", "germany", "germ", "uml"),
+                                                  ("pod", "DEAT_PLAC_lc", "princeton, u.s.a.", "princeton", "prince", "prniceton"),
+                                                  ("pom", "MARR_PLAC_lc", ["uklaulaulaska", "agrogorog"], "uklaulaulaska", "agro", "agroogrog")):
+        assert PERSON_EINSTEIN[attr] == val
+        format_kwargs = {"param": param, "exact": exact, "starts": starts, "like": like}
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={exact}".format(**format_kwargs))
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=exact".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={exact}&{param}_t=exact".format(**format_kwargs))
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=starts".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={starts}&{param}_t=starts".format(**format_kwargs))
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=like".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={like}&{param}_t=like".format(**format_kwargs))
 
-
+    # exact match params
+    for param, attr, val, invalid_val, no_results_val in (("sex", "gender", "M", "FOO", "F"),
+                                                          ("treenum", "tree_num", 1196, "FOO", "1002")):
+        assert PERSON_EINSTEIN[attr] == val
+        format_kwargs = {"param": param, "attr": attr, "val": val, "invalid_val": invalid_val, "no_results_val": no_results_val}
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}={no_results_val}".format(**format_kwargs)))
+        assert_error_message(u"/v1/search?collection=persons&{param}={invalid_val}".format(**format_kwargs),
+                             "invalid value for {param} ({attr}): {invalid_val}".format(**format_kwargs))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={val}".format(**format_kwargs))
 
 
 ### constants
@@ -1370,7 +1406,7 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                                                {"id" : "I837", "name" : [ "Eduard", "Einstein" ], "partners" : [ ], "deceased" : True, "sex" : "M" } ],
                                   "deceased" : True, "sex" : "F" },
                                  { "children" : [ ], "deceased" : True, "id" : "I688", "name" : [ "Elsa", "Einstein-Loewenthal" ], "sex" : "F" } ],
-                   "SEX" : "M",
+                   "SEX" : "M", "gender": "M",
                    "BIRT_PLAC" : "Ulm a.D., Germany",
                    "parents" : [ {"name" : [ "Hermann", "Einstein" ],
                                   "partners" : [ { "children" : [ ], "deceased" : True, "id" : "I685", "name" : [ "Pauline", "Koch" ], "sex" : "F" } ],
@@ -1386,7 +1422,8 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                    "birth_year" : 1879,
                    "DEAT_PLAC" : "Princeton, U.S.A.",
                    "tree_version" : 0,
-                   "marriage_years" : None,
+                   "marriage_years" : [1923, 1934],  # not really (sorry Einstein..)
+                   "MARR_PLAC_lc": ["uklaulaulaska", "agrogorog"], # also not really
                    "tree_num" : 1196,
                    "FAMS" : "@F235@",
                    "death_year" : 1955,
@@ -1399,6 +1436,8 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                    "NAME" : "Albert  /Einstein/",
                    "NOTE_CONT" : "04105, USA. Tel.:207-781-4931.",
                    "name_lc" : [ "albert", "einstein" ],
+                   "first_name_lc": "albert",
+                   "last_name_lc": "einstein",
                    "NOTE" : "The Einstein Tree was compiled by Daniel Einstein, POB 6004, Falmouth,Maine",
                    "BIRT_DATE" : "14.3.1879",
                    "BIRT_PLAC_lc" : "ulm a.d., germany",

@@ -32,7 +32,8 @@ from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
 from bhs_api import phonetic
-from bhs_api.persons import PERSONS_SEARCH_DEFAULT_PARAMETERS, PERSONS_SEARCH_REQUIRES_ONE_OF
+from bhs_api.persons import (PERSONS_SEARCH_DEFAULT_PARAMETERS, PERSONS_SEARCH_REQUIRES_ONE_OF,
+                             PERSONS_SEARCH_YEAR_PARAMS, PERSONS_SEARCH_TEXT_PARAMS, PERSONS_SEARCH_EXACT_PARAMS)
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -73,8 +74,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
         must_queries = []
         if q:
             must_queries.append(default_query)
-        for year_param, year_attr in (("yob", "birth_year"),
-                                      ("yod", "death_year")):
+        for year_param, year_attr in PERSONS_SEARCH_YEAR_PARAMS:
             if kwargs[year_param]:
                 try:
                     year_value = int(kwargs[year_param])
@@ -93,6 +93,31 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                     must_queries.append({"term": {year_attr: year_value}})
                 else:
                     raise Exception("invalid value for {} ({}): {}".format(year_type_param, year_attr, year_type))
+        for text_param, text_attr in PERSONS_SEARCH_TEXT_PARAMS:
+            if kwargs[text_param]:
+                text_value = kwargs[text_param]
+                text_type_param = "{}_t".format(text_param)
+                text_type = kwargs[text_type_param]
+                if text_type == "exact":
+                    must_queries.append({"term": {text_attr: text_value}})
+                elif text_type == "like":
+                    must_queries.append({"match": {text_attr: {"query": text_value,
+                                                               "fuzziness": "AUTO"}}})
+                elif text_type == "starts":
+                    must_queries.append({"prefix": {text_attr: text_value}})
+                else:
+                    raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
+        for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
+            if kwargs[exact_param]:
+                exact_value = kwargs[exact_param]
+                if exact_param == "sex" and exact_value not in ("F", "M", "U"):
+                    raise Exception ("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+                elif exact_param == "treenum":
+                    try:
+                        exact_value = int(exact_value)
+                    except Exception as e:
+                        raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+                must_queries.append({"term": {exact_attr: exact_value}})
         body = {
             "query": {
                 "bool": {
