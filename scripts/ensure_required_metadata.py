@@ -46,7 +46,7 @@ class EnsureRequiredMetadataCommand(object):
         updates = {}
         if es_item["_source"].get("Slug") != mongo_item.get("Slug"):
             updates["Slug"] = mongo_item.get("Slug")
-        if "geometry" not in es_item:
+        if es_item["_source"].get("geometry") != mongo_item.get("geometry"):
             updates["geometry"] = mongo_item.get("geometry")
         src_show = doc_show_filter(collection_name, mongo_item)
         es_show = doc_show_filter(collection_name, es_item["_source"])
