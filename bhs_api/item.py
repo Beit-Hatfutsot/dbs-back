@@ -226,6 +226,8 @@ def enrich_item(item, db=None, collection_name=None):
 
 
 def get_item_by_id(id, collection_name, db=None):
+    if collection_name == "persons":
+        raise Exception("persons collection does not support getting item by id, you need to search person using multiple fields")
     if not db:
         db = current_app.data_db
     id_field = get_collection_id_field(collection_name)
@@ -346,7 +348,7 @@ def get_image_url(image_id, bucket):
     return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
 
 
-def get_collection_id_field(collection_name, is_elasticsearch=False):
+def get_collection_id_field(collection_name):
     doc_id = 'UnitId'
     if collection_name == 'photos':
         doc_id = 'PictureId'
@@ -354,8 +356,7 @@ def get_collection_id_field(collection_name, is_elasticsearch=False):
     elif collection_name == 'genTreeIndividuals':
         doc_id = 'ID'
     elif collection_name == 'persons':
-        # elasticsearch cannot have "id" attribute
-        doc_id = "PID" if is_elasticsearch else "id"
+        raise Exception("persons collection does not support plain id field, but a combination of fields")
     elif collection_name == 'synonyms':
         doc_id = '_id'
     elif collection_name == 'trees':
@@ -412,46 +413,41 @@ def create_slug(document, collection_name):
     return ret
 
 def get_doc_id(collection_name, doc):
-    mongo_id_field = get_collection_id_field(collection_name, is_elasticsearch=False)
-    elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
-    if mongo_id_field == elasticsearch_id_field:
-        return doc.get(mongo_id_field)
-    else:
-        mongo_id = doc.get(mongo_id_field)
-        elasticsearch_id = doc.get(elasticsearch_id_field)
-        if mongo_id == elasticsearch_id:
-            return mongo_id
-        elif elasticsearch_id is None:
-            return mongo_id
-        elif mongo_id is None:
-            return elasticsearch_id
-        else:
-            raise Exception("could not find doc_id for collection {} doc {}".format(collection_name, doc))
+    if collection_name == "persons":
+        raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
+    id_field = get_collection_id_field(collection_name)
+    return doc[id_field]
 
 
-def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db=None, app=None):
+def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=None):
     app = current_app if not app else app
     es_index_name = app.es_data_db_index_name if not es_index_name else es_index_name
     es = app.es if not es else es
-    data_db = app.data_db if not data_db else data_db
     # index only the docs that are publicly available
     if doc_show_filter(collection_name, doc):
         body = deepcopy(doc)
-        # the given doc might come either from mongo or from elasticsearch
-        # here we try to get the doc id from one of them and save it in elasticsearch
-        elasticsearch_id_field = get_collection_id_field(collection_name, is_elasticsearch=True)
-        doc_id = get_doc_id(collection_name, doc)
-        body[elasticsearch_id_field] = doc_id
+        # adjust attributes for elasticsearch
+        if collection_name == "persons":
+            body["person_id"] = body.get("id", body.get("ID"))
+            body["first_name_lc"] = body["name_lc"][0]
+            body["last_name_lc"] = body["name_lc"][1]
+            # maps all known SEX values to normalized gender value
+            body["gender"] = {"F": "F", "M": "M",
+                              None: "U", "": "U", "U": "U", "?": "U", "P": "U"}[body.get("SEX", "").strip()]
         # _id field is internal to mongo
         if '_id' in body:
             del body['_id']
-        # id field has special meaning in elasticsearch (it is copied to correct attribute above in the id_field handling
+        # id field has special meaning in elasticsearch
         if 'id' in body:
             del body['id']
         if "thumbnail" in body and "data" in body["thumbnail"]:
             # no need to have thumbnail data in elasticsearch
             # TODO: ensure we only store and use thumbnail from filesystem
             del body["thumbnail"]["data"]
+        # persons collection gets a fake header to support searching
+        if collection_name == "persons":
+            name = " ".join(body["name"]) if isinstance(body["name"], list) else body["name"]
+            body["Header"] = {"En": name, "He": name}
         # elasticsearch uses the header for completion field
         # this field does not support empty values, so we put a string with space here
         # this is most likely wrong, but works for now
@@ -460,21 +456,16 @@ def update_es(collection_name, doc, is_new, es_index_name=None, es=None, data_db
             for lang in ("He", "En"):
                 if body["Header"].get(lang) is None:
                     body["Header"][lang] = '_'
+        if collection_name == "persons":
+            doc_id = "{}_{}_{}".format(body["tree_num"], body["tree_version"], body["person_id"])
+        else:
+            doc_id = get_doc_id(collection_name, body)
         if is_new:
             uuids_to_str(body)
             es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
-            return True, "indexed successfully"
+            return True, "indexed successfully (inserted)"
         else:
-            try:
-                es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body={"doc": body})
-                return True, "indexed successfully"
-            except elasticsearch.exceptions.NotFoundError as e:
-                # So it's in the DB, passes the SHOW_FILTER and not found in ES
-                # weird, but that's what we have.
-                # let's index it.
-                item = data_db[collection_name].find_one({'_id': doc_id})
-                del item['_id']
-                es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=item)
-                return True, "indexed successfully, by resorting to ES index function for {}:{} with {}".format(collection_name, doc_id, e)
+            es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
+            return True, "indexed successfully (updated)"
     else:
         return True, "item should not be shown - so not indexed"

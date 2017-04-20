@@ -1,0 +1,23 @@
+{
+  "PlaceTypeDesc": {
+    "En": "City",
+    "He": "\u05e2\u05d9\u05e8"
+  },
+  // plain text, long article about this place (may contain newlines)
+  "UnitText1": {
+    "En": "",
+    "He": ""
+  },
+  // the BHP item id
+  "UnitId": 72312,
+  // slug is comprised of "place_header"
+  "Slug": {
+    "En": "place_paris",
+    "He": "\u05de\u05e7\u05d5\u05dd_\u05e4\u05e8\u05d9\u05e1"
+  },
+  // name of the place
+  "Header": {
+    "En": "PARIS",
+    "He": "\u05e4\u05e8\u05d9\u05e1"
+  }
+}

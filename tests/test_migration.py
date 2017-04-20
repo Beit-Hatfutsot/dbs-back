@@ -46,7 +46,8 @@ class MockEnsureRequiredMetadataCommand(EnsureRequiredMetadataCommand):
                                             "debug": True,
                                             "add": True,
                                             "limit": None,
-                                            "legacy": False})
+                                            "legacy": False,
+                                            "index": None})
 
 
 def given_ensure_required_metadata_ran(app):
@@ -69,59 +70,52 @@ def test_update_doc(mocker, app):
     mocker.patch('elasticsearch.Elasticsearch.index')
     collection = app.data_db['personalities']
     with app.app_context():
-        # make sure the collection is clean
-        doc =  collection.find_one({'UnitId':1000})
-        assert not doc
-        r=update_doc(collection, THE_TESTER)
+        # make sure the document does not exist in mongo
+        assert not collection.find_one({'UnitId':1000})
+        # this will create the document in mongo
+        update_doc(collection, deepcopy(THE_TESTER))
         doc =  collection.find_one({'UnitId':1000})
         assert doc['UnitText1']['En'] == 'The Tester'
-        assert doc['_id'] == 1000
-        expected_body = deepcopy(THE_TESTER)
-        del expected_body["_id"]
-        expected_body["Header"]["He"] = "_"
-        elasticsearch.Elasticsearch.index.assert_called_once_with(
-            body = expected_body,
-            doc_type = 'personalities',
-            id=doc['_id'],
-            index = 'bhdata',
-        )
-        assert doc['related'] == ['place_some']
+        assert doc["UnitId"] == 1000
+        # check in elasticsearch
+        expected_elasticsearch_body = dict(deepcopy(THE_TESTER),
+                                           Header={"En": "Nik Nikos", "He": "_"},
+                                           Slug={"En": "luminary_nik-nikos"},
+                                           related=["place_some"])
+        elasticsearch.Elasticsearch.index.assert_called_once_with(body=expected_elasticsearch_body,
+                                                                  doc_type='personalities',
+                                                                  id=1000,
+                                                                  index='bhdata',)
 
 def test_updated_doc(mocker, app):
     ''' testing a creation and an update, ensuring uniquness '''
     mocker.patch('elasticsearch.Elasticsearch.index')
+    mocker.patch('elasticsearch.Elasticsearch.update')
     collection = app.data_db['personalities']
     with app.app_context():
-        update_doc(collection, deepcopy(THE_TESTER))
-        slug = collection.find_one({'UnitId':1000})['Slug']['En']
-        assert slug ==  collection.find_one({'UnitId':1000})['Slug']['En']
-        id = THE_TESTER['_id']
-        expected_body = deepcopy(THE_TESTER)
-        del expected_body["_id"]
-        expected_body["Header"]["He"] = "_"
-        # no hebrew slug
-        expected_body["Slug"] = {"En": expected_body["Slug"]["En"]}
+        the_tester = deepcopy(THE_TESTER)
+        update_doc(collection, the_tester)
+        assert collection.find_one({'UnitId':1000})['Slug']['En'] == "luminary_nik-nikos"
         elasticsearch.Elasticsearch.index.assert_called_once_with(
-            body = expected_body,
-            doc_type = "personalities",
-            id=id,
-            index = "bhdata",
+            index="bhdata", doc_type="personalities", id=1000,
+            body = dict(deepcopy(THE_TESTER),
+                        Header={"En": "Nik Nikos", "He": "_"},
+                        Slug={"En": "luminary_nik-nikos"},
+                        related=["place_some"])
         )
-        elasticsearch.Elasticsearch.index.reset_mock()
-        updated_tester = deepcopy(THE_TESTER)
+        updated_tester = deepcopy(the_tester)
         updated_tester['Header']['En'] = 'Nikos Nikolveich'
         updated_tester['UnitText1']['En'] = 'The Great Tester'
         update_doc(collection, updated_tester)
-        assert collection.count({'UnitId':1000}) == 1
-        expected_body = deepcopy(updated_tester)
-        del expected_body['_id']
-        expected_body["Header"] = {"En": "Nikos Nikolveich"}
-        elasticsearch.Elasticsearch.index.assert_called_once_with(
-            body = expected_body,
-            doc_type = 'personalities',
-            id=id,
-            index = 'bhdata',
+        elasticsearch.Elasticsearch.update.assert_called_once_with(
+            index = 'bhdata', doc_type = 'personalities', id = 1000,
+            body = dict(deepcopy(THE_TESTER),
+                        Header={"En": "Nikos Nikolveich", "He": "_"},
+                        Slug={"En": "luminary_nik-nikos"},
+                        related=["place_some"],
+                        UnitText1={"En": "The Great Tester"})
         )
+
 
 def test_update_photo(mocker):
     mocker.patch('boto.storage_uri')
@@ -209,9 +203,9 @@ def test_ensure_metadata(app, mock_db):
     assert es_search(app, "personalities", "UnitId:1") == []
     assert es_search(app, "personalities", "UnitId:2") == []
     assert es_search(app, "places", "UnitId:3") == []
-    assert es_search(app, "persons", "PID:I2") == []  # living person (in mongo)
-    assert es_search(app, "persons", "PID:I3") == []  # dead person (in mongo)
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == ["I687"]  # living person in ES
+    assert es_search(app, "persons", "person_id:I2") == []  # living person (in mongo)
+    assert es_search(app, "persons", "person_id:I3") == []  # dead person (in mongo)
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I687")] == ["I687"]  # living person in ES
     assert set(given_ensure_required_metadata_ran(app)) == {('places', 'ADDED_ITEM', 3),
                                                             ('places', 'DELETED_ITEM', 71255),
                                                             ('places', 'DELETED_ITEM', 71236),
@@ -225,18 +219,18 @@ def test_ensure_metadata(app, mock_db):
                                                             ('personalities', 'DELETED_ITEM', 93968),
                                                             ('movies', 'DELETED_ITEM', 111554),
                                                             ('movies', 'DELETED_ITEM', 111553),
-                                                            ('persons', 'NO_UPDATE_NEEDED', 'I2'),
-                                                            ('persons', 'ADDED_ITEM', 'I3'),
-                                                            ('persons', 'DELETED_ITEM', u'I687'),
-                                                            ('persons', 'DELETED_ITEM', u'I686')}
+                                                            ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I2')),
+                                                            ('persons', 'ADDED_ITEM', (1, 0, 'I3')),
+                                                            ('persons', 'DELETED_ITEM', (1933, 0, 'I687')),
+                                                            ('persons', 'DELETED_ITEM', (1196, 0, 'I686'))}
     # running again - to make sure it searches items properly in ES
     # items deleted in previous results - don't appear now
     # items added / no update needed in previous results - all have no_update_needed now
     assert set(given_ensure_required_metadata_ran(app)) == {('places', 'NO_UPDATE_NEEDED', 3),
                                                             ('personalities', 'NO_UPDATE_NEEDED', 1),
                                                             ('personalities', 'NO_UPDATE_NEEDED', 2),
-                                                            ('persons', 'NO_UPDATE_NEEDED', 'I2'),
-                                                            ('persons', 'NO_UPDATE_NEEDED', 'I3')}
+                                                            ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I2')),
+                                                            ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I3'))}
     # new item in mongo - added to ES (because add parameter is enabled in these tests)
     assert es_search(app, "personalities", "UnitId:1") == [{u'DisplayStatusDesc': u'free',
                                                             u'RightsDesc': u'Full',
@@ -263,8 +257,11 @@ def test_ensure_metadata(app, mock_db):
     given_ensure_required_metadata_ran(app)
     assert len(es_search(app, "places", "UnitId:3")) == 0
     # dead person - added to ES
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I3")] == ["I3"]
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I3")] == ["I3"]
     # living person in mongo - not synced to ES
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I2")] == []
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I2")] == []
     # living person in ES - deleted
-    assert [h["PID"] for h in es_search(app, "persons", "PID:I687")] == []
+    assert [h["person_id"] for h in es_search(app, "persons", "person_id:I687")] == []
+    # person has first_name / last_name fields (added during migration process for elasticsearch indexing)
+    assert [h["first_name_lc"] for h in es_search(app, "persons", "person_id:I3")] == ["deady"]
+    assert [h["last_name_lc"] for h in es_search(app, "persons", "person_id:I3")] == ["deadead"]

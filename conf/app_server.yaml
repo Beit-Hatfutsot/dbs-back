@@ -28,9 +28,11 @@ image_bucket: bhs-flat-pics
 thumbnail_bucket: bhs-thumbnails
 ftree_bucket_url: https://storage.googleapis.com/bhs-familytrees
 video_bucket_url: https://storage.googleapis.com/bhs-videos
+
 # elastic search
 elasticsearch_host: localhost
-elasticsearch_data_index:
+elasticsearch_data_index: bhdata
+
 # redis
 redis_host: localhost
 redis_port: 6379

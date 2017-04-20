@@ -71,24 +71,21 @@ def test_migrate_trees(mocker):
     def on_save(row):
         collection_name = "persons"
         doc = parse_doc(row, collection_name)
-        id_field = get_collection_id_field(collection_name)
-        saved_docs.append((row, collection_name, id_field, doc))
-        # update_row.delay(doc, collection_name)
+        saved_docs.append((row, collection_name, doc))
         return doc
     assert migrate_trees(cursor, on_save=on_save) == 1
 
     i29 = [doc for doc in saved_docs if doc[0]["id"] == "I29"][0]
     assert i29[0]["id"] == "I29"  # row
     assert i29[1] == "persons"  # collection_name
-    assert i29[2] == "id"  # collection_id_field
-    assert i29[3]["id"] == "I29"  # doc
-    assert i29[3]["deceased"] == False
+    assert i29[2]["id"] == "I29"  # doc
+    assert i29[2]["deceased"] == False
 
-    i19 = [doc for doc in saved_docs if doc[0]["id"] == "I19"][0][3]
+    i19 = [doc for doc in saved_docs if doc[0]["id"] == "I19"][0][2]
     assert i19["id"] == "I19"
     assert i19["deceased"] == True
 
-    i9 = [doc for doc in saved_docs if doc[0]["id"] == "I09"][0][3]
+    i9 = [doc for doc in saved_docs if doc[0]["id"] == "I09"][0][2]
     assert i9["marriage_years"] == [1933]
     assert i9["birth_year"] == 1911
     assert i9["death_year"] == 1965
