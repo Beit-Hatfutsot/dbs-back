@@ -1,0 +1,9 @@
+{
+    "hits": {
+        "hits": [
+            // list of item objects, depending on the searched collections
+            // see Items section for details about the structure of item objects
+        ],
+        "total": 1 // total number of results
+    }
+}

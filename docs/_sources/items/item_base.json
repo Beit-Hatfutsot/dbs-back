@@ -1,0 +1,13 @@
+{
+  // every item gets a unique slug which identifies the item
+  "Slug": {
+    "En": "UNIQUE_ITEM_SLUG_IN_ENGLISH",
+    "He": "UNIQUE_ITEM_SLUG_IN_HEBREW"
+  },
+  // every item has a header title / text, the value depends on the item
+  // for example - for place, it will be the name of the place, for person - the name of the person etc..
+  "Header": {
+    "En": "ENGLISH_HEADER",
+    "He": "HEBREW_HEADER"
+  }
+}

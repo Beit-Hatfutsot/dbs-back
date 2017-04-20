@@ -1,0 +1,15 @@
+{
+  // the BHP item id
+  "UnitId": 72312,
+  // person slugs contain the tree number, version and person id (within that tree)
+  // person slugs are the same for both english and hebrew
+  "Slug": {
+    "En": "person_1130%3B0.I3552",
+    "He": "person_1130%3B0.I3552"
+  },
+  // name of the person - same value is in both english and hebrew
+  "Header": {
+    "En": "Moshe Fakeuser",
+    "He": "Moshe Fakeuser"
+  }
+}

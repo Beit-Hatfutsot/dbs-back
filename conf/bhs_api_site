@@ -8,7 +8,7 @@ server {
 
 	location /v1/docs {
         default_type text/html;
-        alias /home/bhs/api/docs/index.html;
+        alias /home/bhs/api/docs/_build/index.html;
     }
 
     location / {
