@@ -1,0 +1,36 @@
+# coding: utf-8
+
+
+PLACE_BIELSK_NOT_FOR_VIEWING = {"UnitId": 71253,
+                                # StatusDesc must be "Completed" for item to be displayed
+                                "StatusDesc": "Edit",
+                                "RightsDesc": "Full",
+                                "DisplayStatusDesc": "Museum only",
+                                # there was an issue with items that only have text in 1 language
+                                "UnitText1": {"En": "english text"},
+                                "LocationInMuseum": None,
+                                "Pictures": [{"PictureId": "1AEF2108-2392-4523-9400-023EBC251574", "IsPreview": "0"},
+                                             {"PictureId": "5EAB2058-31DD-4014-8280-526FFD0C1B37", "IsPreview": "1"},
+                                             {"PictureId": "670B16E9-B6D4-46CB-ABD7-788E0CB94A3B", "IsPreview": "0"},
+                                             {"PictureId": "2695D6E9-FD45-4BE9-9E07-BF290C116B82", "IsPreview": "0"},
+                                             {"PictureId": "6723F315-ED8F-4511-8DB7-D627029E5BB7", "IsPreview": "0"},
+                                             {"PictureId": "974D7669-2A1E-4BD2-9E38-EFBC3A18CDF3", "IsPreview": "0"}],
+                                "PictureUnitsIds": "135828|12708|126285|136133|5080|48111|",
+                                "UpdateDate": "2015-08-06T11:54:00",
+                                "OldUnitId": "HB000417.HTM-EB000037.HTM",
+                                "UpdateUser": "***** ****** ",
+                                "PrevPictureFileNames": "AR2005-18-1.jpg|01223500.JPG|1-5a.jpg|AR2005-18-13.jpg|00458700.JPG|03617600.JPG|",
+                                "PrevPicturePaths": "Photos\u0001aef2108-2392-4523-9400-023ebc251574.jpg|Photos\u000000613.scn\n23500.JPG|Photos70b16e9-b6d4-46cb-abd7-788e0cb94a3b.jpg|Photos\u001695d6e9-fd45-4be9-9e07-bf290c116b82.jpg|Photos\u000000438.scn\u000458700.JPG|Photos\u000001269.scn\u001e17600.JPG|",
+                                "PlaceTypeCode": 2,
+                                "TS": "00000000003f983a",
+                                "PlaceTypeDesc": {"En": "Town", "He": "עיירה"},
+                                "UnitType": 5, "UnitTypeDesc": "Place", "EditorRemarks": "hasavot from Places ",
+                                "Bibiliography": {"En": None, "He": "אנציקלופדיה יודאיקה"}, "UnitText2": {"En": None, "He": None}, "UnitPlaces": [],
+                                "main_image_url": "https://storage.googleapis.com/bhs-flat-pics/5EAB2058-31DD-4014-8280-526FFD0C1B37.jpg",
+                                "UnitStatus": 2, "UnitHeaderDMSoundex": {"En": "ZZ E784500 ZZ ", "He": "ZZ H784500 ZZ "},
+                                "UnitDisplayStatus": 2, "RightsCode": 1, "IsValueUnit": True, "PlaceParentTypeCodeDesc": {"En": "Country"},
+                                "PlaceParentId": 67291, "UserLexicon": None, "Attachments": [],
+                                "Slug": {"En": "place_bielsk", "He": "מקום_ביילסק"},
+                                "Header": {"En": "BIELSK", "He": "ביילסק"},
+                                "thumbnail_url": "https://storage.googleapis.com/bhs-thumbnails/5EAB2058-31DD-4014-8280-526FFD0C1B37.jpg",
+                                "ForPreview": False}

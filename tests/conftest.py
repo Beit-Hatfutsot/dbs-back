@@ -8,6 +8,7 @@ import pytest
 import mock
 from pytest_flask.plugin import client, config
 import mongomock
+from mocks import PLACE_BIELSK_NOT_FOR_VIEWING
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.pardir)))
@@ -119,5 +120,5 @@ def mock_db():
             'RightsDesc': 'Full',
             'DisplayStatusDesc':  'free',
             'UnitText1': {'En': 'just a place' }})
+    places.insert(PLACE_BIELSK_NOT_FOR_VIEWING)
     return db
-

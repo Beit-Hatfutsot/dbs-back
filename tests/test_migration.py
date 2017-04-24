@@ -1,3 +1,4 @@
+# coding: utf-8
 import json
 import boto
 import elasticsearch
@@ -7,6 +8,7 @@ from migration.files import upload_file
 from test_search import given_local_elasticsearch_client_with_test_data
 from scripts.ensure_required_metadata import EnsureRequiredMetadataCommand
 from copy import deepcopy
+from mocks import PLACE_BIELSK_NOT_FOR_VIEWING
 
 
 first_tree = dict(num=100,
@@ -209,12 +211,14 @@ def test_ensure_metadata(app, mock_db):
     assert set(given_ensure_required_metadata_ran(app)) == {('places', 'ADDED_ITEM', 3),
                                                             ('places', 'DELETED_ITEM', 71255),
                                                             ('places', 'DELETED_ITEM', 71236),
+                                                            # item is not allowed for viewing, and is already not in ES so no update needed
+                                                            ('places', 'NO_UPDATE_NEEDED', PLACE_BIELSK_NOT_FOR_VIEWING["UnitId"]),
                                                             ('familyNames', 'DELETED_ITEM', 77321),
                                                             ('familyNames', 'DELETED_ITEM', 77323),
                                                             ('photoUnits', 'DELETED_ITEM', 140068),
                                                             ('photoUnits', 'DELETED_ITEM', 137523),
                                                             ('personalities', 'ADDED_ITEM', 1),
-                                                            ('personalities', 'ADDED_ITEM', 2),
+                                                            ('personalities', 'NO_UPDATE_NEEDED', 2),
                                                             ('personalities', 'DELETED_ITEM', 93967),
                                                             ('personalities', 'DELETED_ITEM', 93968),
                                                             ('movies', 'DELETED_ITEM', 111554),
@@ -227,6 +231,7 @@ def test_ensure_metadata(app, mock_db):
     # items deleted in previous results - don't appear now
     # items added / no update needed in previous results - all have no_update_needed now
     assert set(given_ensure_required_metadata_ran(app)) == {('places', 'NO_UPDATE_NEEDED', 3),
+                                                            ('places', 'NO_UPDATE_NEEDED', PLACE_BIELSK_NOT_FOR_VIEWING["UnitId"]),
                                                             ('personalities', 'NO_UPDATE_NEEDED', 1),
                                                             ('personalities', 'NO_UPDATE_NEEDED', 2),
                                                             ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I2')),
@@ -241,10 +246,10 @@ def test_ensure_metadata(app, mock_db):
                                                             u'UnitText1': {u'En': u'tester',
                                                                            u'He': u'\u05d1\u05d5\u05d3\u05e7'}}]
     # modifying slug in mongo - should update slug in ES
-    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:2")] == ["personality_another-tester"]
-    mock_db["personalities"].update_one({"UnitId": 2}, {"$set": {"Slug.En": "personality_another-tester-modified"}})
+    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:1")] == ["personality_tester"]
+    mock_db["personalities"].update_one({"UnitId": 1}, {"$set": {"Slug.En": "personality_tester-modified"}})
     given_ensure_required_metadata_ran(app)
-    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:2")] == ["personality_another-tester-modified"]
+    assert [h["Slug"]["En"] for h in es_search(app, "personalities", "UnitId:1")] == ["personality_tester-modified"]
     # changing item rights in ES - will fix them when updating from mongo
     app.es.update(index=app.es_data_db_index_name, doc_type="places", id=3, body={"doc": {"StatusDesc": "PARTIAL"}})
     app.es.indices.refresh()

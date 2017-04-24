@@ -14,8 +14,9 @@ from bhs_api.fsearch import is_living_person
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
                'RightsDesc': 'Full',
-               'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}},
-                                                                         {'UnitText1.He': {'$nin': [None, '']}}]}
+               'DisplayStatusDesc':  {'$nin': ['Internal Use']},
+               '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                       {'UnitText1.He': {'$nin': [None, '']}}]}
 
 
 def get_show_metadata(collection_name, doc):
@@ -25,8 +26,9 @@ def get_show_metadata(collection_name, doc):
     else:
         if SHOW_FILTER != {'StatusDesc': 'Completed',
                            'RightsDesc': 'Full',
-                           'DisplayStatusDesc':  {'$nin': ['Internal Use']}, '$or': [{'UnitText1.En': {'$nin': [None, '']}},
-                                                                                     {'UnitText1.He': {'$nin': [None, '']}}]}:
+                           'DisplayStatusDesc':  {'$nin': ['Internal Use']},
+                           '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                                   {'UnitText1.He': {'$nin': [None, '']}}]}:
             raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
         else:
             return {"StatusDesc": doc.get('StatusDesc'),
@@ -40,10 +42,10 @@ def doc_show_filter(collection_name, doc):
     if collection_name == "persons":
         return not is_living_person(show_metadata["deceased"], show_metadata["birth_year"])
     else:
-        return bool((show_metadata['StatusDesc'] == 'Completed'
-                     and show_metadata['RightsDesc'] == 'Full'
-                     and show_metadata['DisplayStatusDesc'] not in ['Internal Use']) or (show_metadata["UnitText1"].get("En")
-                                                                                         and show_metadata["UnitText1"].get("He")))
+        return bool(show_metadata['StatusDesc'] == 'Completed'
+                    and show_metadata['RightsDesc'] == 'Full'
+                    and show_metadata['DisplayStatusDesc'] not in ['Internal Use']
+                    and (show_metadata["UnitText1"].get("En") or show_metadata["UnitText1"].get("He")))
 
 
 class Slug:
