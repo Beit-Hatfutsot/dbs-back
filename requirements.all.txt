@@ -1,3 +1,4 @@
 -r requirements.txt
 -r requirements.migrate.txt
+-r requirements.devops.txt
 pymssql==2.1.3

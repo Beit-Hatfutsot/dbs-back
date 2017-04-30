@@ -7,14 +7,45 @@ from flask import current_app
 from slugify import Slugify
 from bhs_api import phonetic
 from bhs_api.fsearch import clean_person
+from bhs_api.utils import uuids_to_str
+from copy import deepcopy
+from bhs_api.fsearch import is_living_person
 
-SHOW_FILTER = {
-                'StatusDesc': 'Completed',
-                'RightsDesc': 'Full',
-                'DisplayStatusDesc':  {'$nin': ['Internal Use']},
-                '$or':
-                    [{'UnitText1.En': {'$nin': [None, '']}}, {'UnitText1.He': {'$nin': [None, '']}}]
-                }
+
+SHOW_FILTER = {'StatusDesc': 'Completed',
+               'RightsDesc': 'Full',
+               'DisplayStatusDesc':  {'$nin': ['Internal Use']},
+               '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                       {'UnitText1.He': {'$nin': [None, '']}}]}
+
+
+def get_show_metadata(collection_name, doc):
+    if collection_name == "persons":
+        return {"deceased": doc.get("deceased"),
+                "birth_year": doc.get("birth_year")}
+    else:
+        if SHOW_FILTER != {'StatusDesc': 'Completed',
+                           'RightsDesc': 'Full',
+                           'DisplayStatusDesc':  {'$nin': ['Internal Use']},
+                           '$or': [{'UnitText1.En': {'$nin': [None, '']}},
+                                   {'UnitText1.He': {'$nin': [None, '']}}]}:
+            raise Exception("this script has a translation of the show filter, if the mongo SHOW_FILTER is modified, this logic needs to be modified as well")
+        else:
+            return {"StatusDesc": doc.get('StatusDesc'),
+                    "RightsDesc": doc.get('RightsDesc'),
+                    "DisplayStatusDesc": doc.get("DisplayStatusDesc"),
+                    "UnitText1": doc.get("UnitText1", {})}
+
+
+def doc_show_filter(collection_name, doc):
+    show_metadata = get_show_metadata(collection_name, doc)
+    if collection_name == "persons":
+        return not is_living_person(show_metadata["deceased"], show_metadata["birth_year"])
+    else:
+        return bool(show_metadata['StatusDesc'] == 'Completed'
+                    and show_metadata['RightsDesc'] == 'Full'
+                    and show_metadata['DisplayStatusDesc'] not in ['Internal Use']
+                    and (show_metadata["UnitText1"].get("En") or show_metadata["UnitText1"].get("He")))
 
 
 class Slug:
@@ -197,6 +228,8 @@ def enrich_item(item, db=None, collection_name=None):
 
 
 def get_item_by_id(id, collection_name, db=None):
+    if collection_name == "persons":
+        raise Exception("persons collection does not support getting item by id, you need to search person using multiple fields")
     if not db:
         db = current_app.data_db
     id_field = get_collection_id_field(collection_name)
@@ -321,10 +354,11 @@ def get_collection_id_field(collection_name):
     doc_id = 'UnitId'
     if collection_name == 'photos':
         doc_id = 'PictureId'
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     elif collection_name == 'genTreeIndividuals':
         doc_id = 'ID'
     elif collection_name == 'persons':
-        doc_id = 'id'
+        raise Exception("persons collection does not support plain id field, but a combination of fields")
     elif collection_name == 'synonyms':
         doc_id = '_id'
     elif collection_name == 'trees':
@@ -348,6 +382,7 @@ def create_slug(document, collection_name):
         'photos': {'En': 'image',
                    'He': u'תמונה',
                   },
+        # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
         'genTreeIndividuals': {'En': 'person',
                                'He': u'אדם',
                               },
@@ -364,6 +399,9 @@ def create_slug(document, collection_name):
     try:
         headers = document['Header'].items()
     except KeyError:
+        # persons collection will be handled here as the cllection's docs don't have a Header
+        # it's the calling function responsibility to add a slug
+        # TODO: refactor to more specific logic, instead of relying on them not having a Header
         return
 
     ret = {}
@@ -375,3 +413,61 @@ def create_slug(document, collection_name):
                 slug = slugify('_'.join([collection_slug, val.lower()]))
                 ret[lang] = slug.encode('utf8')
     return ret
+
+def get_doc_id(collection_name, doc):
+    if collection_name == "persons":
+        raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
+    id_field = get_collection_id_field(collection_name)
+    return doc[id_field]
+
+
+def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=None):
+    app = current_app if not app else app
+    es_index_name = app.es_data_db_index_name if not es_index_name else es_index_name
+    es = app.es if not es else es
+    # index only the docs that are publicly available
+    if doc_show_filter(collection_name, doc):
+        body = deepcopy(doc)
+        # adjust attributes for elasticsearch
+        if collection_name == "persons":
+            body["person_id"] = body.get("id", body.get("ID"))
+            body["first_name_lc"] = body["name_lc"][0]
+            body["last_name_lc"] = body["name_lc"][1]
+            # maps all known SEX values to normalized gender value
+            body["gender"] = {"F": "F", "M": "M",
+                              None: "U", "": "U", "U": "U", "?": "U", "P": "U"}[body.get("SEX", "").strip()]
+        # _id field is internal to mongo
+        if '_id' in body:
+            del body['_id']
+        # id field has special meaning in elasticsearch
+        if 'id' in body:
+            del body['id']
+        if "thumbnail" in body and "data" in body["thumbnail"]:
+            # no need to have thumbnail data in elasticsearch
+            # TODO: ensure we only store and use thumbnail from filesystem
+            del body["thumbnail"]["data"]
+        # persons collection gets a fake header to support searching
+        if collection_name == "persons":
+            name = " ".join(body["name"]) if isinstance(body["name"], list) else body["name"]
+            body["Header"] = {"En": name, "He": name}
+        # elasticsearch uses the header for completion field
+        # this field does not support empty values, so we put a string with space here
+        # this is most likely wrong, but works for now
+        # TODO: figure out how to handle it properly, maybe items without header are invalid?
+        if "Header" in body:
+            for lang in ("He", "En"):
+                if body["Header"].get(lang) is None:
+                    body["Header"][lang] = '_'
+        if collection_name == "persons":
+            doc_id = "{}_{}_{}".format(body["tree_num"], body["tree_version"], body["person_id"])
+        else:
+            doc_id = get_doc_id(collection_name, body)
+        if is_new:
+            uuids_to_str(body)
+            es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
+            return True, "indexed successfully (inserted)"
+        else:
+            es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
+            return True, "indexed successfully (updated)"
+    else:
+        return True, "item should not be shown - so not indexed"

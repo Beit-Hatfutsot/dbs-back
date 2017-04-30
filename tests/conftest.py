@@ -8,6 +8,7 @@ import pytest
 import mock
 from pytest_flask.plugin import client, config
 import mongomock
+from mocks import PLACE_BIELSK_NOT_FOR_VIEWING
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.pardir)))
@@ -75,7 +76,8 @@ def mock_db():
             'DisplayStatusDesc':  'free',
             'UnitText1': {'En': 'another tester',
                         'He': 'עוד בודק',
-                        }
+                        },
+             "Header": {"En": "Nava Schreiber, Daniella Luxemburg", "He": None}
             },
             ]:
         personalities.insert(i)
@@ -88,16 +90,29 @@ def mock_db():
                       }]
     })
     persons = db.create_collection('persons')
+    # living person
     persons.insert({
             'name_lc': ['tester', 'de-tester'],
             'tree_num': 1,
             'tree_version': 0,
             'id': 'I2',
+            "name": ["hoomy", "cookie"],
             'StatusDesc': 'Completed',
             'RightsDesc': 'Full',
             'DisplayStatusDesc':  'free',
             'Slug': {'En': 'person_1;0.I2'},
         })
+    # dead person
+    persons.insert({
+        'name_lc': ['deady', 'deadead'],
+        'tree_num': 1,
+        'tree_version': 0,
+        'id': 'I3',
+        "name": ["rookie", "bloopy"],
+        'Slug': {'En': 'person_1;0.I3'},
+        "deceased": True,
+        "BIRT_PLAC": "London"
+    })
     places = db.create_collection('places')
     places.insert({'Slug': {'En': 'place_some'},
                    'UnitId': 3,
@@ -105,5 +120,5 @@ def mock_db():
             'RightsDesc': 'Full',
             'DisplayStatusDesc':  'free',
             'UnitText1': {'En': 'just a place' }})
+    places.insert(PLACE_BIELSK_NOT_FOR_VIEWING)
     return db
-

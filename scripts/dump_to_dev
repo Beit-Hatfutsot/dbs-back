@@ -8,13 +8,16 @@ then
         mongodump --db $1 --query '{"Header.En" : /^B/}' --collection $c
     done
     # save a backup in tmp
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     mongodump --quiet --db $1 --query '{"GTN": 3372}' --collection genTreeIndividuals -o /tmp
     # remove info of the living
     mongo $1 scripts/dump_to_dev.js > /dev/null
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     mongodump --quiet --db $1 --query '{"GTN": 3372}' --collection genTreeIndividuals
     rm -rf dump/bhdata
     mv dump/$1 dump/bhdata
     tar cz dump/bhdata
+    # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
     mongorestore --quiet --db $1 --collection genTreeIndividuals /tmp/$1
 else
     echo "dump to dev tar ball"

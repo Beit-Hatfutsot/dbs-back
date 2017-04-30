@@ -20,6 +20,7 @@ import elasticsearch
 import pymongo
 import jinja2
 import requests
+import traceback
 
 from bhs_api import SEARCH_CHUNK_SIZE
 from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
@@ -31,6 +32,8 @@ from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
 from bhs_api import phonetic
+from bhs_api.persons import (PERSONS_SEARCH_DEFAULT_PARAMETERS, PERSONS_SEARCH_REQUIRES_ONE_OF,
+                             PERSONS_SEARCH_YEAR_PARAMS, PERSONS_SEARCH_TEXT_PARAMS, PERSONS_SEARCH_EXACT_PARAMS)
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -51,13 +54,79 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
 '''
 
 
-def es_search(q, size, collection=None, from_=0, sort=None):
-    # body = {"query": { "match" : { "_all": {"query": q, "operator": "and"} }}}
-    body = {"query": { "query_string" : {
-        "fields": ['Header.En^2', 'Header.He^2', 'UnitText1.En', 'UnitText1.He'],
-        "query": q,
-        "default_operator": "and"
-    }}}
+def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, **kwargs):
+    if collection:
+        # if user requested specific collections - we don't filter for persons (that's what user asked for!)
+        collections = collection.split(",")
+    else:
+        # we consider the with_persons to decide whether to include persons collection or not
+        collections = [collection for collection in SEARCHABLE_COLLECTIONS
+                                  if with_persons or collection != "persons"]
+    default_query = {
+        "query_string": {
+            "fields": ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He"],
+            "query": q,
+            "default_operator": "and"
+        }
+    }
+
+    if collection == "persons":
+        must_queries = []
+        if q:
+            must_queries.append(default_query)
+        for year_param, year_attr in PERSONS_SEARCH_YEAR_PARAMS:
+            if kwargs[year_param]:
+                try:
+                    year_value = int(kwargs[year_param])
+                except Exception as e:
+                    raise Exception("invalid value for {} ({}): {}".format(year_param, year_attr, kwargs[year_param]))
+                year_type_param = "{}_t".format(year_param)
+                year_type = kwargs[year_type_param]
+                if year_type == "pmyears":
+                    year_type_value_param = "{}_v".format(year_param)
+                    try:
+                        year_type_value = int(kwargs[year_type_value_param])
+                    except Exception as e:
+                        raise Exception("invalid value for {} ({}): {}".format(year_type_value_param, year_attr, kwargs[year_type_value_param]))
+                    must_queries.append({"range": {year_attr: {"gte": year_value - year_type_value, "lte": year_value + year_type_value,}}})
+                elif year_type == "exact":
+                    must_queries.append({"term": {year_attr: year_value}})
+                else:
+                    raise Exception("invalid value for {} ({}): {}".format(year_type_param, year_attr, year_type))
+        for text_param, text_attr in PERSONS_SEARCH_TEXT_PARAMS:
+            if kwargs[text_param]:
+                text_value = kwargs[text_param]
+                text_type_param = "{}_t".format(text_param)
+                text_type = kwargs[text_type_param]
+                if text_type == "exact":
+                    must_queries.append({"term": {text_attr: text_value}})
+                elif text_type == "like":
+                    must_queries.append({"match": {text_attr: {"query": text_value,
+                                                               "fuzziness": "AUTO"}}})
+                elif text_type == "starts":
+                    must_queries.append({"prefix": {text_attr: text_value}})
+                else:
+                    raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
+        for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
+            if kwargs[exact_param]:
+                exact_value = kwargs[exact_param]
+                if exact_param == "sex" and exact_value not in ("F", "M", "U"):
+                    raise Exception ("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+                elif exact_param == "treenum":
+                    try:
+                        exact_value = int(exact_value)
+                    except Exception as e:
+                        raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+                must_queries.append({"term": {exact_attr: exact_value}})
+        body = {
+            "query": {
+                "bool": {
+                    "must": must_queries
+                }
+            }
+        }
+    else:
+        body = {"query": default_query}
     if sort == "abc":
         if phonetic.is_hebrew(q.strip()):
             # hebrew alphabetical sort
@@ -71,16 +140,13 @@ def es_search(q, size, collection=None, from_=0, sort=None):
     elif sort == "year" and collection == "photoUnits":
         body["sort"] = [{"UnitPeriod.PeriodStartDate.keyword": "asc"}, "_score"]
     try:
-        try:
-            collection = collection.split(',')
-        except:
-            pass
-        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collection, json.dumps(body)))
-        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body,
-                            doc_type=collection, size=size, from_=from_)
+        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collections, json.dumps(body)))
+        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
-        current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e.error))
-        return None
+        current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e))
+        raise Exception("Error connecting to Elasticsearch: {}".format(e))
+    except Exception as e:
+        raise Exception("Elasticsearch error: {}".format(e))
     return results
 
 def _generate_credits(fn='credits.html'):
@@ -367,20 +433,27 @@ def save_user_content():
 @v1_endpoints.route('/search')
 def general_search():
     args = request.args
-    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None}
+    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None, "with_persons": False}
+    parameters.update(PERSONS_SEARCH_DEFAULT_PARAMETERS)
+    got_one_of_required_persons_params = False
     for param in parameters.keys():
         if param in args:
-            parameters[param] = args[param]
-    if not parameters['q']:
-        abort(400, 'You must specify a search query')
-    else:
-        rv = es_search(**parameters)
-        if not rv:
-            abort(500, 'Sorry, the search cluster appears to be down')
-        else:
-            for item in rv['hits']['hits']:
-                enrich_item(item['_source'], collection_name=item['_type'])
+            if param == "with_persons":
+                parameters[param] = args[param].lower() in ["1", "yes", "true"]
+            else:
+                parameters[param] = args[param]
+                if param in PERSONS_SEARCH_REQUIRES_ONE_OF and parameters[param]:
+                    got_one_of_required_persons_params = True
+    if parameters["q"] or (parameters["collection"] == "persons" and got_one_of_required_persons_params):
+        try:
+            rv = es_search(**parameters)
+        except Exception as e:
+            return humanify({"error": e.message}, 500)
+        for item in rv['hits']['hits']:
+            enrich_item(item['_source'], collection_name=item['_type'])
         return humanify(rv)
+    else:
+        return humanify({"error": "You must specify a search query"}, 400)
 
 @v1_endpoints.route('/wsearch')
 def wizard_search():
@@ -441,20 +514,21 @@ def get_suggestions(collection,string):
     '''
     rv = {}
     try:
+        unlistify_item = lambda i: " ".join(i) if isinstance(i, (tuple, list)) else i
         if collection == "*":
             rv['starts_with'], rv['phonetic'] = get_completion_all_collections(string)
             rv['contains'] = {}
             # make all the words in the suggestion start with a capital letter
-            rv = {k: {kk: [i.title() for i in vv] for kk, vv in v.items()} for k, v in rv.items()}
+            rv = {k: {kk: [unlistify_item(i).title() for i in vv] for kk, vv in v.items()} for k, v in rv.items()}
             return humanify(rv)
         else:
             rv['starts_with'], rv['phonetic'] = get_completion(collection, string)
             rv['contains'] = []
             # make all the words in the suggestion start with a capital letter
-            rv = {k: [i.title() for i in v] for k, v in rv.items()}
+            rv = {k: [unlistify_item(i).title() for i in v] for k, v in rv.items()}
             return humanify(rv)
     except Exception, e:
-        return humanify({"error": "unexpected exception getting completion data: {}".format(e)}, 500)
+        return humanify({"error": "unexpected exception getting completion data: {}".format(e), "traceback": traceback.format_exc()}, 500)
 
 
 
@@ -545,6 +619,7 @@ def get_changes(from_date, to_date):
     else:
         for doc in cursor:
             col, _id = doc['item_id'].split('.')
+            # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
             if col == 'genTreeIndividuals':
                 continue
             else:

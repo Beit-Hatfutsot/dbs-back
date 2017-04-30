@@ -15,7 +15,7 @@ pytest-flask==0.4.0
 requests==2.11.1
 soundcloud==0.4.1
 gmail>=0.5
-elasticsearch==1.4.0
+elasticsearch==5.3.0
 redis==2.10.5
 celery==3.1.23
 pytest-mock==1.2
@@ -23,3 +23,5 @@ gcs-oauth2-boto-plugin==1.14
 awesome-slugify==1.6.5
 Pillow==3.3.1
 unicodecsv==0.14.1
+pytest-cov==2.4.0
+Fabric==1.13.1

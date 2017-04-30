@@ -3,6 +3,7 @@ from elasticsearch import Elasticsearch
 from scripts.elasticsearch_create_index import ElasticsearchCreateIndexCommand
 from copy import deepcopy
 import os
+from bhs_api.item import get_doc_id
 
 
 ### environment setup functions
@@ -15,7 +16,11 @@ def index_doc(app, collection, doc):
     doc = deepcopy(doc)
     doc.get("Header", {}).setdefault("He_lc", doc.get("Header", {}).get("He", "").lower())
     doc.get("Header", {}).setdefault("En_lc", doc.get("Header", {}).get("En", "").lower())
-    app.es.index(app.es_data_db_index_name, collection, doc)
+    if collection == "persons":
+        doc_id = "{}_{}_{}".format(doc["tree_num"], doc["tree_version"], doc["person_id"])
+    else:
+        doc_id = get_doc_id(collection, doc)
+    app.es.index(index=app.es_data_db_index_name, doc_type=collection, body=doc, id=doc_id)
 
 def index_docs(app, collections, reuse_db=False):
     if not reuse_db or not app.es.indices.exists(app.es_data_db_index_name):
@@ -25,31 +30,34 @@ def index_docs(app, collections, reuse_db=False):
                 index_doc(app, collection, doc)
         app.es.indices.refresh(app.es_data_db_index_name)
 
-def given_local_elasticsearch_client_with_test_data(app):
+def given_local_elasticsearch_client_with_test_data(app, session_id=None):
+    """
+    setup elasticsearch on localhost:9200 for testing on a testing index
+    if given session_id param and it is the same as previous session_id param - will not reindex the docs
+    """
     app.es = Elasticsearch("localhost")
     app.es_data_db_index_name = "bh_dbs_back_pytest"
-    reuse_db = os.environ.get("REUSE_DB", "") == "1"
-    index_docs(app, {
-        "places": [PLACES_BOURGES, PLACES_BOZZOLO],
-        "photoUnits": [PHOTO_BRICKS, PHOTOS_BOYS_PRAYING],
-        "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
-        "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
-        "movies": [MOVIES_MIDAGES, MOVIES_SPAIN]
-    }, reuse_db)
+    if not session_id or session_id != getattr(given_local_elasticsearch_client_with_test_data, "_session_id", None):
+        given_local_elasticsearch_client_with_test_data._session_id = session_id
+        reuse_db = os.environ.get("REUSE_DB", "") == "1"
+        index_docs(app, {
+            "places": [PLACES_BOURGES, PLACES_BOZZOLO],
+            "photoUnits": [PHOTO_BRICKS, PHOTOS_BOYS_PRAYING],
+            "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
+            "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
+            "movies": [MOVIES_MIDAGES, MOVIES_SPAIN],
+            "persons": [PERSON_EINSTEIN, PERSON_LIVING],
+        }, reuse_db)
 
 ### custom assertions
 
 
-def assert_error_response(res, expected_status_code, expected_error):
+def assert_error_response(res, expected_status_code, expected_error_startswith):
     assert res.status_code == expected_status_code
-    assert res.data == """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
-<title>{status_code} {status_msg}</title>
-<h1>{status_msg}</h1>
-<p>{error}</p>
-""".format(error=expected_error, status_code=expected_status_code, status_msg="Bad Request" if expected_status_code == 400 else "Internal Server Error")
+    assert res.json["error"].startswith(expected_error_startswith)
 
 def assert_common_elasticsearch_search_results(res):
-    assert res.status_code == 200
+    assert res.status_code == 200, "invalid status, json response: {}".format(res.json)
     hits = res.json["hits"]
     shards = res.json["_shards"]
     assert shards["successful"] > 0
@@ -106,14 +114,14 @@ def test_search_without_parameters_should_return_error(client):
 
 def test_search_without_elasticsearch_should_return_error(client, app):
     given_invalid_elasticsearch_client(app)
-    assert_error_response(client.get('/v1/search?q=test'), 500, "Sorry, the search cluster appears to be down")
+    assert_error_response(client.get('/v1/search?q=test'), 500, "Error connecting to Elasticsearch")
 
 def test_searching_for_nonexistant_term_should_return_no_results(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_no_results(client.get('/v1/search?q=testfoobarbazbaxINVALID'))
 
 def test_general_search_single_result(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # test data contains exactly 1 match for "BOURGES"
     res = client.get("/v1/search?q=BOURGES")
     for hit in assert_search_results(res, 1):
@@ -121,7 +129,7 @@ def test_general_search_single_result(client, app):
         assert hit["_source"]["Header"]["En"] == "BOURGES"
 
 def test_general_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_search_hit_ids(client, u"q=יהודים&sort=rel", [312757, 187521, 187559, 340727, 240790, 262366], ignore_order=True)
     # sort=abc - query is in hebrew, ordered on the hebrew headers
     # 187559 = בוצולו
@@ -141,7 +149,7 @@ def test_general_search(client, app):
     assert_search_hit_ids(client, u"q=jews&sort=abc", [187521, 312757, 187559, 240790, 340727, 262367])
 
 def test_places_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_search_hit_ids(client, u"q=יהודים&collection=places", [187521, 187559], ignore_order=True)
     # sort=abc - query is in hebrew, ordered on the hebrew headers
     # 187559 = בוצולו
@@ -153,7 +161,7 @@ def test_places_search(client, app):
     assert_search_hit_ids(client, u"q=jews&collection=places&sort=abc", [187521, 187559])
 
 def test_images_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 303772 = Building Blocks for Housing Projects, Israel 1950s
     # 312757 = Boys praying at the synagogue of Mosad Aliyah, Israel 1963
     assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [303772, 312757])
@@ -167,19 +175,19 @@ def test_images_search(client, app):
     assert_search_hit_ids(client, u"q=זוננפלד&collection=photoUnits&sort=abc", [303772, 312757])
 
 def test_family_names_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 341018 = אדרהי
     # 340727 = דרעי
     assert_search_hit_ids(client, u"q=משפחה&collection=familyNames&sort=abc", [341018, 340727])
 
 def test_personalities_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 240790 = David, Ferdinand
     # 240792 = Davydov, Karl Yulyevich
     assert_search_hit_ids(client, u"q=Leipzig&collection=personalities&sort=abc", [240790, 240792])
 
 def test_movies_search(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     # 262367 = Jewish Communities in the Middle Ages: Babylonia; Spain; Ashkenaz (Hebrew)
     assert_search_hit_ids(client, u"q=jews&collection=movies&sort=abc", [262367])
 
@@ -189,46 +197,46 @@ def test_invalid_suggest(client, app):
                             500, expected_error_message="unexpected exception getting completion data: ConnectionError")
 
 def test_general_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"*", u"bo",
-                            200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": []},
+                            200, expected_json={"phonetic": {"places": [], "photoUnits": [], "familyNames": [], "personalities": [], "movies": [], "persons": []},
                                                 "contains": {},
                                                 "starts_with": {"places": [u'Bourges', u'Bozzolo'],
                                                                                # notice that suggest captilizes all letters
                                                                 "photoUnits": ['Boys Praying At The Synagogue Of Mosad Aliyah, Israel 1963'],
-                                                                "familyNames": [], "personalities": [], "movies": []}})
+                                                                "familyNames": [], "personalities": [], "movies": [], "persons": []}})
 
 def test_places_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"places", u"bo",
                             200, expected_json={"phonetic": [], "contains": [], "starts_with": ["Bourges", "Bozzolo"]})
 
 def test_images_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"photoUnits", u"נער",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950']})
 
 def test_family_names_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"familyNames", u"דר",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'דרעי']})
 
 def test_personalities_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"personalities", u"dav",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'David, Ferdinand', u'Davydov, Karl Yulyevich']})
 
 def test_movies_suggest(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"movies", u"liv",
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'Living Moments In Jewish Spain (English)']})
 
 def test_search_result_without_slug(client, app):
-    given_local_elasticsearch_client_with_test_data(app)
+    given_local_elasticsearch_client_with_test_data(app, __file__)
 
     assert "Slug" not in PHOTO_BRICKS
     results = list(assert_search_results(client.get(u"/v1/search?q=Blocks&collection=photoUnits&sort=abc"), 1))
@@ -245,6 +253,100 @@ def test_search_result_without_slug(client, app):
       "En": "place_bourges",
       "He": u"מקום_בורג"
     }
+
+def test_search_missing_header_slug(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    # update_es function sets item without header to _
+    # so this is how an item with missing hebrew header will look like in ES
+    assert PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG["Header"] == {'En': 'Davydov, Karl Yulyevich', 'He': '_'}
+    # these items will also no have a slug
+    assert PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG["Slug"] == {'En': 'luminary_davydov-karl-yulyevich'}
+    # search for these items
+    result = list(assert_search_results(client.get(u"/v1/search?q=karl+yulyevich"), 1))[0]["_source"]
+    assert result["Header"] == {'En': 'Davydov, Karl Yulyevich', 'He': '_',
+                                "En_lc": 'Davydov, Karl Yulyevich'.lower(), "He_lc": "_"}
+    assert result["Slug"] == {'En': 'luminary_davydov-karl-yulyevich'}
+
+def test_search_persons(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    assert PERSON_EINSTEIN["name_lc"] == ["albert", "einstein"]
+    # searching without persons support - doesn't return persons
+    assert_no_results(client.get(u"/v1/search?q=einstein"))
+    # search with persons support - return persons as part of general search
+    result = list(assert_search_results(client.get(u"/v1/search?q=einstein&with_persons=1"), 1))[0]["_source"]
+    assert result["name_lc"] == ["albert", "einstein"]
+    # searching for collection persons - returns only persons results
+    result = list(assert_search_results(client.get(u"/v1/search?q=einstein&collection=persons"), 1))[0]["_source"]
+    assert result["name_lc"] == ["albert", "einstein"]
+    assert result["person_id"] == "I686"
+
+def test_advanced_search_persons(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    is_einstein_result = lambda url: list(assert_search_results(client.get(url), 1))[0]["_source"]["name_lc"] == ["albert", "einstein"]
+    assert_error_message = lambda url, msg: assert_error_response(client.get(url), 500, msg)
+    assert PERSON_EINSTEIN["name_lc"] == ["albert", "einstein"]
+
+    # death year params
+    assert PERSON_EINSTEIN["death_year"] == 1955
+    assert_no_results(client.get(u"/v1/search?collection=persons&yod=1910"))
+    assert is_einstein_result(u"/v1/search?collection=persons&yod=1955")
+    assert is_einstein_result(u"/v1/search?collection=persons&yod=1953&yod_t=pmyears&yod_v=2")
+    assert is_einstein_result(u"/v1/search?collection=persons&yod=1957&yod_t=pmyears&yod_v=2")
+    assert_error_message(u"/v1/search?collection=persons&yod=foobar", "invalid value for yod (death_year): foobar")
+    assert_error_message(u"/v1/search?collection=persons&yod=1957&yod_t=invalid", "invalid value for yod_t (death_year): invalid")
+    assert_error_message(u"/v1/search?collection=persons&yod=1957&yod_t=pmyears&yod_v=foo", "invalid value for yod_v (death_year): foo")
+
+    # birth year params
+    assert PERSON_EINSTEIN["birth_year"] == 1879
+    assert_no_results(client.get(u"/v1/search?collection=persons&yob=1910"))
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1879")
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1877&yob_t=pmyears&yob_v=2")
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1881&yob_t=pmyears&yob_v=2")
+    assert_error_message(u"/v1/search?collection=persons&yob=foobar", "invalid value for yob (birth_year): foobar")
+    assert_error_message(u"/v1/search?collection=persons&yob=1877&yob_t=invalid", "invalid value for yob_t (birth_year): invalid")
+    assert_error_message(u"/v1/search?collection=persons&yob=1877&yob_t=pmyears&yob_v=foo", "invalid value for yob_v (birth_year): foo")
+
+    # marriage years params
+    assert PERSON_EINSTEIN["marriage_years"] == [1923, 1934]
+    assert_no_results(client.get(u"/v1/search?collection=persons&yom=1910"))
+    assert is_einstein_result(u"/v1/search?collection=persons&yom=1923")
+    assert is_einstein_result(u"/v1/search?collection=persons&yom=1936&yom_t=pmyears&yom_v=2")
+    assert is_einstein_result(u"/v1/search?collection=persons&yom=1932&yom_t=pmyears&yom_v=2")
+    assert_error_message(u"/v1/search?collection=persons&yom=foobar", "invalid value for yom (marriage_years): foobar")
+    assert_error_message(u"/v1/search?collection=persons&yom=1877&yom_t=invalid", "invalid value for yom_t (marriage_years): invalid")
+    assert_error_message(u"/v1/search?collection=persons&yom=1877&yom_t=pmyears&yom_v=foo", "invalid value for yom_v (marriage_years): foo")
+
+    # multiple params
+    assert is_einstein_result(u"/v1/search?collection=persons&yob=1877&yob=1881&yob_t=pmyears&yob_v=2&yod=1955")
+    assert_error_message(u"/v1/search?collection=persons&yod=123&&yob=1877&yob_t=pmyears&yob_v=foo", "invalid value for yob_v (birth_year): foo")
+    assert_no_results(client.get(u"/v1/search?collection=persons&yob=1879&yod=1953"))
+
+    # text params
+    for param, attr, val, exact, starts, like in (("first", "first_name_lc", "albert", "albert", "alber", "alebrt"),
+                                                  ("last", "last_name_lc", "einstein", "einstein", "einste", "einstien"),
+                                                  ("pob", "BIRT_PLAC_lc", "ulm a.d., germany", "germany", "germ", "uml"),
+                                                  ("pod", "DEAT_PLAC_lc", "princeton, u.s.a.", "princeton", "prince", "prniceton"),
+                                                  ("pom", "MARR_PLAC_lc", ["uklaulaulaska", "agrogorog"], "uklaulaulaska", "agro", "agroogrog")):
+        assert PERSON_EINSTEIN[attr] == val
+        format_kwargs = {"param": param, "exact": exact, "starts": starts, "like": like}
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={exact}".format(**format_kwargs))
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=exact".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={exact}&{param}_t=exact".format(**format_kwargs))
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=starts".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={starts}&{param}_t=starts".format(**format_kwargs))
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=like".format(**format_kwargs)))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={like}&{param}_t=like".format(**format_kwargs))
+
+    # exact match params
+    for param, attr, val, invalid_val, no_results_val in (("sex", "gender", "M", "FOO", "F"),
+                                                          ("treenum", "tree_num", 1196, "FOO", "1002")):
+        assert PERSON_EINSTEIN[attr] == val
+        format_kwargs = {"param": param, "attr": attr, "val": val, "invalid_val": invalid_val, "no_results_val": no_results_val}
+        assert_no_results(client.get(u"/v1/search?collection=persons&{param}={no_results_val}".format(**format_kwargs)))
+        assert_error_message(u"/v1/search?collection=persons&{param}={invalid_val}".format(**format_kwargs),
+                             "invalid value for {param} ({attr}): {invalid_val}".format(**format_kwargs))
+        assert is_einstein_result(u"/v1/search?collection=persons&{param}={val}".format(**format_kwargs))
 
 
 ### constants
@@ -875,7 +977,7 @@ FAMILY_NAMES_EDREHY = {
           "Id" : 341018
         }
 
-PERSONALITIES_DAVIDOV = {
+PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG = PERSONALITIES_DAVIDOV = {
           "PeriodDateTypeDesc" : {
             "En" : "Date|Date|",
             "He" : "תאריך מדויק|תאריך מדויק|"
@@ -934,8 +1036,7 @@ PERSONALITIES_DAVIDOV = {
           "UnitTypeDesc" : "Personality",
           "PeriodStartDate" : "18380315|18890226|",
           "Slug" : {
-            "En" : "luminary_davydov-karl-yulyevich",
-            "He" : "אישיות_דוידוב-קרל-יולייביץ"
+            "En" : "luminary_davydov-karl-yulyevich"
           },
           "PeriodDateTypeCode" : "2|2|",
           "RightsDesc" : "Full",
@@ -978,10 +1079,7 @@ PERSONALITIES_DAVIDOV = {
           },
           "Header" : {
             "En" : "Davydov, Karl Yulyevich",
-            "He" : "דוידוב, קרל יולייביץ'",
-
-              "En_lc": "davydov, karl yulyevich",
-              "He_lc": "דוידוב, קרל יולייביץ'"
+            "He" : "_"
           },
           "PeriodTypeDesc" : {
             "En" : "Date of birth|Date of death|",
@@ -1289,3 +1387,65 @@ MOVIES_SPAIN = {
           "ForPreview" : False,
           "ReceiveType" : 4
         }
+
+PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
+                   "OCCU" : "Physicist",
+                   "sex" : "M",
+                   "DEAT_PLAC_S" : "ZZ E796536 E796436 ZZ ",
+                   "person_id" : "I686",
+                   "partners" : [{"id" : "I687", "name" : [ "Mileva", "Maric" ],
+                                  "children": [{"id": "I835", "partners": [], "name" : [ "Lieserl", "Maric" ], "deceased" : True, "sex" : "F" },
+                                               {"id": "I836", "name" : [ "Hans Albert", "Einstein" ],
+                                                "partners": [{"id" : "I838", "name" : [ "Frieda", "Knecht" ],
+                                                              "children": [{"id": "I839", "name": ["Bernhard Caesar", "Einstein"], "deceased" : False, "sex" : "M"},
+                                                                           {"id" : "I1287", "name": ["Klaus", "Einstein"], "deceased": True, "sex" : "M" },
+                                                                           { "id" : "I1288", "name" : [ "Evelyn", "Einstein" ], "deceased" : False, "sex" : "F" }],
+                                                              "deceased" : True, "sex" : "F" },
+                                                             {"id" : "I1289", "name" : [ "Elizabeth", "Roboz" ], "children" : [ ], "deceased" : True, "sex" : "F" }],
+                                                "deceased" : True, "sex" : "M" },
+                                               {"id" : "I837", "name" : [ "Eduard", "Einstein" ], "partners" : [ ], "deceased" : True, "sex" : "M" } ],
+                                  "deceased" : True, "sex" : "F" },
+                                 { "children" : [ ], "deceased" : True, "id" : "I688", "name" : [ "Elsa", "Einstein-Loewenthal" ], "sex" : "F" } ],
+                   "SEX" : "M", "gender": "M",
+                   "BIRT_PLAC" : "Ulm a.D., Germany",
+                   "parents" : [ {"name" : [ "Hermann", "Einstein" ],
+                                  "partners" : [ { "children" : [ ], "deceased" : True, "id" : "I685", "name" : [ "Pauline", "Koch" ], "sex" : "F" } ],
+                                  "sex" : "M",
+                                  "parents" : [ { "id" : "I682", "name" : [ "Abraham Ruppert", "Einstein" ], "deceased" : True, "sex" : "M" },
+                                                { "id" : "I683", "name" : [ "Helena", "Moos" ], "deceased" : True, "sex" : "F" } ],
+                                  "id" : "I684", "deceased" : True },
+                                 {"name" : [ "Pauline", "Koch" ],
+                                  "partners" : [ { "children" : [ ], "deceased" : True, "id" : "I684", "name" : [ "Hermann", "Einstein" ], "sex" : "M" } ],
+                                  "sex" : "F", "parents" : [ ], "id" : "I685", "deceased" : True } ],
+                   "siblings" : [ { "id" : "I840", "name" : [ "Maja", "Einstein" ], "deceased" : True, "sex" : "F" } ],
+                   "Slug" : { "En" : "person_1196;0.I686" },
+                   "birth_year" : 1879,
+                   "DEAT_PLAC" : "Princeton, U.S.A.",
+                   "tree_version" : 0,
+                   "marriage_years" : [1923, 1934],  # not really (sorry Einstein..)
+                   "MARR_PLAC_lc": ["uklaulaulaska", "agrogorog"], # also not really
+                   "tree_num" : 1196,
+                   "FAMS" : "@F235@",
+                   "death_year" : 1955,
+                   "tree_size" : 1728,
+                   "DEAT_PLAC_lc" : "princeton, u.s.a.",
+                   "FAMC" : "@F233@",
+                   "name" : [ "Albert", "Einstein" ],
+                   "name_S" : [ "ZZ E087930 ZZ ", "ZZ E064360 ZZ " ],
+                   "DEAT_DATE" : "18.4.1955",
+                   "NAME" : "Albert  /Einstein/",
+                   "NOTE_CONT" : "04105, USA. Tel.:207-781-4931.",
+                   "name_lc" : [ "albert", "einstein" ],
+                   "first_name_lc": "albert",
+                   "last_name_lc": "einstein",
+                   "NOTE" : "The Einstein Tree was compiled by Daniel Einstein, POB 6004, Falmouth,Maine",
+                   "BIRT_DATE" : "14.3.1879",
+                   "BIRT_PLAC_lc" : "ulm a.d., germany",
+                   "BIRT_PLAC_S" : "ZZ E086359 ZZ ",
+                   "deceased" : True,
+                   "Header": {
+                       "En": "Albert Einstein",
+                       "He": "Albert Einstein"
+                   },}
+
+PERSON_LIVING = {"person_id" : "I687", "Slug" : { "En" : "person_1196;0.I687" }, "deceased" : False, "tree_num": 1933, "tree_version": 0, "name": ["mookie", "shooki"]}

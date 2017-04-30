@@ -6,7 +6,7 @@ from celery import Celery
 from flask import current_app
 from bhs_api import create_app
 from bhs_api.utils import uuids_to_str
-from bhs_api.item import get_collection_id_field, create_slug
+from bhs_api.item import get_collection_id_field, create_slug, doc_show_filter, get_doc_id, update_es
 from scripts.get_places_geo import get_place_geo
 from scripts.batch_related import get_bhp_related
 
@@ -69,62 +69,6 @@ def ensure_indices(collection):
     else:
         collection.create_index("Slug.He", unique=True, sparse=True)
         collection.create_index("Slug.En", unique=True, sparse=True)
-
-def update_es(collection, doc, id, new):
-    if MIGRATE_ES != '1':
-        return
-
-    # index only the docs that are publicly available
-    try:
-        if doc['StatusDesc'] != 'Completed' or\
-           doc['RightsDesc'] != 'Full' or\
-           doc['DisplayStatusDesc'] == 'Internal Use' or\
-           doc['UnitText1']['En'] in [None, ''] and \
-           doc['UnitText1']['He'] in [None, '']:
-            return
-    except KeyError:
-        return
-
-    index_name = current_app.data_db.name
-    body = doc.copy()
-    if '_id' in body:
-        del body['_id']
-    if new:
-        try:
-            current_app.es.index(index=index_name,
-                                doc_type=collection,
-                                id=id,
-                                body=body)
-        except elasticsearch.exceptions.SerializationError:
-            # UUID fields are causing es to crash, turn them to strings
-            uuids_to_str(doc)
-            try:
-                current_app.es.index(index=index_name,
-                                    doc_type=collection,
-                                    id=id,
-                                    body=doc)
-            except elasticsearch.exceptions.SerializationError as e:
-                current_app.logger.error("Elastic search index failed for {}:{} with {}"
-                                        .format(collection, id, e))
-    else:
-        try:
-            current_app.es.update(index=index_name,
-                                doc_type=collection,
-                                id=id,
-                                body={"doc": body})
-        except elasticsearch.exceptions.NotFoundError as e:
-            # So it's in the DB, passes the SHOW_FILTER and not found in ES
-            # weird, but that's what we have.
-            # let's index it.
-            current_app.logger.info(
-                "Resorting to ES index function as update failed for {}:{} with {}"
-                .format(collection, id, e))
-            item = current_app.data_db[collection].find_one({'_id': id})
-            del item['_id']
-            current_app.es.index(index=index_name,
-                                doc_type=collection,
-                                id=id,
-                                body=item)
 
 
 def reslugify(collection, document):
@@ -266,43 +210,34 @@ def update_doc(collection, document):
             else:
                 current_app.logger.info("didn't find tree number {} using version 0 for {}"
                                          .format(tree_num, id))
-                i = 0;
+                i = 0
 
         document['tree_version'] = i
         query['tree_version'] = i
 
+        # we have to create it here as at the moment create_slug function requires Header to create slug
+        # TODO: move this logic to create_slug function
         document['Slug'] = {'En': 'person_{};{}.{}'.format(
                               tree_num,
                               i,
                               id)}
-        update_collection(collection, query, document)
+        created = update_collection(collection, query, document)
+        if MIGRATE_ES == '1':
+            is_ok, msg = update_es(collection.name, document, created)
+            if not is_ok:
+                current_app.logger.error(msg)
         current_app.logger.info('Updated person: {}.{}'
                                 .format(tree_num, id))
     else:
-        # post parsing: add _id and Slug
-        doc_id_field = get_collection_id_field(collection.name)
-        try:
-            doc_id = document[doc_id_field]
-        except KeyError:
-            current_app.logger.error('update failed because of id {} {}'
-                                     .format(collection.name,
-                                             doc_id_field,
-                                             ))
-            return
-
-
-        query = {'_id': doc_id}
-        created = update_collection(collection, query, document)
-
-        update_es(collection.name, document, doc_id, created)
-
-        try:
-            slug = document['Slug']['En']
-        except KeyError:
-            slug = 'None'
-
-        current_app.logger.info('Updated {} {}: {}, Slug: {}'.format(
-            collection.name,
-            doc_id_field,
-            doc_id,
-            slug))
+        doc_id = get_doc_id(collection.name, document)
+        if doc_id:
+            query = {get_collection_id_field(collection): doc_id}
+            created = update_collection(collection, query, document)
+            if MIGRATE_ES == '1':
+                is_ok, msg = update_es(collection.name, document, created)
+                if not is_ok:
+                    current_app.logger.error(msg)
+            slug = document.get("Slug", {}).get("En")
+            current_app.logger.info('Updated {} {}, Slug: {}'.format(collection.name, doc_id, slug))
+        else:
+            current_app.logger.error('update failed because of id {}'.format(collection.name))
