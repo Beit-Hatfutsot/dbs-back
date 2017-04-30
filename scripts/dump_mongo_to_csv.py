@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os
 from datetime import datetime
-from uuid import UUID
 import argparse
 import urllib2
 from subprocess import call
@@ -11,26 +10,25 @@ import unicodecsv
 
 
 from bhs_api import create_app
-from bhs_api.utils import SEARCHABLE_COLLECTIONS
 from bhs_api.item import SHOW_FILTER
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--out', default ='/tmp',
+    parser.add_argument('-o', '--out', default='/tmp',
                         help='the directory to store the csvs in. defaults to /tmp')
     parser.add_argument('--debug', action='store_true',
                         help='debug mode, dump only 100 records of each collection')
     parser.add_argument('--db',
-                        help='the db to run on defaults to the value in /etc/bhs/config.yml')
+        help='the db to run on defaults to the value in /etc/bhs/app_server.yaml')
     parser.add_argument('--header', action='store_true',
                         help='add this to add a header line to the output')
-    parser.add_argument('--ftp_server',
+    parser.add_argument('--ftp-server',
                         help='the address of the ftp server to push mojp-dump.tgz to')
-    parser.add_argument('--ftp_user', default='anonymous')
-    parser.add_argument('--ftp_password', default=None)
-    parser.add_argument('--ftp_dir', default='incoming',
-                        help='the ftp directory where to store the file')
+    parser.add_argument('--ftp-user', default='anonymous')
+    parser.add_argument('--ftp-password', default=None)
+    parser.add_argument('--ftp-dir', default='incoming',
+                        help='the ftp directory where to store the file defaults to "incoming"')
     return parser.parse_args()
 
 def clean(row):

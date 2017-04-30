@@ -313,6 +313,10 @@ def get_file_descriptors(tree, gedcom_path):
 
 
 def migrate_trees(cursor, only_process_treenum=None, gedcom_path=None, on_save=None, dryrun=False):
+    ''' get command line arguments and sql query and initiated update_tree
+        and update_row celery tasks.
+        returns how many people migrated
+    '''
     collection_name = "persons"
     row_number = 0
     filtered_rows = filter(lambda row: not only_process_treenum or row['GenTreeNumber'] == only_process_treenum, cursor)
