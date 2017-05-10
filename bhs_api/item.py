@@ -151,7 +151,6 @@ def fetch_item(slug, db=None):
     """
     Gets an item based on slug and returns it
     If slug is bad or item is not found, raises an exception.
-
     """
     if not db:
         db = current_app.data_db
@@ -201,10 +200,16 @@ def enrich_item(item, db=None, collection_name=None):
                     main_image_id = picture_id
 
         if main_image_id:
-            item['main_image_url'] = get_image_url(main_image_id,
-                                                current_app.conf.image_bucket)
-            item['thumbnail_url'] = get_image_url(main_image_id,
-                                            current_app.conf.thumbnail_bucket)
+            if item.has_key('bagnowka'):
+                image_bucket = current_app.conf.bagnowka_bucket_url
+                # For bagnowka, thumbnail_bucket is the same as image_bucket (full sized images) because images are very small as it is
+                thumbnail_bucket = current_app.conf.bagnowka_bucket_url
+            else:
+                image_bucket = current_app.conf.image_bucket
+                thumbnail_bucket = current_app.conf.thumbnail_bucket
+            item['main_image_url'] = get_image_url(main_image_id, image_bucket)
+            item['thumbnail_url'] = get_image_url(main_image_id, thumbnail_bucket)
+            
     video_id_key = 'MovieFileId'
     if video_id_key in item:
         # Try to fetch the video URL
@@ -347,7 +352,10 @@ def search_by_header(string, collection, starts_with=True, db=None):
         return {}
 
 def get_image_url(image_id, bucket):
-    return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
+    if bucket.startswith('https://s3'):
+        return 'https://s3-us-west-2.amazonaws.com/bagnowka-scraped/full/{}.jpg'.format(image_id)
+    else:
+        return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)
 
 
 def get_collection_id_field(collection_name):
