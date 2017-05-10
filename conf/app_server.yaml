@@ -24,6 +24,8 @@ email_password: 19782013
 email_from: info@bh.org.il
 
 # Bucket urls
+bagnowka_bucket_url: https://s3-us-west-2.amazonaws.com/bagnowka-scraped/full
+bagnowka_bucket: full
 image_bucket: bhs-flat-pics
 thumbnail_bucket: bhs-thumbnails
 ftree_bucket_url: https://storage.googleapis.com/bhs-familytrees
