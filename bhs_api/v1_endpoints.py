@@ -9,6 +9,7 @@ import urllib
 import mimetypes
 from uuid import UUID
 import json
+import logging
 
 from flask import Flask, Blueprint, request, abort, url_for, current_app
 from flask.ext.security import auth_token_required
@@ -432,28 +433,32 @@ def save_user_content():
 
 @v1_endpoints.route('/search')
 def general_search():
-    args = request.args
-    parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None, "with_persons": False}
-    parameters.update(PERSONS_SEARCH_DEFAULT_PARAMETERS)
-    got_one_of_required_persons_params = False
-    for param in parameters.keys():
-        if param in args:
-            if param == "with_persons":
-                parameters[param] = args[param].lower() in ["1", "yes", "true"]
-            else:
-                parameters[param] = args[param]
-                if param in PERSONS_SEARCH_REQUIRES_ONE_OF and parameters[param]:
-                    got_one_of_required_persons_params = True
-    if parameters["q"] or (parameters["collection"] == "persons" and got_one_of_required_persons_params):
-        try:
-            rv = es_search(**parameters)
-        except Exception as e:
-            return humanify({"error": e.message}, 500)
-        for item in rv['hits']['hits']:
-            enrich_item(item['_source'], collection_name=item['_type'])
-        return humanify(rv)
-    else:
-        return humanify({"error": "You must specify a search query"}, 400)
+    try:
+        args = request.args
+        parameters = {'collection': None, 'size': SEARCH_CHUNK_SIZE, 'from_': 0, 'q': None, 'sort': None, "with_persons": False}
+        parameters.update(PERSONS_SEARCH_DEFAULT_PARAMETERS)
+        got_one_of_required_persons_params = False
+        for param in parameters.keys():
+            if param in args:
+                if param == "with_persons":
+                    parameters[param] = args[param].lower() in ["1", "yes", "true"]
+                else:
+                    parameters[param] = args[param]
+                    if param in PERSONS_SEARCH_REQUIRES_ONE_OF and parameters[param]:
+                        got_one_of_required_persons_params = True
+        if parameters["q"] or (parameters["collection"] == "persons" and got_one_of_required_persons_params):
+            try:
+                rv = es_search(**parameters)
+            except Exception as e:
+                return humanify({"error": e.message}, 500)
+            for item in rv['hits']['hits']:
+                enrich_item(item['_source'], collection_name=item['_type'])
+            return humanify(rv)
+        else:
+            return humanify({"error": "You must specify a search query"}, 400)
+    except Exception as e:
+        logging.exception("unexpected error")
+        return humanify(({"error": e.message}, 500))
 
 @v1_endpoints.route('/wsearch')
 def wizard_search():
@@ -679,4 +684,3 @@ def get_geocoded_places():
         'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
     ret = humanify(list(points))
     return ret
-
