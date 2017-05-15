@@ -16,4 +16,6 @@ nohup.out
 error.log
 htmlcov
 .coverage
+/.vscode
+
 
