@@ -1,0 +1,64 @@
+{
+    "phonetic": {
+        "personalities": [],
+        "places": [],
+        "persons": [],
+        "movies": [],
+        "photoUnits": [],
+        "familyNames": []
+    },
+    "contains": {},
+    "starts_with": {
+        "personalities": [
+            "Liberman, David",
+            "Lichtblau, Leon ",
+            "Lichtenstadt, Avraham Aharon ",
+            "Lichtenstein, Hillel Ben Barukh",
+            "Liebermann, Max",
+            "Liebermann, Rolf",
+            "Lieberson, Goddard"
+        ],
+        "places": [
+            "Lichtenfels",
+            "Lida, Belorussia",
+            "Liepaja",
+            "Liezere",
+            "Ligatne",
+            "Ligumai",
+            "Lille"
+        ],
+        "persons": [
+            " Libicki",
+            " Lia",
+            " Lia",
+            " Liba",
+            "?Li?S Feldman",
+            "Li Ben Simol",
+            "Li Berman"
+        ],
+        "movies": [
+            " Living Moments In Jewish Spain (Hebrew)",
+            "Lita- Clip",
+            "Living Moments In Jewish Spain (Spanish)",
+            "Living Moments In Jewish Spain (English)"
+        ],
+        "photoUnits": [
+            "\"Libraries Are Culture'S Armies\". Caricature, New York, 1900-20",
+            "\"Lid Un Ballade\" By Itzik Manger, New York 1952",
+            "Liath And Her Friend Are Crying, Givat Washington, Israel, 1985",
+            "Liba Beila Samsonov. Tartu, Estonia, 1894",
+            "Libe-Haviva Winokur And Friends, Poland, Late  1920S",
+            "Libe-Haviva Winokur And Friends, Poland, Late  1920S",
+            "Libe-Haviva Winokur And Friends, Korycin, Poland, Late 1920S\r\n"
+        ],
+        "familyNames": [
+            "Libenson",
+            "Liber",
+            "Liberati",
+            "Liberati",
+            "Liberbaum",
+            "Liberman",
+            "Libermanas"
+        ]
+    }
+}
