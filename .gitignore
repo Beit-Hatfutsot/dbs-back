@@ -17,5 +17,7 @@ error.log
 htmlcov
 .coverage
 /.vscode
+ENV/*
+ENV
 
 
