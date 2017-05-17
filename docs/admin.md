@@ -66,3 +66,11 @@ index:
     $ scripts/dump_mongo_to_es.py -r
 
 ### Photos are missing
+
+TODO
+
+### Disk space problems
+Here are some commands to try if a server disk space runs out
+```
+sudo find /tmp -name 'tmp*' -exec rm -f {} \;
+```
