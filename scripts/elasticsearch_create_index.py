@@ -72,6 +72,7 @@ class ElasticsearchCreateIndexCommand(object):
                                               "birth_year": {"type": "integer"},
                                               "death_year": {"type": "integer"},
                                               "marriage_years": {"type": "integer"},
+                                              # these are updated in bhs_api.item.update_es functions
                                               "first_name_lc": {"type": "text"},
                                               "last_name_lc": {"type": "text"},
                                               "BIRT_PLAC_lc": {"type": "text"},
