@@ -36,11 +36,12 @@ PERSONS_SEARCH_YEAR_PARAMS = (("yob", "birth_year"),
                               ("yod", "death_year"),
                               ("yom", "marriage_years"))
 
-PERSONS_SEARCH_TEXT_PARAMS = (("first", "first_name_lc"),
-                              ("last", "last_name_lc"),
-                              ("pob", "BIRT_PLAC_lc"),
-                              ("pom", "MARR_PLAC_lc"),
-                              ("pod", "DEAT_PLAC_lc"),)
+# these are updated in bhs_api.item.update_es functions
+PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE = (("first", "first_name_lc"),
+                                        ("last", "last_name_lc"),
+                                        ("pob", "BIRT_PLAC_lc"),
+                                        ("pom", "MARR_PLAC_lc"),
+                                        ("pod", "DEAT_PLAC_lc"),)
 
 PERSONS_SEARCH_EXACT_PARAMS = (("sex", "gender"),
                                ("treenum", "tree_num"))

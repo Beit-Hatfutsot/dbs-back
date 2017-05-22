@@ -34,7 +34,7 @@ from bhs_api.user import get_user
 
 from bhs_api import phonetic
 from bhs_api.persons import (PERSONS_SEARCH_DEFAULT_PARAMETERS, PERSONS_SEARCH_REQUIRES_ONE_OF,
-                             PERSONS_SEARCH_YEAR_PARAMS, PERSONS_SEARCH_TEXT_PARAMS, PERSONS_SEARCH_EXACT_PARAMS)
+                             PERSONS_SEARCH_YEAR_PARAMS, PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE, PERSONS_SEARCH_EXACT_PARAMS)
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -94,9 +94,9 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                     must_queries.append({"term": {year_attr: year_value}})
                 else:
                     raise Exception("invalid value for {} ({}): {}".format(year_type_param, year_attr, year_type))
-        for text_param, text_attr in PERSONS_SEARCH_TEXT_PARAMS:
+        for text_param, text_attr in PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE:
             if kwargs[text_param]:
-                text_value = kwargs[text_param]
+                text_value = kwargs[text_param].lower()
                 text_type_param = "{}_t".format(text_param)
                 text_type = kwargs[text_type_param]
                 if text_type == "exact":
@@ -111,8 +111,10 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
         for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
             if kwargs[exact_param]:
                 exact_value = kwargs[exact_param]
-                if exact_param == "sex" and exact_value not in ("F", "M", "U"):
-                    raise Exception ("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+                if exact_param == "sex":
+                    exact_value = exact_value.upper()
+                    if exact_value not in ["F", "M", "U"]:
+                        raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
                 elif exact_param == "treenum":
                     try:
                         exact_value = int(exact_value)
