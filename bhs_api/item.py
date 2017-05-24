@@ -190,17 +190,17 @@ def enrich_item(item, db=None, collection_name=None):
         main_image_id = None
         for image in pictures:
             # Add 'PictureUrl' to all images of an item
-            image_id = image['PictureId']
-            if item.has_key('bagnowka'):
-                image['PictureUrl'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, image_id)
-            else:
-                image_bucket = current_app.conf.image_bucket
-                thumbnail_bucket = current_app.conf.thumbnail_bucket
-                image['PictureUrl'] = get_image_url(image_id, image_bucket)
+            picture_id = image.get('PictureId', None)
+            if picture_id:
+                if item.has_key('bagnowka'):
+                    image['PictureUrl'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, picture_id)
+                else:
+                    image_bucket = current_app.conf.image_bucket
+                    image['PictureUrl'] = get_image_url(picture_id, image_bucket)
 
             is_preview = image.get('IsPreview', False)
             if is_preview == '1':
-                main_image_id = image['PictureId']
+                main_image_id = picture_id
 
         if not main_image_id:
             for image in pictures:
