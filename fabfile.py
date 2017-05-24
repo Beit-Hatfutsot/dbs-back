@@ -23,6 +23,8 @@ def push_code(rev='HEAD', virtualenv=True, requirements=True, cur_date=None):
     run('mkdir api')
     with cd("api"):
         run('tar xzf /tmp/api.tar.gz')
+        run('rm -rf env')
+        run('cp -r /tmp/latest-api-{}/env env'.format(cur_date))
         if virtualenv:
             if not files.exists('env'):
                 run('virtualenv env')
