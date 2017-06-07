@@ -1131,3 +1131,27 @@ PERSON_EINSTEIN = {"tree_file_id" : "faabda6e-6453-4b69-b77b-a3d9b7e60e74",
                    },}
 
 PERSON_LIVING = {"person_id" : "I687", "Slug" : { "En" : "person_1196;0.I687" }, "deceased" : False, "tree_num": 1933, "tree_version": 0, "name": ["Mookie", "Shooki"]}
+
+PERSON_MOSHE_A = {
+  "person_id" : "I7787", "Slug" : { "En" : "person_1796;0.I787" }, "deceased" : True, 
+  "tree_num": 6654, "tree_version": 0,
+  "first_name_lc": "moshe", "last_name_lc": "a", 
+  "BIRT_PLAC_lc": "holon", "DEAT_PLAC_lc": "tel aviv",
+  "Header": {
+      "En": "Moshe A",
+      "He": "Moshe A"
+  }}
+PERSON_MOSHE_B = {
+  "person_id" : "I7788", "Slug" : { "En" : "person_1796;0.I787" }, "deceased" : True, 
+  "tree_num": 6654, "tree_version": 0,
+  "first_name_lc": "moshe", "last_name_lc": "b", 
+  "BIRT_PLAC_lc": "holon", "DEAT_PLAC_lc": "yaffo",
+  "Header": {
+      "En": "Moshe B",
+      "He": "Moshe B"
+  }}
+
+
+
+
+

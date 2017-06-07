@@ -205,15 +205,20 @@ def test_advanced_search_persons_text_params(client, app):
         assert_einstein_result(client, u"/v1/search?collection=persons&{param}={starts}&{param}_t=starts".format(**format_kwargs))
         assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=like".format(**format_kwargs)))
         assert_einstein_result(client, u"/v1/search?collection=persons&{param}={like}&{param}_t=like".format(**format_kwargs))
+    # the place param does a search over multiple fields
+    # TODO: integrate it into the above for loop - to test all the place_type options
+    assert_search_hit_ids(client, u"q=moshe&with_persons=1&place=yaffo&place_type=exact", [None])
+
 
 def test_persons_search_query_should_filter_on_all_text_fields(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    for param, attr, val, exact, starts, like in (("pob", "BIRT_PLAC_lc", "ulm a.d., germany", "germany", "germ", "uml"),
-                                                  ("pod", "DEAT_PLAC_lc", "princeton, u.s.a.", "princeton", "prince", "prniceton"),
-                                                  ("pom", "MARR_PLAC_lc", ["uklaulaulaska", "agrogorog"], "uklaulaulaska", "agro", "agroogrog")):
-        assert PERSON_EINSTEIN[attr] == val
-        format_kwargs = {"param": param, "exact": exact, "starts": starts, "like": like}
-        assert_einstein_result(client, u"/v1/search?collection=persons&q=princeton&last=einstein")
+    # Values exist
+    assert_einstein_result(client, u"/v1/search?q=princeton&last=einstein&collection=persons")
+    assert_einstein_result(client, u"/v1/search?q=princeton&last=einstein&with_persons=1")
+    assert_einstein_result(client, u"/v1/search?q=princeton&with_persons=1")
+    # Values don't exist
+    assert_no_results(client.get(u"/v1/search?collection=persons&q=foobarbaz&last=einstein"))
+    assert_no_results(client.get(u"/v1/search?q=princeton&last=einstein"))
 
 def test_advanced_search_persons_other_params(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)

@@ -54,6 +54,22 @@ for i in [400, 403, 404, 405, 409, 415, 500]:
     app.error_handler_spec[None][i] = custom_error
 '''
 
+def get_person_elastic_search_text_param_query(text_type, text_attr, text_value):
+    if isinstance(text_attr, list):
+        return {"bool": {"should": [
+            get_person_elastic_search_text_param_query(text_type, sub_text_attr, text_value)
+            for sub_text_attr in text_attr
+        ]}}
+    elif text_type == "exact":
+        return {"term": {text_attr: text_value}}
+    elif text_type == "like":
+        return {"match": {text_attr: {"query": text_value,
+                                                    "fuzziness": "AUTO"}}}
+    elif text_type == "starts":
+        return {"prefix": {text_attr: text_value}}
+    else:
+        raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
+
 
 def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, **kwargs):
     if collection:
@@ -63,18 +79,22 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
         # we consider the with_persons to decide whether to include persons collection or not
         collections = [collection for collection in SEARCHABLE_COLLECTIONS
                                   if with_persons or collection != "persons"]
+    
+
+    fields = ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He"]
     default_query = {
         "query_string": {
-            "fields": ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He", "BIRT_PLAC_lc", "MARR_PLAC_lc", "DEAT_PLAC_lc"],
+            "fields": fields,
             "query": q,
             "default_operator": "and"
         }
     }
-
+    for k, v in PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE:
+        if not isinstance(v, list):
+            fields.append(v)
     if collection == "persons":
         must_queries = []
         if q:
-
             must_queries.append(default_query)
         for year_param, year_attr in PERSONS_SEARCH_YEAR_PARAMS:
             if kwargs[year_param]:
@@ -100,15 +120,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                 text_value = kwargs[text_param].lower()
                 text_type_param = "{}_t".format(text_param)
                 text_type = kwargs[text_type_param]
-                if text_type == "exact":
-                    must_queries.append({"term": {text_attr: text_value}})
-                elif text_type == "like":
-                    must_queries.append({"match": {text_attr: {"query": text_value,
-                                                               "fuzziness": "AUTO"}}})
-                elif text_type == "starts":
-                    must_queries.append({"prefix": {text_attr: text_value}})
-                else:
-                    raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
+                must_queries.append(get_person_elastic_search_text_param_query(text_type, text_attr, text_value))
         
         for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
             if kwargs[exact_param]:
@@ -454,6 +466,7 @@ def general_search():
             try:
                 rv = es_search(**parameters)
             except Exception as e:
+                logging.exception(e)
                 return humanify({"error": e.message}, 500)
             for item in rv['hits']['hits']:
                 enrich_item(item['_source'], collection_name=item['_type'])
