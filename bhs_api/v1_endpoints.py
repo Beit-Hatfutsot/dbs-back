@@ -65,7 +65,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                                   if with_persons or collection != "persons"]
     default_query = {
         "query_string": {
-            "fields": ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He"],
+            "fields": ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He", "BIRT_PLAC_lc", "MARR_PLAC_lc", "DEAT_PLAC_lc"],
             "query": q,
             "default_operator": "and"
         }
@@ -74,6 +74,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
     if collection == "persons":
         must_queries = []
         if q:
+
             must_queries.append(default_query)
         for year_param, year_attr in PERSONS_SEARCH_YEAR_PARAMS:
             if kwargs[year_param]:
@@ -108,6 +109,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                     must_queries.append({"prefix": {text_attr: text_value}})
                 else:
                     raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
+        
         for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
             if kwargs[exact_param]:
                 exact_value = kwargs[exact_param]

@@ -206,6 +206,15 @@ def test_advanced_search_persons_text_params(client, app):
         assert_no_results(client.get(u"/v1/search?collection=persons&{param}=foobarbaz&{param}_t=like".format(**format_kwargs)))
         assert_einstein_result(client, u"/v1/search?collection=persons&{param}={like}&{param}_t=like".format(**format_kwargs))
 
+def test_persons_search_query_should_filter_on_all_text_fields(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    for param, attr, val, exact, starts, like in (("pob", "BIRT_PLAC_lc", "ulm a.d., germany", "germany", "germ", "uml"),
+                                                  ("pod", "DEAT_PLAC_lc", "princeton, u.s.a.", "princeton", "prince", "prniceton"),
+                                                  ("pom", "MARR_PLAC_lc", ["uklaulaulaska", "agrogorog"], "uklaulaulaska", "agro", "agroogrog")):
+        assert PERSON_EINSTEIN[attr] == val
+        format_kwargs = {"param": param, "exact": exact, "starts": starts, "like": like}
+        assert_einstein_result(client, u"/v1/search?collection=persons&q=princeton&last=einstein")
+
 def test_advanced_search_persons_other_params(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     for param, attr, val, invalid_val, no_results_val in (("sex", "gender", "M", "FOO", "F"),
