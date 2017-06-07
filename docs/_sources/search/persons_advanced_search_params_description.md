@@ -2,7 +2,7 @@
     + collection: `persons` (enum, required) - The advanced persons search requires collection to be persons
         + Members
             + persons
-    + q (string, optional) - same as in [general search](#database-search-general-search), but optional
+    + q (string, optional) - same as in [general search](#database-search-general-search) except: 1. it's optional   2. it searches in the person places as well
     + from_ (number, optional) - see [general search](#database-search-general-search)
     + size (number, optional) - see [general search](#database-search-general-search)
     + first (string, optional) - first name
@@ -15,6 +15,8 @@
     + pom_t: `like` (enum, optional) - place of marriage <!-- include(text_search_type_members.md) -->
     + pod (string, optional) - place of death
     + pod_t: `like` (enum, optional) - place of death <!-- include(text_search_type_members.md) -->
+    + place (string, optional) - search over all place fields, if any matches it will return the result
+    + place_t: `like` (enum, optional) - combined place field <!-- include(text_search_type_members.md) -->
     + yob (number, optional) - year of birth
     + yob_t: `pmyears` (enum, optional) - year of birth <!-- include(year_search_type_members.md) -->
     + yob_v: <!-- include(year_search_v_param.md) -->

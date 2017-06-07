@@ -43,7 +43,7 @@ def given_local_elasticsearch_client_with_test_data(app, session_id=None):
             "familyNames": [FAMILY_NAMES_DERI, FAMILY_NAMES_EDREHY],
             "personalities": [PERSONALITIES_FERDINAND, PERSONALITIES_DAVIDOV],
             "movies": [MOVIES_MIDAGES, MOVIES_SPAIN],
-            "persons": [PERSON_EINSTEIN, PERSON_LIVING],
+            "persons": [PERSON_EINSTEIN, PERSON_LIVING, PERSON_MOSHE_A, PERSON_MOSHE_B],
         }, reuse_db)
 
 
@@ -69,7 +69,7 @@ def assert_no_results(res):
 
 def assert_search_results(res, num_expected):
     hits = assert_common_elasticsearch_search_results(res)
-    assert len(hits["hits"]) == num_expected and hits["total"] == num_expected
+    assert len(hits["hits"]) == num_expected and hits["total"] == num_expected, "unexpected number of hits: {} / {}".format(len(hits["hits"]), hits["total"])
     for hit in hits["hits"]:
         assert hit["_index"] == "bh_dbs_back_pytest"
         yield hit
@@ -80,9 +80,9 @@ def assert_search_hit_ids(client, search_params, expected_ids, ignore_order=Fals
                in assert_search_results(client.get(u"/v1/search?{}".format(search_params)),
                                         len(expected_ids))]
     if not ignore_order:
-        assert hit_ids == expected_ids
+        assert hit_ids == expected_ids, "hit_ids={}".format(hit_ids)
     else:
-        assert {id:id for id in hit_ids} == {id:id for id in expected_ids}
+        assert {id:id for id in hit_ids} == {id:id for id in expected_ids}, "actual IDs = {}".format(hit_ids)
 
 def assert_suggest_response(client, collection, string,
                             expected_http_status_code=200, expected_error_message=None, expected_json=None):

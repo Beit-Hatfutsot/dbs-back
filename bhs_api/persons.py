@@ -27,6 +27,7 @@ PERSONS_SEARCH_DEFAULT_PARAMETERS = {"first": None, "first_t": "exact",
                                      "pob": None, "pob_t": "exact",
                                      "pom": None, "pom_t": "exact",
                                      "pod": None, "pod_t": "exact",
+                                     "place": None, "place_t": "exact",
                                      "yob": None, "yob_t": "exact", "yob_v": None,
                                      "yom": None, "yom_t": "exact", "yom_v": None,
                                      "yod": None, "yod_t": "exact", "yod_v": None,
@@ -41,7 +42,8 @@ PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE = (("first", "first_name_lc"),
                                         ("last", "last_name_lc"),
                                         ("pob", "BIRT_PLAC_lc"),
                                         ("pom", "MARR_PLAC_lc"),
-                                        ("pod", "DEAT_PLAC_lc"),)
+                                        ("pod", "DEAT_PLAC_lc"),
+                                        ("place", ["BIRT_PLAC_lc", "MARR_PLAC_lc", "DEAT_PLAC_lc"]),)
 
 PERSONS_SEARCH_EXACT_PARAMS = (("sex", "gender"),
                                ("treenum", "tree_num"))
