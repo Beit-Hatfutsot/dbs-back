@@ -226,7 +226,9 @@ def test_ensure_metadata(app, mock_db):
                                                             ('persons', 'NO_UPDATE_NEEDED', (1, 0, 'I2')),
                                                             ('persons', 'ADDED_ITEM', (1, 0, 'I3')),
                                                             ('persons', 'DELETED_ITEM', (1933, 0, 'I687')),
-                                                            ('persons', 'DELETED_ITEM', (1196, 0, 'I686'))}
+                                                            ('persons', 'DELETED_ITEM', (1196, 0, 'I686')),
+                                                            ('persons', 'DELETED_ITEM', (6654, 0, 'I7787')),
+                                                            ('persons', 'DELETED_ITEM', (6654, 0, 'I7788')),}
     # running again - to make sure it searches items properly in ES
     # items deleted in previous results - don't appear now
     # items added / no update needed in previous results - all have no_update_needed now
