@@ -92,58 +92,65 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
     for k, v in PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE:
         if not isinstance(v, list):
             fields.append(v)
-    if collection == "persons":
-        must_queries = []
-        if q:
-            must_queries.append(default_query)
-        for year_param, year_attr in PERSONS_SEARCH_YEAR_PARAMS:
-            if kwargs[year_param]:
+    must_queries = []
+    if q:
+        must_queries.append(default_query)
+    for year_param, year_attr in PERSONS_SEARCH_YEAR_PARAMS:
+        if kwargs[year_param]:
+            try:
+                year_value = int(kwargs[year_param])
+            except Exception as e:
+                raise Exception("invalid value for {} ({}): {}".format(year_param, year_attr, kwargs[year_param]))
+            year_type_param = "{}_t".format(year_param)
+            year_type = kwargs[year_type_param]
+            if year_type == "pmyears":
+                year_type_value_param = "{}_v".format(year_param)
                 try:
-                    year_value = int(kwargs[year_param])
+                    year_type_value = int(kwargs[year_type_value_param])
                 except Exception as e:
-                    raise Exception("invalid value for {} ({}): {}".format(year_param, year_attr, kwargs[year_param]))
-                year_type_param = "{}_t".format(year_param)
-                year_type = kwargs[year_type_param]
-                if year_type == "pmyears":
-                    year_type_value_param = "{}_v".format(year_param)
-                    try:
-                        year_type_value = int(kwargs[year_type_value_param])
-                    except Exception as e:
-                        raise Exception("invalid value for {} ({}): {}".format(year_type_value_param, year_attr, kwargs[year_type_value_param]))
-                    must_queries.append({"range": {year_attr: {"gte": year_value - year_type_value, "lte": year_value + year_type_value,}}})
-                elif year_type == "exact":
-                    must_queries.append({"term": {year_attr: year_value}})
-                else:
-                    raise Exception("invalid value for {} ({}): {}".format(year_type_param, year_attr, year_type))
-        for text_param, text_attr in PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE:
-            if kwargs[text_param]:
-                text_value = kwargs[text_param].lower()
-                text_type_param = "{}_t".format(text_param)
-                text_type = kwargs[text_type_param]
-                must_queries.append(get_person_elastic_search_text_param_query(text_type, text_attr, text_value))
-        
-        for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
-            if kwargs[exact_param]:
-                exact_value = kwargs[exact_param]
-                if exact_param == "sex":
-                    exact_value = exact_value.upper()
-                    if exact_value not in ["F", "M", "U"]:
-                        raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
-                elif exact_param == "treenum":
-                    try:
-                        exact_value = int(exact_value)
-                    except Exception as e:
-                        raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
-                must_queries.append({"term": {exact_attr: exact_value}})
-        body = {
-            "query": {
-                "bool": {
-                    "must": must_queries
-                }
+                    raise Exception("invalid value for {} ({}): {}".format(year_type_value_param, year_attr, kwargs[year_type_value_param]))
+                must_queries.append({"range": {year_attr: {"gte": year_value - year_type_value, "lte": year_value + year_type_value,}}})
+            elif year_type == "exact":
+                must_queries.append({"term": {year_attr: year_value}})
+            else:
+                raise Exception("invalid value for {} ({}): {}".format(year_type_param, year_attr, year_type))
+    for text_param, text_attr in PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE:
+        if kwargs[text_param]:
+            text_value = kwargs[text_param].lower()
+            text_type_param = "{}_t".format(text_param)
+            text_type = kwargs[text_type_param]
+            must_queries.append(get_person_elastic_search_text_param_query(text_type, text_attr, text_value))
+
+    for exact_param, exact_attr in PERSONS_SEARCH_EXACT_PARAMS:
+        if kwargs[exact_param]:
+            exact_value = kwargs[exact_param]
+            if exact_param == "sex":
+                exact_value = exact_value.upper()
+                if exact_value not in ["F", "M", "U"]:
+                    raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+            elif exact_param == "treenum":
+                try:
+                    exact_value = int(exact_value)
+                except Exception as e:
+                    raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
+            must_queries.append({"term": {exact_attr: exact_value}})
+    collection_boosts = {
+        "places": 5
+    }
+    for collection in SEARCHABLE_COLLECTIONS:
+        if collection not in collection_boosts:
+            collection_boosts[collection] = 1
+    must_queries.append({"bool": {
+        "should": [{"match": {"_type": {"query": collection, "boost": boost}}}
+                   for collection, boost in collection_boosts.items()]
+    }})
+    body = {
+        "query": {
+            "bool": {
+                "must": must_queries
             }
         }
-    else:
-        body = {"query": default_query}
+    }
     if sort == "abc":
         if phonetic.is_hebrew(q.strip()):
             # hebrew alphabetical sort

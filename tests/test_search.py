@@ -235,3 +235,11 @@ def test_advanced_search_persons_other_params(client, app):
 def test_advanced_search_persons_exact_search_should_be_case_insensitive(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_einstein_results(client, "first=aLbErT&first_t=exact")
+
+def test_should_return_places_before_people(client, app):
+    given_local_elasticsearch_client_with_test_data(app, "test_search_test_should_return_places_before_people",
+                                                    additional_index_docs={"persons": [PERSON_JAMES_GERMANY_MCDADE],
+                                                                           "places": [PLACES_GERMANY]})
+    results = assert_search_results(client.get(u"/v1/search?with_persons=1&q=germany"), 6)
+    assert next(results)["_source"]["Header"]["En"] == "GERMANY"
+
