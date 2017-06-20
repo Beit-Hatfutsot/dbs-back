@@ -64,6 +64,11 @@ def assert_error_response(res, expected_status_code, expected_error_startswith):
     assert res.status_code == expected_status_code
     assert res.json["error"].startswith(expected_error_startswith)
 
+def assert_client_get(client, url, expected_status_code=200):
+    res = client.get(url)
+    assert res.status_code == expected_status_code, get_res_dump(res)
+    return res.json
+
 def assert_common_elasticsearch_search_results(res):
     assert res.status_code == 200, "invalid status, json response: {}".format(res.json)
     hits = res.json["hits"]
@@ -107,5 +112,8 @@ def assert_suggest_response(client, collection, string,
         print(res.json)
         assert expected_json == res.json, "expected={}, actual={}".format(expected_json, res.json)
 
+def get_res_dump(res):
+    return (res.status_code, res.data)
+
 def dump_res(res):
-    print(res.status_code, res.data)
+    print(get_res_dump(res))

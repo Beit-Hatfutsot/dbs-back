@@ -181,6 +181,12 @@ def fetch_item(slug, db=None):
         return _make_serializable(item)
         return item
 
+def hits_to_docs(hits):
+    for hit in hits:
+        doc = hit["_source"]
+        # TODO: remove / modify fields here
+        yield doc
+
 def enrich_item(item, db=None, collection_name=None):
     if not db:
         db = current_app.data_db

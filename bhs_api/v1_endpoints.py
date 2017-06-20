@@ -28,7 +28,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify, SEARCHABLE_COLLECTIONS)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER)
+                          enrich_item, hits_to_docs)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -695,17 +695,30 @@ def get_story(hash):
 @v1_endpoints.route('/geo/places')
 def get_geocoded_places():
     args = request.args
-    filters = SHOW_FILTER.copy()
-    filters['geometry'] = {'$exists': True}
-    filters['Header.En'] = {'$nin' : [None, '']}
     try:
-        filters['geometry.coordinates.1'] = {'$gte': float(args['sw_lat']), '$lte': float(args['ne_lat'])}
-        filters['geometry.coordinates.0'] = {'$gte': float(args['sw_lng']), '$lte': float(args['ne_lng'])}
-    except KeyError:
-        abort(400, 'Please specify a box using sw_lat, sw_lng, ne_lat, ne_lng')
-    except ValueError:
-        abort(400, 'Please specify a box using floats in sw_lat, sw_lng, ne_lat, ne_lng')
-    points = current_app.data_db['places'].find(filters, {'Header': True,
-        'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
-    ret = humanify(list(points))
-    return ret
+        north_lat = float(args['ne_lat'])
+        west_lng = float(args['sw_lng'])
+        south_lat = float(args['sw_lat'])
+        east_lng = float(args['ne_lng'])
+    except KeyError as e:
+        return humanify({"error": "required argument: {}".format(e.message)}, 500)
+    except Exception as e:
+        return humanify({"error": e.message}, 500)
+    body = {
+        "query": {
+            "bool" : {
+                "filter" : {
+                    "geo_bounding_box" : {
+                        "location" : {
+                            "top_left" : {"lat" : north_lat, "lon" : west_lng},
+                            "bottom_right" : {"lat" : south_lat, "lon" : east_lng}
+                        }
+                    }
+                }
+            }
+        }
+    }
+    collections = ["places"]
+    res = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections)
+    hits = res["hits"]["hits"]
+    return humanify(hits_to_docs(hits))
