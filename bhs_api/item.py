@@ -429,11 +429,16 @@ def create_slug(document, collection_name):
     return ret
 
 def get_doc_id(collection_name, doc):
-    if collection_name == "persons":
-        raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
-    id_field = get_collection_id_field(collection_name)
-    return doc[id_field]
-
+    if "source" in doc and "source_id" in doc:
+        # new doc
+        return "{source}_{source_id}".format(source=doc["source"], source_id=doc["source_id"])
+    else:
+        # legacy doc
+        # TODO: remove this code!
+        if collection_name == "persons":
+            raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
+        id_field = get_collection_id_field(collection_name)
+        return doc[id_field]
 
 def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=None):
     app = current_app if not app else app

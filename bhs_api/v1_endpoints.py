@@ -81,7 +81,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                                   if with_persons or collection != "persons"]
     
 
-    fields = ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He"]
+    fields = ["title_en", "title_he", "content_html_he", "content_html_en"]
     default_query = {
         "query_string": {
             "fields": fields,
@@ -154,10 +154,10 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
     if sort == "abc":
         if phonetic.is_hebrew(q.strip()):
             # hebrew alphabetical sort
-            body["sort"] = [{"Header.He_lc": "asc"}, "_score"]
+            body["sort"] = [{"title_he_lc": "asc"}, "_score"]
         else:
             # english alphabetical sort
-            body["sort"] = [{"Header.En_lc": "asc"}, "_score"]
+            body["sort"] = [{"title_en_lc": "asc"}, "_score"]
     elif sort == "rel":
         # relevance sort
         body["sort"] = ["_score"]
@@ -282,14 +282,15 @@ def get_completion(collection, string, size=7):
     # currently we only do a simple starts with search, without contains or phonetics
     # TODO: fix phonetics search, some work was done for that
     # see https://github.com/Beit-Hatfutsot/dbs-back/blob/2e79c363e40472f28fd07f8a344fe55ab77198ee/bhs_api/v1_endpoints.py#L189
-    lang = "He" if phonetic.is_hebrew(string) else "En"
+    lang = "he" if phonetic.is_hebrew(string) else "en"
     q = {
-        "_source": ["Slug", "Header"],
+        # TODO: find out why it was needed, or if it was a mistake
+        # "_source": ["Slug", "Header"],
         "suggest": {
             "header" : {
                 "prefix": string,
                 "completion": {
-                    "field": "Header.{}.suggest".format(lang),
+                    "field": "title_{}.suggest".format(lang),
                     "size": size,
                     "contexts": {
                         "collection": collection,
@@ -308,7 +309,7 @@ def get_completion(collection, string, size=7):
         phonetic_options = results['suggest']['phonetic'][0]['options']
     except KeyError:
         phonetic_options = []
-    return  [i['_source']['Header'][lang] for i in header_options], [i['_source']['Header'][lang] for i in phonetic_options]
+    return  [i['_source']['title_{}'.format(lang)] for i in header_options], [i['_source']['title_{}'.format(lang)] for i in phonetic_options]
 
 
 def get_phonetic(collection, string, limit=5):

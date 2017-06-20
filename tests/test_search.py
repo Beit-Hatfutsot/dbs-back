@@ -2,6 +2,11 @@
 from common import *
 from mocks import *
 
+def assert_doc(app, doc_id, **assert_attrs):
+    res = app.es.get(index=app.es_data_db_index_name, id=doc_id)
+    doc = res["_source"]
+    for k,v in assert_attrs.items():
+        assert doc[k] == v, "expected={}, actual={}".format(assert_attrs, {k:v for k,v in doc.items() if k in assert_attrs})
 
 def test_search_without_parameters_should_return_error(client):
     assert_error_response(client.get('/v1/search'), 400, "You must specify a search query")
@@ -20,37 +25,65 @@ def test_general_search_single_result(client, app):
     res = client.get("/v1/search?q=BOURGES")
     for hit in assert_search_results(res, 1):
         assert hit["_type"] == "places"
-        assert hit["_source"]["Header"]["En"] == "BOURGES"
+        assert hit["_source"]["title_en"] == "BOURGES"
 
 def test_general_search(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert_search_hit_ids(client, u"q=יהודים&sort=rel", [312757, 187521, 187559, 340727, 240790, 262366], ignore_order=True)
-    assert_search_hit_ids(client, u"q=יהודים&sort=abc", [187559, 187521, 240790, 340727, 312757, 262366])
-    assert_search_hit_ids(client, u"q=jews&sort=abc", [187521, 312757, 187559, 240790, 340727, 262367])
+    # for reference - to know how the results should be sorted
+    assert_doc(app, u'clearmash_154126', **{"title_en": "BOZZOLO", "title_he": u"בוצולו"})
+    assert_doc(app, u'clearmash_244123', **{"title_en": "BOURGES", "title_he": u"בורג'"})
+    assert_doc(app, u'clearmash_222830', **{"title_en": "EDREHY", "title_he": u"אדרהי"})
+    assert_doc(app, u'clearmash_175821', **{"title_en": "Boys (jews) praying at the synagogue of Mosad Aliyah, Israel 1963",
+                                            "title_he": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950"})
+    # relevancy search
+    assert_search_hit_ids(client, u"q=יהודים&sort=rel", [u'clearmash_154126', u'clearmash_244123', u'clearmash_222830', u'clearmash_175821'], ignore_order=True)
+    # sort abc with hebrew query - will sort based on the hebrew titles
+    assert_search_hit_ids(client, u"q=יהודים&sort=abc", [u'clearmash_222830', u'clearmash_154126', u'clearmash_244123', u'clearmash_175821'])
+    # sort abc with english query - will sort based on the english titles
+    assert_search_hit_ids(client, u"q=jews&sort=abc", [u'clearmash_244123', u'clearmash_175821', u'clearmash_154126', u'clearmash_224646'])
 
 def test_places_search(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert_search_hit_ids(client, u"q=יהודים&collection=places", [187521, 187559], ignore_order=True)
-    assert_search_hit_ids(client, u"q=יהודים&collection=places&sort=abc", [187559, 187521])
-    assert_search_hit_ids(client, u"q=jews&collection=places&sort=abc", [187521, 187559])
+    # for reference - to know how the results should be sorted
+    assert_doc(app, u'clearmash_154126', **{"title_en": "BOZZOLO", "title_he": u"בוצולו"})
+    assert_doc(app, u'clearmash_244123', **{"title_en": "BOURGES", "title_he": u"בורג'"})
+    assert_search_hit_ids(client, u"q=יהודים&collection=places", [u'clearmash_154126', u'clearmash_244123'], ignore_order=True)
+    assert_search_hit_ids(client, u"q=יהודים&collection=places&sort=abc", [u'clearmash_154126', u'clearmash_244123'])
+    assert_search_hit_ids(client, u"q=jews&collection=places&sort=abc", [u'clearmash_244123', u'clearmash_154126'])
 
 def test_images_search(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [303772, 312757])
-    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=abc", [312757, 303772])
-    assert_search_hit_ids(client, u"q=זוננפלד&collection=photoUnits&sort=abc", [303772, 312757])
+    assert_doc(app, u'clearmash_189948', **{"title_en": "Building Blocks for Housing Projects, Israel 1950s",
+                                            "title_he": u"לבנים למפעל בנייה למגורים, ישראל שנות 1960",
+                                            "period_startdate": "1960-01-01T00:00:00Z"})
+    assert_doc(app, u'clearmash_175821', **{"title_en": "Boys (jews) praying at the synagogue of Mosad Aliyah, Israel 1963",
+                                            "title_he": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950",
+                                            "period_startdate": "1950-01-01T00:00:00Z"})
+    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [u'clearmash_189948', u'clearmash_175821'])
+    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=abc", [u'clearmash_175821', u'clearmash_189948'])
+    assert_search_hit_ids(client, u"q=זוננפלד&collection=photoUnits&sort=abc", [u'clearmash_189948', u'clearmash_175821'])
 
 def test_family_names_search(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert_search_hit_ids(client, u"q=משפחה&collection=familyNames&sort=abc", [341018, 340727])
+    assert_doc(app, u'clearmash_222829', **{"title_en": "DER'I", "title_he": u"דרעי"})
+    assert_doc(app, u'clearmash_222830', **{"title_en": "EDREHY", "title_he": u"אדרהי"})
+    assert_search_hit_ids(client, u"q=משפחה&collection=familyNames&sort=abc", [u'clearmash_222830', u'clearmash_222829'])
+    assert_search_hit_ids(client, u"q=EDREHY+DER'I&collection=familyNames&sort=abc", [u'clearmash_222829', u'clearmash_222830'])
 
 def test_personalities_search(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert_search_hit_ids(client, u"q=Leipzig&collection=personalities&sort=abc", [240790, 240792])
+    assert_doc(app, u'clearmash_202014', **{'title_en': "Davydov, Karl Yulyevich", "title_he": u"דוידוב, קרל יולייביץ'"})
+    assert_doc(app, u'clearmash_202015', **{'title_en': "David, Ferdinand", "title_he": u"דוד, פרדיננד"})
+    assert_search_hit_ids(client, u"q=Leipzig&collection=personalities&sort=abc", [u'clearmash_202015', u'clearmash_202014'])
+    assert_search_hit_ids(client, u"q=לייפציג&collection=personalities&sort=abc", [u'clearmash_202015', u'clearmash_202014'])
 
 def test_movies_search(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert_search_hit_ids(client, u"q=jews&collection=movies&sort=abc", [262367])
+    assert_doc(app, u'clearmash_224646', **{"title_en": "Jewish Communities in the Middle Ages: Babylonia; Spain; Ashkenaz (Hebrew)",
+                                            "title_he": u"קהילות יהודיות בימי הביניים:  בבל; ספרד; אשכנז (עברית)"})
+    assert_doc(app, u'clearmash_130323', **{"title_en": "Living Moments in Jewish Spain (English jews)",
+                                            "title_he": u"רגעים עם יהודי ספרד (אנגלית)"})
+    assert_search_hit_ids(client, u"q=jews&collection=movies&sort=abc", [u'clearmash_224646', u'clearmash_130323'])
 
 def test_invalid_suggest(client, app):
     given_invalid_elasticsearch_client(app)
@@ -64,7 +97,7 @@ def test_general_suggest(client, app):
                                                 "contains": {},
                                                 "starts_with": {"places": [u'Bourges', u'Bozzolo'],
                                                                                # notice that suggest captilizes all letters
-                                                                "photoUnits": ['Boys Praying At The Synagogue Of Mosad Aliyah, Israel 1963'],
+                                                                "photoUnits": ['Boys (Jews) Praying At The Synagogue Of Mosad Aliyah, Israel 1963'],
                                                                 "familyNames": [], "personalities": [], "movies": [], "persons": []}})
 
 def test_places_suggest(client, app):
@@ -94,11 +127,10 @@ def test_movies_suggest(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_suggest_response(client, u"movies", u"liv",
                             200, expected_json={u'phonetic': [], u'contains': [],
-                                                u'starts_with': [u'Living Moments In Jewish Spain (English)']})
+                                                u'starts_with': [u'Living Moments In Jewish Spain (English Jews)']})
 
 def test_search_result_without_slug(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-
     assert "Slug" not in PHOTO_BRICKS
     results = list(assert_search_results(client.get(u"/v1/search?q=Blocks&collection=photoUnits&sort=abc"), 1))
     # slug is generated on-the-fly if it doesn't exist in source data
@@ -106,7 +138,6 @@ def test_search_result_without_slug(client, app):
       "En": "image_building-blocks-for-housing-projects-israel-1950s",
       "He": u"תמונה_לבנים-למפעל-בנייה-למגורים-ישראל-שנות-1960"
     }
-
     assert "Slug" not in PLACES_BOURGES
     results = list(assert_search_results(client.get(u"/v1/search?q=bourges&collection=places&sort=abc"), 1))
     # slug is generated on-the-fly if it doesn't exist in source data

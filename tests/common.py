@@ -4,7 +4,7 @@ from copy import deepcopy
 import os
 from bhs_api.item import get_doc_id
 from mocks import *
-import json
+import logging
 
 
 def given_invalid_elasticsearch_client(app):
@@ -12,11 +12,16 @@ def given_invalid_elasticsearch_client(app):
 
 def index_doc(app, collection, doc):
     doc = deepcopy(doc)
-    doc.get("Header", {}).setdefault("He_lc", doc.get("Header", {}).get("He", "").lower())
-    doc.get("Header", {}).setdefault("En_lc", doc.get("Header", {}).get("En", "").lower())
+    # sync pipelines adds this attribute, but for simplicity we don't include it in the mocks and just add it here
+    doc.setdefault("title_he_lc", doc.get("title_he", "").lower())
+    doc.setdefault("title_en_lc", doc.get("title_en", "").lower())
+    # TODO: remove this code, doc_id for the new docs is much simpler
+    # something like this: "{}_{}".format(doc["source"], doc["source_id"])
     if collection == "persons":
+        # persons data is still not available in new schema
         doc_id = "{}_{}_{}".format(doc["tree_num"], doc["tree_version"], doc["person_id"])
     else:
+        # get_doc_id detects new schema docs and sets correct doc_id
         doc_id = get_doc_id(collection, doc)
     app.es.index(index=app.es_data_db_index_name, doc_type=collection, body=doc, id=doc_id)
 
@@ -77,16 +82,16 @@ def assert_no_results(res):
 
 def assert_search_results(res, num_expected):
     hits = assert_common_elasticsearch_search_results(res)
-    assert len(hits["hits"]) == num_expected and hits["total"] == num_expected, "unexpected number of hits: {} / {}".format(len(hits["hits"]), hits["total"])
+    assert (len(hits["hits"]) == num_expected
+            and hits["total"] == num_expected), "unexpected number of hits: {} / {}\n{}".format(len(hits["hits"]),
+                                                                                                hits["total"],
+                                                                                                [h["_id"] for h in hits["hits"]])
     for hit in hits["hits"]:
         assert hit["_index"] == "bh_dbs_back_pytest"
         yield hit
 
 def assert_search_hit_ids(client, search_params, expected_ids, ignore_order=False):
-    hit_ids = [hit["_source"].get("Id", hit["_source"].get("id"))
-               for hit
-               in assert_search_results(client.get(u"/v1/search?{}".format(search_params)),
-                                        len(expected_ids))]
+    hit_ids = [hit["_id"] for hit in assert_search_results(client.get(u"/v1/search?{}".format(search_params)), len(expected_ids))]
     if not ignore_order:
         assert hit_ids == expected_ids, "hit_ids={}".format(hit_ids)
     else:
@@ -95,12 +100,12 @@ def assert_search_hit_ids(client, search_params, expected_ids, ignore_order=Fals
 def assert_suggest_response(client, collection, string,
                             expected_http_status_code=200, expected_error_message=None, expected_json=None):
     res = client.get(u"/v1/suggest/{}/{}".format(collection, string))
-    assert res.status_code == expected_http_status_code
+    assert res.status_code == expected_http_status_code, "{}: {}".format(res, res.json["traceback"])
     if expected_error_message is not None:
         assert expected_error_message in res.data
     if expected_json is not None:
         print(res.json)
-        assert expected_json == res.json
+        assert expected_json == res.json, "expected={}, actual={}".format(expected_json, res.json)
 
 def dump_res(res):
     print(res.status_code, res.data)
