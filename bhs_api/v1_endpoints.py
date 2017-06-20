@@ -18,6 +18,7 @@ from itsdangerous import URLSafeSerializer, BadSignature
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
 import elasticsearch
+import elasticsearch.helpers
 import pymongo
 import jinja2
 import requests
@@ -28,7 +29,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify, SEARCHABLE_COLLECTIONS)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER)
+                          enrich_item, SHOW_FILTER, create_slug)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -708,3 +709,30 @@ def get_geocoded_places():
         'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
     ret = humanify(list(points))
     return ret
+
+@v1_endpoints.route("/linkify", methods=['GET', 'POST'])
+def linkify():
+    collections = ["places", "personalities", "familyNames"]
+    res = {collection: [] for collection in collections}
+    try:
+        if request.method == "POST":
+            html_lower = request.form["html"].lower()
+        else:
+            html_lower = request.args["html"].lower()
+    except Exception as e:
+        logging.exception(e)
+        raise
+    items = elasticsearch.helpers.scan(current_app.es, index=current_app.es_data_db_index_name, doc_type=collections, scroll=u"3h")
+    for item in items:
+        for lang in ["He", "En"]:
+            title = item["_source"]["Header"][lang]
+            if title.lower() in html_lower:
+                slug = create_slug(item["_source"], item["_type"])
+                slug = slug[lang]
+                # TODO: determine better way to transform slug to URL
+                # TODO: add the domain dynamically based on the environment
+                slug = slug.decode("utf-8")
+                slug = slug.replace(u"_", u"/")
+                url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
+                res[item["_type"]].append({"title": title, "url": url})
+    return humanify(res)
