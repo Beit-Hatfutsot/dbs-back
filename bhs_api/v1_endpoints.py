@@ -733,6 +733,6 @@ def linkify():
                 # TODO: add the domain dynamically based on the environment
                 slug = slug.decode("utf-8")
                 slug = slug.replace(u"_", u"/")
-                url = u"http://test.dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
+                url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
                 res[item["_type"]].append({"title": title, "url": url})
     return humanify(res)
