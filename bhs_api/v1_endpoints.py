@@ -710,21 +710,29 @@ def get_geocoded_places():
     ret = humanify(list(points))
     return ret
 
-@v1_endpoints.route("/linkify")
+@v1_endpoints.route("/linkify", methods=['GET', 'POST'])
 def linkify():
-    html = request.args["html"]
     collections = ["places", "personalities", "familyNames"]
+    res = {collection: [] for collection in collections}
+    try:
+        if request.method == "POST":
+            html_lower = request.form["html"].lower()
+        else:
+            html_lower = request.args["html"].lower()
+    except Exception as e:
+        logging.exception(e)
+        raise
     items = elasticsearch.helpers.scan(current_app.es, index=current_app.es_data_db_index_name, doc_type=collections, scroll=u"3h")
     for item in items:
         for lang in ["He", "En"]:
             title = item["_source"]["Header"][lang]
-            if title in html:
+            if title.lower() in html_lower:
                 slug = create_slug(item["_source"], item["_type"])
                 slug = slug[lang]
                 # TODO: determine better way to transform slug to URL
                 # TODO: add the domain dynamically based on the environment
                 slug = slug.decode("utf-8")
                 slug = slug.replace(u"_", u"/")
-                slug = u"http://test.dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
-                html = re.sub(title, u"<a href=\"{}\">{}</a>".format(slug, title), html)
-    return humanify({"linkified_html": html})
+                url = u"http://test.dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
+                res[item["_type"]].append({"title": title, "url": url})
+    return humanify(res)
