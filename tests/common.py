@@ -71,32 +71,22 @@ def assert_client_get(client, url, expected_status_code=200):
 
 def assert_common_elasticsearch_search_results(res):
     assert res.status_code == 200, "invalid status, json response: {}".format(res.json)
-    hits = res.json["hits"]
-    shards = res.json["_shards"]
-    assert shards["successful"] > 0
-    assert shards["failed"] < 1
-    assert shards["total"] == shards["successful"]
-    assert res.json["took"] > 0
-    assert isinstance(res.json["timed_out"], bool)
-    return hits
-
+    hits, total = res.json["hits"], res.json["total"]
+    return hits, total
 
 def assert_no_results(res):
-    hits = assert_common_elasticsearch_search_results(res)
-    assert hits["hits"] == [] and hits["total"] == 0 and hits["max_score"] == None
+    hits, total = assert_common_elasticsearch_search_results(res)
+    assert hits == [] and total == 0
 
 def assert_search_results(res, num_expected):
-    hits = assert_common_elasticsearch_search_results(res)
-    assert (len(hits["hits"]) == num_expected
-            and hits["total"] == num_expected), "unexpected number of hits: {} / {}\n{}".format(len(hits["hits"]),
-                                                                                                hits["total"],
-                                                                                                [h["_id"] for h in hits["hits"]])
-    for hit in hits["hits"]:
-        assert hit["_index"] == "bh_dbs_back_pytest"
+    hits, total = assert_common_elasticsearch_search_results(res)
+    assert (len(hits) == num_expected
+            and total == num_expected), "unexpected number of hits: {} / {}\n{}".format(len(hits), total, [hit["source"]+"_"+hit["source_id"] for hit in hits])
+    for hit in hits:
         yield hit
 
 def assert_search_hit_ids(client, search_params, expected_ids, ignore_order=False):
-    hit_ids = [hit["_id"] for hit in assert_search_results(client.get(u"/v1/search?{}".format(search_params)), len(expected_ids))]
+    hit_ids = [hit["source"]+"_"+hit["source_id"] for hit in assert_search_results(client.get(u"/v1/search?{}".format(search_params)), len(expected_ids))]
     if not ignore_order:
         assert hit_ids == expected_ids, "hit_ids={}".format(hit_ids)
     else:

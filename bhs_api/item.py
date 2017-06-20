@@ -19,6 +19,18 @@ SHOW_FILTER = {'StatusDesc': 'Completed',
                        {'UnitText1.He': {'$nin': [None, '']}}]}
 
 
+SLUG_LANGUAGES_MAP = {
+    'places': {'en': 'place', 'he': u'מקום',},
+    'familyNames': {'en': 'familyname', 'he': u'שםמשפחה',},
+    'lexicon': {'en': 'lexicon', 'he': u'מלון',},
+    'photoUnits': {'en': 'image', 'he': u'תמונה',},
+    'photos': {'en': 'image', 'he': u'תמונה',},
+    'synonyms': {'en': 'synonym', 'he': u'שם נרדף',},
+    'personalities': {'en': 'luminary', 'he': u'אישיות',},
+    'movies': {'en': 'video', 'he': u'וידאו',},
+}
+
+
 def get_show_metadata(collection_name, doc):
     if collection_name == "persons":
         return {"deceased": doc.get("deceased"),
@@ -236,13 +248,7 @@ def enrich_item(item, db=None, collection_name=None):
             return {}
             #abort(404, 'No video URL was found for this movie item.')
 
-    if 'Slug' not in item:
-        if 'GTN' in item:
-            item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
-        elif collection_name:
-            slug = create_slug(item, collection_name)
-            if slug:
-                item['Slug'] = slug
+    update_slugs(item, collection_name)
 
     return item
 
@@ -385,54 +391,19 @@ def get_collection_id_field(collection_name):
         doc_id = 'num'
     return doc_id
 
-def create_slug(document, collection_name):
-    collection_slug_map = {
-        'places': {'En': 'place',
-                   'He': u'מקום',
-                  },
-        'familyNames': {'En': 'familyname',
-                        'He': u'שםמשפחה',
-                       },
-        'lexicon': {'En': 'lexicon',
-                    'He': u'מלון',
-                   },
-        'photoUnits': {'En': 'image',
-                       'He': u'תמונה',
-                      },
-        'photos': {'En': 'image',
-                   'He': u'תמונה',
-                  },
-        # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
-        'genTreeIndividuals': {'En': 'person',
-                               'He': u'אדם',
-                              },
-        'synonyms': {'En': 'synonym',
-                     'He': u'שם נרדף',
-                    },
-        'personalities': {'En': 'luminary',
-                          'He': u'אישיות',
-                          },
-        'movies': {'En': 'video',
-                   'He': u'וידאו',
-                  },
-    }
-    try:
-        headers = document['Header'].items()
-    except KeyError:
-        # persons collection will be handled here as the cllection's docs don't have a Header
-        # it's the calling function responsibility to add a slug
-        # TODO: refactor to more specific logic, instead of relying on them not having a Header
-        return
-
-    ret = {}
-    slugify = Slugify(translate=None, safe_chars='_')
-    for lang, val in headers:
-        if val:
-            collection_slug = collection_slug_map[collection_name].get(lang)
-            if collection_slug:
-                slug = slugify('_'.join([collection_slug, val.lower()]))
-                ret[lang] = slug.encode('utf8')
-    return ret
+def update_slugs(document, collection_name):
+    slugify = None
+    for lang, collection_slug in SLUG_LANGUAGES_MAP[collection_name].items():
+        title = document.get("title_{}".format(lang), "")
+        if title != "":
+            slug = document.get("slug_{}".format(lang), "")
+            if slug == "":
+                if not slugify:
+                    slugify = Slugify(translate=None, safe_chars='_')
+                document["slug_{}".format(lang)] = slugify('_'.join([collection_slug, title.lower()])).encode("utf8")
+    # TODO: figure out what's GTN
+    # if 'GTN' in item:
+    #     item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
 
 def get_doc_id(collection_name, doc):
     if "source" in doc and "source_id" in doc:

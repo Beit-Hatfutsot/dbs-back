@@ -29,7 +29,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify, SEARCHABLE_COLLECTIONS)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER, create_slug, hits_to_docs)
+                          enrich_item, SHOW_FILTER, update_slugs, hits_to_docs)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -477,8 +477,10 @@ def general_search():
             except Exception as e:
                 logging.exception(e)
                 return humanify({"error": e.message}, 500)
-            for item in rv['hits']['hits']:
+            rv = rv["hits"]
+            for item in rv["hits"]:
                 enrich_item(item['_source'], collection_name=item['_type'])
+            rv["hits"] = list(hits_to_docs(rv["hits"]))
             return humanify(rv)
         else:
             return humanify({"error": "You must specify a search query"}, 400)
@@ -738,15 +740,17 @@ def linkify():
         raise
     items = elasticsearch.helpers.scan(current_app.es, index=current_app.es_data_db_index_name, doc_type=collections, scroll=u"3h")
     for item in items:
-        for lang in ["He", "En"]:
-            title = item["_source"]["Header"][lang]
+        item, collection = item["_source"], item["_type"]
+        update_slugs(item, collection)
+        for lang in ["he", "en"]:
+            title = item["title_{}".format(lang)]
             if title.lower() in html_lower:
-                slug = create_slug(item["_source"], item["_type"])
-                slug = slug[lang]
-                # TODO: determine better way to transform slug to URL
-                # TODO: add the domain dynamically based on the environment
-                slug = slug.decode("utf-8")
-                slug = slug.replace(u"_", u"/")
-                url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
-                res[item["_type"]].append({"title": title, "url": url})
+                slug = item.get("slug_{}".format(lang), "")
+                if slug != "":
+                    # TODO: determine better way to transform slug to URL
+                    # TODO: add the domain dynamically based on the environment
+                    slug = slug.decode("utf-8")
+                    slug = slug.replace(u"_", u"/")
+                    url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
+                    res[collection].append({"title": title, "url": url})
     return humanify(res)

@@ -63,7 +63,7 @@ FAMILY_NAMES_EDREHY = {
 PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG = PERSONALITIES_DAVIDOV = {
     "source": "clearmash", "source_id": "202014", "collection": "personalities",
     "title_en": "Davydov, Karl Yulyevich",
-    "title_he": "דוידוב, קרל יולייביץ'",
+    "slug_en": "luminary_davydov-karl-yulyevich",
     "content_html_en": "Davydov, Karl Yulyevich (1838-1889) , cellist and composer. Born in Goldingen, Kurland (Latvia) (then part of the Russian Empire), he first studied mathematics at Moscow University and graduated in 1858. Between 1859-1862 he lived in Leipzig, Germany, where he performed as soloist, chamber musician and principle cellist of the Gewandhaus Orchestra, and taught at the Leipzig Conservatory. In 1862 he returned to Russia, became director of the St. Petersburg Conservatory (1876-1887) and joined the quartet of the Russian Music Society, with Leopold Auer as his partner. He eventually succeeded Anton Rubinstein as conductor of the conservatory’s orchestra, with which he traveled extensively on concert tours abroad. Davydov’s works include many compositions for the cello. He died in Moscow, Russia.",
     "content_html_he": "דוידוב, קרל יולייביץ' (1838-1889) , צ'לן ומלחין. נולד בגולדינגן, קורלנד (לטביה). השלים לימודי מתמטיקה באוניברסיטה של מוסקבה ב-1858. בשנים 1862-1859 התגורר בלייפציג, הופיע כסולן, ניגן בתזמורת הקאמרית והיה צ'לן ראשי של תזמורת הגוואנדהאוס. כמו כן, לימד בקונסרבטוריון של לייפציג. ב-1862 חזר לרוסיה ומונה למנהל הקונסרבטוריון של סנט פטרסבורג (1887-1876) והצטרף לרביעיית האגודה למוסיקה רוסית, שבמסגרתה ניגן יחד עם ליאופולד אאואר. דוידוב ירש את מקומו של אנטון רובינשטיין כמנצח התזמורת של הקונסרבטוריון, ואתה יצא למסע הופעות נרחב בחו\"ל. בין יצירותיו, יצירות רבות לצ'לו. הוא נפטר במוסקבה, רוסיה.",
 }
