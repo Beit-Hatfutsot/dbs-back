@@ -36,7 +36,7 @@ KNOWN_LANGS = iso639.languages.part1.keys()
 
 KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang}', 'title_{lang}_lc']
 
-KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id']
+KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url']
 for lang in KNOWN_LANGS:
     for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
         KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
