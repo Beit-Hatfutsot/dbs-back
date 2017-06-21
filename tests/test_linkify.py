@@ -13,10 +13,10 @@ def test_linkify_single(client, app):
 
 def test_linkify_all_types(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
-    res = client.get(u"/v1/linkify?html={0}+{1}+{2}+{3}".format(PLACES_BOURGES["Header"]["En"],
-                                                                PLACES_BOZZOLO["Header"]["En"],
-                                                                PERSONALITIES_DAVIDOV["Header"]["En"],
-                                                                FAMILY_NAMES_DERI["Header"]["En"]))
+    res = client.get(u"/v1/linkify?html={0}+{1}+{2}+{3}".format(PLACES_BOURGES["title_en"],
+                                                                PLACES_BOZZOLO["title_en"],
+                                                                PERSONALITIES_DAVIDOV["title_en"],
+                                                                FAMILY_NAMES_DERI["title_en"]))
     assert res.status_code == 200, "invalid status, json response: {}".format(res.data)
     assert res.json == {"familyNames": [{"url": "http://dbs.bh.org.il/familyname/deri", "title": "DER'I"}],
                         "personalities": [{"url": "http://dbs.bh.org.il/luminary/davydov-karl-yulyevich", "title": "Davydov, Karl Yulyevich"},],

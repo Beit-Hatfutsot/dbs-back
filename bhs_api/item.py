@@ -10,6 +10,7 @@ from bhs_api.fsearch import clean_person
 from bhs_api.utils import uuids_to_str
 from copy import deepcopy
 from bhs_api.fsearch import is_living_person
+import iso639
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -18,6 +19,27 @@ SHOW_FILTER = {'StatusDesc': 'Completed',
                '$or': [{'UnitText1.En': {'$nin': [None, '']}},
                        {'UnitText1.He': {'$nin': [None, '']}}]}
 
+
+SLUG_LANGUAGES_MAP = {
+    'places': {'en': 'place', 'he': u'מקום',},
+    'familyNames': {'en': 'familyname', 'he': u'שםמשפחה',},
+    'lexicon': {'en': 'lexicon', 'he': u'מלון',},
+    'photoUnits': {'en': 'image', 'he': u'תמונה',},
+    'photos': {'en': 'image', 'he': u'תמונה',},
+    'synonyms': {'en': 'synonym', 'he': u'שם נרדף',},
+    'personalities': {'en': 'luminary', 'he': u'אישיות',},
+    'movies': {'en': 'video', 'he': u'וידאו',},
+}
+
+# all 2 letter language codes
+KNOWN_LANGS = iso639.languages.part1.keys()
+
+KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang}', 'title_{lang}_lc']
+
+KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url']
+for lang in KNOWN_LANGS:
+    for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
+        KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
 
 def get_show_metadata(collection_name, doc):
     if collection_name == "persons":
@@ -181,64 +203,86 @@ def fetch_item(slug, db=None):
         return _make_serializable(item)
         return item
 
-def enrich_item(item, db=None, collection_name=None):
-    if not db:
-        db = current_app.data_db
-    ''' and the media urls to the item '''
-    pictures = item.get('Pictures', None)
-    if pictures:
-        main_image_id = None
-        for image in pictures:
-            # Add 'PictureUrl' to all images of an item
-            picture_id = image.get('PictureId', None)
-            if picture_id:
-                if item.has_key('bagnowka'):
-                    image['PictureUrl'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, picture_id)
-                else:
-                    image_bucket = current_app.conf.image_bucket
-                    image['PictureUrl'] = get_image_url(picture_id, image_bucket)
+def hits_to_docs(hits):
+    for hit in hits:
+        doc = hit["_source"]
+        enrich_item(doc)
+        # TODO: remove / modify fields here
+        yield doc
 
-            is_preview = image.get('IsPreview', False)
-            if is_preview == '1':
-                main_image_id = picture_id
+def html_to_text(html):
+    # TODO: write a proper html to text function (or support html content)
+    if html:
+        return html.replace("<br/>", "\n")
+    else:
+        return html
 
-        if not main_image_id:
-            for image in pictures:
-                picture_id = image.get('PictureId', None)
-                if picture_id:
-                    main_image_id = picture_id
-
-        if main_image_id:
-            if item.has_key('bagnowka'):
-                # For bagnowka, thumbnail_bucket is the same as image_bucket (full sized images) because images are very small as it is
-                item['main_image_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
-                item['thumbnail_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
-            else:
-                image_bucket = current_app.conf.image_bucket
-                thumbnail_bucket = current_app.conf.thumbnail_bucket
-                item['main_image_url'] = get_image_url(main_image_id, image_bucket)
-                item['thumbnail_url'] = get_image_url(main_image_id, thumbnail_bucket)
-            
-    video_id_key = 'MovieFileId'
-    if video_id_key in item:
-        # Try to fetch the video URL
-        video_id = item[video_id_key]
-        video_url = get_video_url(video_id, db)
-        if video_url:
-            item['video_url'] = video_url
-        else:
-            return {}
-            #abort(404, 'No video URL was found for this movie item.')
-
-    if 'Slug' not in item:
-        if 'GTN' in item:
-            item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
-        elif collection_name:
-            slug = create_slug(item, collection_name)
-            if slug:
-                item['Slug'] = slug
-
+def enrich_item(item):
+    """
+    ensure item has all needed attributes before returning it via API
+    :param item: a new ES document
+    :return: enriched item
+    """
+    collection_name = item.get("collection", None)  # all new ES items have collection attribute
+    update_slugs(item, collection_name)
+    for k,v in item.items():
+        if k not in KNOWN_ITEM_ATTRIBUTES:
+            del item[k]
+        elif k.startswith("content_html_"):
+            # convert html to text
+            lang = k[13:]
+            item["content_text_{}".format(lang)] = html_to_text(v)
+            del item[k]
     return item
+    # TODO: figure out the best way to handle pictures from the new ES
+    # I think it's best to let all the work be done in the pipelines sync and just have image urls
+    # see https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/21
+    # pictures = item.get('Pictures', None)
+    # if pictures:
+    #     main_image_id = None
+    #     for image in pictures:
+    #         # Add 'PictureUrl' to all images of an item
+    #         picture_id = image.get('PictureId', None)
+    #         if picture_id:
+    #             if item.has_key('bagnowka'):
+    #                 image['PictureUrl'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, picture_id)
+    #             else:
+    #                 image_bucket = current_app.conf.image_bucket
+    #                 image['PictureUrl'] = get_image_url(picture_id, image_bucket)
+    #
+    #         is_preview = image.get('IsPreview', False)
+    #         if is_preview == '1':
+    #             main_image_id = picture_id
+    #
+    #     if not main_image_id:
+    #         for image in pictures:
+    #             picture_id = image.get('PictureId', None)
+    #             if picture_id:
+    #                 main_image_id = picture_id
+    #
+    #     if main_image_id:
+    #         if item.has_key('bagnowka'):
+    #             # For bagnowka, thumbnail_bucket is the same as image_bucket (full sized images) because images are very small as it is
+    #             item['main_image_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
+    #             item['thumbnail_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
+    #         else:
+    #             image_bucket = current_app.conf.image_bucket
+    #             thumbnail_bucket = current_app.conf.thumbnail_bucket
+    #             item['main_image_url'] = get_image_url(main_image_id, image_bucket)
+    #             item['thumbnail_url'] = get_image_url(main_image_id, thumbnail_bucket)
+
+    # TODO: figure out how to handle videos
+    # see https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/22
+    # video_id_key = 'MovieFileId'
+    # if video_id_key in item:
+    #     # Try to fetch the video URL
+    #     video_id = item[video_id_key]
+    #     video_url = get_video_url(video_id, db)
+    #     if video_url:
+    #         item['video_url'] = video_url
+    #     else:
+    #         return {}
+    #         #abort(404, 'No video URL was found for this movie item.')
 
 
 def get_item_by_id(id, collection_name, db=None):
@@ -379,61 +423,31 @@ def get_collection_id_field(collection_name):
         doc_id = 'num'
     return doc_id
 
-def create_slug(document, collection_name):
-    collection_slug_map = {
-        'places': {'En': 'place',
-                   'He': u'מקום',
-                  },
-        'familyNames': {'En': 'familyname',
-                        'He': u'שםמשפחה',
-                       },
-        'lexicon': {'En': 'lexicon',
-                    'He': u'מלון',
-                   },
-        'photoUnits': {'En': 'image',
-                       'He': u'תמונה',
-                      },
-        'photos': {'En': 'image',
-                   'He': u'תמונה',
-                  },
-        # TODO: remove references to the genTreeIndividuals collection - it is irrelevant and not in use
-        'genTreeIndividuals': {'En': 'person',
-                               'He': u'אדם',
-                              },
-        'synonyms': {'En': 'synonym',
-                     'He': u'שם נרדף',
-                    },
-        'personalities': {'En': 'luminary',
-                          'He': u'אישיות',
-                          },
-        'movies': {'En': 'video',
-                   'He': u'וידאו',
-                  },
-    }
-    try:
-        headers = document['Header'].items()
-    except KeyError:
-        # persons collection will be handled here as the cllection's docs don't have a Header
-        # it's the calling function responsibility to add a slug
-        # TODO: refactor to more specific logic, instead of relying on them not having a Header
-        return
-
-    ret = {}
-    slugify = Slugify(translate=None, safe_chars='_')
-    for lang, val in headers:
-        if val:
-            collection_slug = collection_slug_map[collection_name].get(lang)
-            if collection_slug:
-                slug = slugify('_'.join([collection_slug, val.lower()]))
-                ret[lang] = slug.encode('utf8')
-    return ret
+def update_slugs(document, collection_name):
+    slugify = None
+    for lang, collection_slug in SLUG_LANGUAGES_MAP[collection_name].items():
+        title = document.get("title_{}".format(lang), "")
+        if title != "":
+            slug = document.get("slug_{}".format(lang), "")
+            if slug == "":
+                if not slugify:
+                    slugify = Slugify(translate=None, safe_chars='_')
+                document["slug_{}".format(lang)] = slugify('_'.join([collection_slug, title.lower()])).encode("utf8")
+    # TODO: figure out what's GTN
+    # if 'GTN' in item:
+    #     item['Slug'] = {'En': 'person_{}.{}'.format(item['GTN'], item['II'])}
 
 def get_doc_id(collection_name, doc):
-    if collection_name == "persons":
-        raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
-    id_field = get_collection_id_field(collection_name)
-    return doc[id_field]
-
+    if "source" in doc and "source_id" in doc:
+        # new doc
+        return "{source}_{source_id}".format(source=doc["source"], source_id=doc["source_id"])
+    else:
+        # legacy doc
+        # TODO: remove this code!
+        if collection_name == "persons":
+            raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
+        id_field = get_collection_id_field(collection_name)
+        return doc[id_field]
 
 def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=None):
     app = current_app if not app else app

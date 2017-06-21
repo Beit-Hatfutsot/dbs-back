@@ -29,7 +29,7 @@ from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
                            upload_file, send_gmail, humanify, SEARCHABLE_COLLECTIONS)
 from bhs_api.user import collect_editors_items
 from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER, create_slug)
+                          enrich_item, SHOW_FILTER, update_slugs, hits_to_docs)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
 
@@ -71,6 +71,25 @@ def get_person_elastic_search_text_param_query(text_type, text_attr, text_value)
     else:
         raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
 
+def get_collections_es_query(collections):
+    collection_boosts = {
+        "places": 5
+    }
+    return {
+        "bool": {
+            "should": [
+                {
+                    "match": {
+                        "collection": {
+                            "query": collection,
+                            "boost": collection_boosts.get(collection, 1)
+                        }
+                    }
+                }
+                for collection in collections
+            ]
+        }
+    }
 
 def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, **kwargs):
     if collection:
@@ -82,7 +101,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                                   if with_persons or collection != "persons"]
     
 
-    fields = ["Header.En^2", "Header.He^2", "UnitText1.En", "UnitText1.He"]
+    fields = ["title_en", "title_he", "content_html_he", "content_html_en"]
     default_query = {
         "query_string": {
             "fields": fields,
@@ -135,16 +154,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                 except Exception as e:
                     raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
             must_queries.append({"term": {exact_attr: exact_value}})
-    collection_boosts = {
-        "places": 5
-    }
-    for collection in SEARCHABLE_COLLECTIONS:
-        if collection not in collection_boosts:
-            collection_boosts[collection] = 1
-    must_queries.append({"bool": {
-        "should": [{"match": {"_type": {"query": collection, "boost": boost}}}
-                   for collection, boost in collection_boosts.items()]
-    }})
+    must_queries.append(get_collections_es_query(collections))
     body = {
         "query": {
             "bool": {
@@ -155,18 +165,18 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
     if sort == "abc":
         if phonetic.is_hebrew(q.strip()):
             # hebrew alphabetical sort
-            body["sort"] = [{"Header.He_lc": "asc"}, "_score"]
+            body["sort"] = [{"title_he_lc": "asc"}, "_score"]
         else:
             # english alphabetical sort
-            body["sort"] = [{"Header.En_lc": "asc"}, "_score"]
+            body["sort"] = [{"title_en_lc": "asc"}, "_score"]
     elif sort == "rel":
         # relevance sort
         body["sort"] = ["_score"]
     elif sort == "year" and collection == "photoUnits":
-        body["sort"] = [{"UnitPeriod.PeriodStartDate.keyword": "asc"}, "_score"]
+        body["sort"] = [{"period_startdate": "asc"}, "_score"]
     try:
-        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collections, json.dumps(body)))
-        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections, size=size, from_=from_)
+        current_app.logger.debug("es.search index={}, body={}".format(current_app.es_data_db_index_name, json.dumps(body)))
+        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
         current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e))
         raise Exception("Error connecting to Elasticsearch: {}".format(e))
@@ -283,14 +293,15 @@ def get_completion(collection, string, size=7):
     # currently we only do a simple starts with search, without contains or phonetics
     # TODO: fix phonetics search, some work was done for that
     # see https://github.com/Beit-Hatfutsot/dbs-back/blob/2e79c363e40472f28fd07f8a344fe55ab77198ee/bhs_api/v1_endpoints.py#L189
-    lang = "He" if phonetic.is_hebrew(string) else "En"
+    lang = "he" if phonetic.is_hebrew(string) else "en"
     q = {
-        "_source": ["Slug", "Header"],
+        # TODO: find out why it was needed, or if it was a mistake
+        # "_source": ["Slug", "Header"],
         "suggest": {
             "header" : {
                 "prefix": string,
                 "completion": {
-                    "field": "Header.{}.suggest".format(lang),
+                    "field": "title_{}.suggest".format(lang),
                     "size": size,
                     "contexts": {
                         "collection": collection,
@@ -309,7 +320,7 @@ def get_completion(collection, string, size=7):
         phonetic_options = results['suggest']['phonetic'][0]['options']
     except KeyError:
         phonetic_options = []
-    return  [i['_source']['Header'][lang] for i in header_options], [i['_source']['Header'][lang] for i in phonetic_options]
+    return  [i['_source']['title_{}'.format(lang)] for i in header_options], [i['_source']['title_{}'.format(lang)] for i in phonetic_options]
 
 
 def get_phonetic(collection, string, limit=5):
@@ -472,13 +483,11 @@ def general_search():
                         got_one_of_required_persons_params = True
         if parameters["q"] or (parameters["collection"] == "persons" and got_one_of_required_persons_params):
             try:
-                rv = es_search(**parameters)
+                res = es_search(**parameters)
             except Exception as e:
                 logging.exception(e)
                 return humanify({"error": e.message}, 500)
-            for item in rv['hits']['hits']:
-                enrich_item(item['_source'], collection_name=item['_type'])
-            return humanify(rv)
+            return humanify({"hits": hits_to_docs(res["hits"]["hits"]), "total": res["hits"]["total"]})
         else:
             return humanify({"error": "You must specify a search query"}, 400)
     except Exception as e:
@@ -695,20 +704,33 @@ def get_story(hash):
 @v1_endpoints.route('/geo/places')
 def get_geocoded_places():
     args = request.args
-    filters = SHOW_FILTER.copy()
-    filters['geometry'] = {'$exists': True}
-    filters['Header.En'] = {'$nin' : [None, '']}
     try:
-        filters['geometry.coordinates.1'] = {'$gte': float(args['sw_lat']), '$lte': float(args['ne_lat'])}
-        filters['geometry.coordinates.0'] = {'$gte': float(args['sw_lng']), '$lte': float(args['ne_lng'])}
-    except KeyError:
-        abort(400, 'Please specify a box using sw_lat, sw_lng, ne_lat, ne_lng')
-    except ValueError:
-        abort(400, 'Please specify a box using floats in sw_lat, sw_lng, ne_lat, ne_lng')
-    points = current_app.data_db['places'].find(filters, {'Header': True,
-        'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
-    ret = humanify(list(points))
-    return ret
+        north_lat = float(args['ne_lat'])
+        west_lng = float(args['sw_lng'])
+        south_lat = float(args['sw_lat'])
+        east_lng = float(args['ne_lng'])
+    except KeyError as e:
+        return humanify({"error": "required argument: {}".format(e.message)}, 500)
+    except Exception as e:
+        return humanify({"error": e.message}, 500)
+    body = {
+        "query": {
+            "bool" : {
+                "filter" : {
+                    "geo_bounding_box" : {
+                        "location" : {
+                            "top_left" : {"lat" : north_lat, "lon" : west_lng},
+                            "bottom_right" : {"lat" : south_lat, "lon" : east_lng}
+                        }
+                    }
+                }
+            }
+        }
+    }
+    collections = ["places"]
+    res = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections)
+    hits = res["hits"]["hits"]
+    return humanify(hits_to_docs(hits))
 
 @v1_endpoints.route("/linkify", methods=['GET', 'POST'])
 def linkify():
@@ -722,17 +744,24 @@ def linkify():
     except Exception as e:
         logging.exception(e)
         raise
-    items = elasticsearch.helpers.scan(current_app.es, index=current_app.es_data_db_index_name, doc_type=collections, scroll=u"3h")
+    items = elasticsearch.helpers.scan(current_app.es,
+                                       index=current_app.es_data_db_index_name,
+                                       query={"query": get_collections_es_query(collections)},
+                                       scroll=u"3h")
     for item in items:
-        for lang in ["He", "En"]:
-            title = item["_source"]["Header"][lang]
-            if title.lower() in html_lower:
-                slug = create_slug(item["_source"], item["_type"])
-                slug = slug[lang]
-                # TODO: determine better way to transform slug to URL
-                # TODO: add the domain dynamically based on the environment
-                slug = slug.decode("utf-8")
-                slug = slug.replace(u"_", u"/")
-                url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
-                res[item["_type"]].append({"title": title, "url": url})
+        item = item["_source"]
+        collection = item["collection"]
+        update_slugs(item, collection)
+        # TODO: support more langs? it's possible from backend perspective
+        for lang in ["he", "en"]:
+            title = item.get("title_{}".format(lang), "")
+            if len(title) > 2 and title.lower() in html_lower:
+                slug = item.get("slug_{}".format(lang), "")
+                if slug != "":
+                    # TODO: determine better way to transform slug to URL
+                    # TODO: add the domain dynamically based on the environment
+                    slug = slug.decode("utf-8")
+                    slug = slug.replace(u"_", u"/")
+                    url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "he" else "", slug)
+                    res[collection].append({"title": title, "url": url})
     return humanify(res)

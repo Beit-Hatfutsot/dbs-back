@@ -33,55 +33,50 @@ class ElasticsearchCreateIndexCommand(object):
             },
         }
 
-    @property
-    def header_mapping(self):
-        ret = {
-            "properties": {}
-        }
-        for lang in ["En", "He"]:
-            ret["properties"][lang] = self.completion_field
+    def get_collection_properties(self, collection):
+        properties = {}
+        for lang in ["en", "he"]: # TODO: the pipeline supports more languages - should be updated here as well
+            properties["title_{}".format(lang)] = self.completion_field
             # currently the best option for case-insensitive search is to lower case when indexing a document
-            # type keyword allows for efficient sorting
-            ret["properties"]["{}_lc".format(lang)] = {"type": "keyword"}
-        return ret
+            # keyword type allows for efficient sorting
+            # related issue in mojp-dbs-pipelines: https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/13
+            properties["title_{}_lc".format(lang)] = {"type": "keyword"}
+        properties["period_startdate"] = {"type": "date"}
+        properties["location"] = {"type": "geo_point"}
+        properties["main_thumbnail_image_url"] = {"type": "keyword"}
+        properties["main_image_url"] = {"type": "keyword"}
+        return properties
+        # following code is for the old schema
+        # TODO: fix for the new schema (will need to add the data in the pipelines)
+        # if collection == "persons":
+            # properties.update({"tree_num": {"type": "integer"},
+            #             "tree_version": {"type": "integer"},
+            #             "person_id": {"type": "keyword"},
+            #             "birth_year": {"type": "integer"},
+            #             "death_year": {"type": "integer"},
+            #             "marriage_years": {"type": "integer"},
+            #             # these are updated in bhs_api.item.update_es functions
+            #             "first_name_lc": {"type": "text"},
+            #             "last_name_lc": {"type": "text"},
+            #             "BIRT_PLAC_lc": {"type": "text"},
+            #             "MARR_PLAC_lc": {"type": "text"},
+            #             "DEAT_PLAC_lc": {"type": "text"},
+            #             "gender": {"type": "keyword"}})
+        # if collection == "familyNames":
+        #     properties["dm_soundex"] = {
+        #         "type": "completion",
+        #         "max_input_length": 20,
+        #         "contexts": [{
+        #             "name": "collection",
+        #             "type": "CATEGORY",
+        #             "path": "_type"
+        #         }]
+        #     }
+
 
     def _get_index_body(self):
-        body = {
-            "mappings": {
-                collection: {
-                    "properties": {"Header": self.header_mapping,}
-                } for collection in SEARCHABLE_COLLECTIONS
-            }
-        }
-        body["mappings"]["familyNames"]["properties"]["dm_soundex"] = {
-            "type": "completion",
-            "max_input_length": 20,
-            "contexts": [{
-                "name": "collection",
-                "type": "CATEGORY",
-                "path": "_type"
-            }]
-        }
-        for collection_name, mapping in body["mappings"].items():
-            if collection_name == "persons":
-                # persons specific mappings
-                # ensure all fields relevant for search are properly indexed
-                mapping["properties"].update({"tree_num": {"type": "integer"},
-                                              "tree_version": {"type": "integer"},
-                                              "person_id": {"type": "keyword"},
-                                              "birth_year": {"type": "integer"},
-                                              "death_year": {"type": "integer"},
-                                              "marriage_years": {"type": "integer"},
-                                              # these are updated in bhs_api.item.update_es functions
-                                              "first_name_lc": {"type": "text"},
-                                              "last_name_lc": {"type": "text"},
-                                              "BIRT_PLAC_lc": {"type": "text"},
-                                              "MARR_PLAC_lc": {"type": "text"},
-                                              "DEAT_PLAC_lc": {"type": "text"},
-                                              "gender": {"type": "keyword"}})
-            else:
-                mapping["properties"][get_collection_id_field(collection_name)] = {"type": "keyword"}
-        return body
+        return {"mappings": {collection: {"properties": self.get_collection_properties(collection)}
+                             for collection in SEARCHABLE_COLLECTIONS}}
 
     def create_es_index(self, es, es_index_name, delete_existing=False):
         if es.indices.exists(es_index_name):
