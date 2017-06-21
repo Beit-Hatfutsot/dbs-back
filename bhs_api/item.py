@@ -210,6 +210,13 @@ def hits_to_docs(hits):
         # TODO: remove / modify fields here
         yield doc
 
+def html_to_text(html):
+    # TODO: write a proper html to text function (or support html content)
+    if html:
+        return html.replace("<br/>", "\n")
+    else:
+        return html
+
 def enrich_item(item):
     """
     ensure item has all needed attributes before returning it via API
@@ -220,6 +227,11 @@ def enrich_item(item):
     update_slugs(item, collection_name)
     for k,v in item.items():
         if k not in KNOWN_ITEM_ATTRIBUTES:
+            del item[k]
+        elif k.startswith("content_html_"):
+            # convert html to text
+            lang = k[13:]
+            item["content_text_{}".format(lang)] = html_to_text(v)
             del item[k]
     return item
     # TODO: figure out the best way to handle pictures from the new ES
