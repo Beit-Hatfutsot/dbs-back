@@ -11,7 +11,7 @@ from uuid import UUID
 import json
 import logging
 
-from flask import Flask, Blueprint, request, abort, url_for, current_app
+from flask import Blueprint, request, abort, url_for, current_app
 from flask.ext.security import auth_token_required
 from flask.ext.security import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
@@ -32,6 +32,7 @@ from bhs_api.item import (fetch_items, search_by_header, get_image_url,
                           enrich_item, SHOW_FILTER, update_slugs, hits_to_docs)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
+from bhs_api.clearmash import item_updated
 
 from bhs_api import phonetic
 from bhs_api.persons import (PERSONS_SEARCH_DEFAULT_PARAMETERS, PERSONS_SEARCH_REQUIRES_ONE_OF,
@@ -574,6 +575,8 @@ def get_suggestions(collection,string):
 @v1_endpoints.route('/item/<slugs>')
 def get_items(slugs):
     if slugs:
+        if slugs == 'updated':
+            return item_updated()
         items_list = slugs.split(',')
     elif request.is_json:
         items_list = request.get_json()
