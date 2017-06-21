@@ -10,6 +10,7 @@ from bhs_api.fsearch import clean_person
 from bhs_api.utils import uuids_to_str
 from copy import deepcopy
 from bhs_api.fsearch import is_living_person
+import iso639
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -30,6 +31,15 @@ SLUG_LANGUAGES_MAP = {
     'movies': {'en': 'video', 'he': u'וידאו',},
 }
 
+# all 2 letter language codes
+KNOWN_LANGS = iso639.languages.part1.keys()
+
+KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang}', 'title_{lang}_lc']
+
+KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id']
+for lang in KNOWN_LANGS:
+    for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
+        KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
 
 def get_show_metadata(collection_name, doc):
     if collection_name == "persons":
@@ -196,62 +206,71 @@ def fetch_item(slug, db=None):
 def hits_to_docs(hits):
     for hit in hits:
         doc = hit["_source"]
+        enrich_item(doc)
         # TODO: remove / modify fields here
         yield doc
 
-def enrich_item(item, db=None):
-    collection_name = item.get("collection", None)
-    if not db:
-        db = current_app.data_db
-    ''' and the media urls to the item '''
-    pictures = item.get('Pictures', None)
-    if pictures:
-        main_image_id = None
-        for image in pictures:
-            # Add 'PictureUrl' to all images of an item
-            picture_id = image.get('PictureId', None)
-            if picture_id:
-                if item.has_key('bagnowka'):
-                    image['PictureUrl'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, picture_id)
-                else:
-                    image_bucket = current_app.conf.image_bucket
-                    image['PictureUrl'] = get_image_url(picture_id, image_bucket)
-
-            is_preview = image.get('IsPreview', False)
-            if is_preview == '1':
-                main_image_id = picture_id
-
-        if not main_image_id:
-            for image in pictures:
-                picture_id = image.get('PictureId', None)
-                if picture_id:
-                    main_image_id = picture_id
-
-        if main_image_id:
-            if item.has_key('bagnowka'):
-                # For bagnowka, thumbnail_bucket is the same as image_bucket (full sized images) because images are very small as it is
-                item['main_image_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
-                item['thumbnail_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
-            else:
-                image_bucket = current_app.conf.image_bucket
-                thumbnail_bucket = current_app.conf.thumbnail_bucket
-                item['main_image_url'] = get_image_url(main_image_id, image_bucket)
-                item['thumbnail_url'] = get_image_url(main_image_id, thumbnail_bucket)
-            
-    video_id_key = 'MovieFileId'
-    if video_id_key in item:
-        # Try to fetch the video URL
-        video_id = item[video_id_key]
-        video_url = get_video_url(video_id, db)
-        if video_url:
-            item['video_url'] = video_url
-        else:
-            return {}
-            #abort(404, 'No video URL was found for this movie item.')
-
+def enrich_item(item):
+    """
+    ensure item has all needed attributes before returning it via API
+    :param item: a new ES document
+    :return: enriched item
+    """
+    collection_name = item.get("collection", None)  # all new ES items have collection attribute
     update_slugs(item, collection_name)
-
+    for k,v in item.items():
+        if k not in KNOWN_ITEM_ATTRIBUTES:
+            del item[k]
     return item
+    # TODO: figure out the best way to handle pictures from the new ES
+    # I think it's best to let all the work be done in the pipelines sync and just have image urls
+    # see https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/21
+    # pictures = item.get('Pictures', None)
+    # if pictures:
+    #     main_image_id = None
+    #     for image in pictures:
+    #         # Add 'PictureUrl' to all images of an item
+    #         picture_id = image.get('PictureId', None)
+    #         if picture_id:
+    #             if item.has_key('bagnowka'):
+    #                 image['PictureUrl'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, picture_id)
+    #             else:
+    #                 image_bucket = current_app.conf.image_bucket
+    #                 image['PictureUrl'] = get_image_url(picture_id, image_bucket)
+    #
+    #         is_preview = image.get('IsPreview', False)
+    #         if is_preview == '1':
+    #             main_image_id = picture_id
+    #
+    #     if not main_image_id:
+    #         for image in pictures:
+    #             picture_id = image.get('PictureId', None)
+    #             if picture_id:
+    #                 main_image_id = picture_id
+    #
+    #     if main_image_id:
+    #         if item.has_key('bagnowka'):
+    #             # For bagnowka, thumbnail_bucket is the same as image_bucket (full sized images) because images are very small as it is
+    #             item['main_image_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
+    #             item['thumbnail_url'] = '{}/{}.jpg'.format(current_app.conf.bagnowka_bucket_url, main_image_id)
+    #         else:
+    #             image_bucket = current_app.conf.image_bucket
+    #             thumbnail_bucket = current_app.conf.thumbnail_bucket
+    #             item['main_image_url'] = get_image_url(main_image_id, image_bucket)
+    #             item['thumbnail_url'] = get_image_url(main_image_id, thumbnail_bucket)
+
+    # TODO: figure out how to handle videos
+    # see https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/22
+    # video_id_key = 'MovieFileId'
+    # if video_id_key in item:
+    #     # Try to fetch the video URL
+    #     video_id = item[video_id_key]
+    #     video_url = get_video_url(video_id, db)
+    #     if video_url:
+    #         item['video_url'] = video_url
+    #     else:
+    #         return {}
+    #         #abort(404, 'No video URL was found for this movie item.')
 
 
 def get_item_by_id(id, collection_name, db=None):

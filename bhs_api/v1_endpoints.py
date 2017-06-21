@@ -71,6 +71,25 @@ def get_person_elastic_search_text_param_query(text_type, text_attr, text_value)
     else:
         raise Exception("invalid value for {} ({}): {}".format(text_type, text_attr, text_type))
 
+def get_collections_es_query(collections):
+    collection_boosts = {
+        "places": 5
+    }
+    return {
+        "bool": {
+            "should": [
+                {
+                    "match": {
+                        "collection": {
+                            "query": collection,
+                            "boost": collection_boosts.get(collection, 1)
+                        }
+                    }
+                }
+                for collection in collections
+            ]
+        }
+    }
 
 def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, **kwargs):
     if collection:
@@ -135,13 +154,7 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
                 except Exception as e:
                     raise Exception("invalid value for {} ({}): {}".format(exact_param, exact_attr, exact_value))
             must_queries.append({"term": {exact_attr: exact_value}})
-    collection_boosts = {
-        "places": 5
-    }
-    must_queries.append({"bool": {"should": [{"match": {"collection": {"query": collection,
-                                                                       "boost": collection_boosts.get(collection,
-                                                                                                      1)}}}
-                                             for collection in collections]}})
+    must_queries.append(get_collections_es_query(collections))
     body = {
         "query": {
             "bool": {
@@ -470,15 +483,11 @@ def general_search():
                         got_one_of_required_persons_params = True
         if parameters["q"] or (parameters["collection"] == "persons" and got_one_of_required_persons_params):
             try:
-                rv = es_search(**parameters)
+                res = es_search(**parameters)
             except Exception as e:
                 logging.exception(e)
                 return humanify({"error": e.message}, 500)
-            rv = rv["hits"]
-            for item in rv["hits"]:
-                enrich_item(item['_source'])
-            rv["hits"] = list(hits_to_docs(rv["hits"]))
-            return humanify(rv)
+            return humanify({"hits": hits_to_docs(res["hits"]["hits"]), "total": res["hits"]["total"]})
         else:
             return humanify({"error": "You must specify a search query"}, 400)
     except Exception as e:
@@ -735,19 +744,24 @@ def linkify():
     except Exception as e:
         logging.exception(e)
         raise
-    items = elasticsearch.helpers.scan(current_app.es, index=current_app.es_data_db_index_name, doc_type=collections, scroll=u"3h")
+    items = elasticsearch.helpers.scan(current_app.es,
+                                       index=current_app.es_data_db_index_name,
+                                       query={"query": get_collections_es_query(collections)},
+                                       scroll=u"3h")
     for item in items:
-        item, collection = item["_source"], item["_type"]
+        item = item["_source"]
+        collection = item["collection"]
         update_slugs(item, collection)
+        # TODO: support more langs? it's possible from backend perspective
         for lang in ["he", "en"]:
-            title = item["title_{}".format(lang)]
-            if title.lower() in html_lower:
+            title = item.get("title_{}".format(lang), "")
+            if len(title) > 2 and title.lower() in html_lower:
                 slug = item.get("slug_{}".format(lang), "")
                 if slug != "":
                     # TODO: determine better way to transform slug to URL
                     # TODO: add the domain dynamically based on the environment
                     slug = slug.decode("utf-8")
                     slug = slug.replace(u"_", u"/")
-                    url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "He" else "", slug)
+                    url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "he" else "", slug)
                     res[collection].append({"title": title, "url": url})
     return humanify(res)

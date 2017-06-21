@@ -19,6 +19,26 @@ def test_searching_for_nonexistant_term_should_return_no_results(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     assert_no_results(client.get('/v1/search?q=testfoobarbazbaxINVALID'))
 
+
+def test_search_should_return_only_relevant_data(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    res = client.get("/v1/search?q=BOURGES")
+    assert res.status_code == 200, "invalid status, json response: {}".format(res.json)
+    assert res.json.keys() == ["hits", "total"]
+    assert res.json["total"] == 1
+    assert res.json["hits"] == [{u'collection': u'places',
+                                 u'content_html_en': u'BOURGES<br/><br/>CAPITAL OF THE DEPARTMENT OF CHER, CENTRAL FRANCE.<br/><br/>IN 570 A JEW, SIGERICUS, WAS BAPTIZED IN BOURGES, WHILE AT ABOUT THE SAME TIME A JEW PRACTICING MEDICINE THERE TREATED A CLERIC. SULPICIUS, BISHOP OF BOURGES, 624--647, ATTEMPTED TO CONVERT THE JEWS IN BOURGES TO CHRISTIANITY, AND EXPELLED ANY WHO RESISTED HIS MISSIONARY ACTIVITIES. IN 1020 A JEWISH QUARTER IS MENTIONED TO THE SOUTH OF THE CITY. ABOUT 1200 A BAPTIZED JEW OF BOURGES NAMED GUILLAUME, WHO HAD BECOME A DEACON, COMPOSED AN ANTI-JEWISH TREATISE, BELLUM DOMINI ADVERSUS IUDAEOS. AROUND 1250 THE POPE REQUESTED THE ARCHBISHOP OF BOURGES TO SECURE A LIVELIHOOD FOR THE BAPTIZED JEW, JEAN. BETWEEN THE END OF THE 13TH CENTURY AND 1305 MANY JEWISH NAMES APPEAR ON THE MUNICIPAL TAX ROLLS AND BAILIFF COURT RECORDS. A BUILDING AT 79 RUE DES JUIFS IS BELIEVED TO HAVE BEEN USED AS A SYNAGOGUE IN THE MIDDLE AGES. THE COMMUNITY CEASED TO EXIST AFTER THE JEWS WERE EXPELLED FROM FRANCE IN THE 14TH CENTURY. DURING WORLD WAR II, ESPECIALLY AFTER JUNE 1940, HUNDREDS OF JEWISH REFUGEES WERE<br/>TEMPORARILY SETTLED IN BOURGES.',
+                                 u'content_html_he': u'\u05d1\u05d5\u05e8\u05d2\'<br/><br/>\u05e2\u05d9\u05e8 \u05d1\u05de\u05e8\u05db\u05d6 \u05e6\u05e8\u05e4\u05ea.<br/><br/>\u05d9\u05d3\u05d9\u05e2\u05d5\u05ea \u05e8\u05d0\u05e9\u05d5\u05e0\u05d5\u05ea \u05e2\u05dc \u05d9\u05d9\u05e9\u05d5\u05d1 \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd \u05d1\u05de\u05e7\u05d5\u05dd \u05de\u05e7\u05d5\u05e8\u05df \u05d1\u05de\u05d0\u05d4 \u05d4-6 . \u05d1\u05ea\u05d7\u05d9\u05dc\u05ea \u05d4\u05de\u05d0\u05d4 \u05d4-11 \u05e0\u05d6\u05db\u05e8 \u05e8\u05d5\u05d1\u05e2 \u05d9\u05d4\u05d5\u05d3\u05d9 \u05d1\u05d3\u05e8\u05d5\u05dd \u05d4\u05e2\u05d9\u05e8.<br/><br/>\u05d9\u05d4\u05d5\u05d3\u05d9 \u05de\u05d5\u05de\u05e8, \u05d1\u05df \u05d1\u05d5\u05e8\u05d2\', \u05e4\u05d9\u05e8\u05e1\u05dd \u05d1- 1200 \u05dc\u05e2\u05e8\u05da \u05d7\u05d9\u05d1\u05d5\u05e8 \u05e2\u05dc "\u05de\u05dc\u05d7\u05de\u05ea \u05d9\u05e9\u05d5 \u05d1\u05d9\u05d4\u05d5\u05d3\u05d9\u05dd".<br/><br/>\u05d1\u05ea\u05d7\u05d9\u05dc\u05ea \u05d4\u05de\u05d0\u05d4 \u05d4-14 \u05de\u05d5\u05e4\u05d9\u05e2\u05d9\u05dd \u05e9\u05de\u05d5\u05ea \u05d9\u05d4\u05d5\u05d3\u05d9\u05d9\u05dd \u05e8\u05d1\u05d9\u05dd \u05d1\u05e8\u05e9\u05d9\u05de\u05ea \u05de\u05e9\u05dc\u05de\u05d9 \u05d4\u05de\u05e1\u05d9\u05dd \u05d4\u05e2\u05d9\u05e8\u05d5\u05e0\u05d9\u05d9\u05dd.<br/><br/>\u05d4\u05e7\u05d4\u05d9\u05dc\u05d4 \u05d7\u05d3\u05dc\u05d4 \u05dc\u05d4\u05ea\u05e7\u05d9\u05d9\u05dd \u05e2\u05dd \u05d2\u05d9\u05e8\u05d5\u05e9 \u05e6\u05e8\u05e4\u05ea (1394).<br/><br/>\u05d1\u05d9\u05de\u05d9 \u05de\u05dc\u05d7\u05de\u05ea \u05d4\u05e2\u05d5\u05dc\u05dd \u05d4\u05e9\u05e0\u05d9\u05d9\u05d4, \u05d0\u05d7\u05e8\u05d9 \u05d9\u05d5\u05e0\u05d9 1940 , \u05d9\u05e9\u05d1\u05d5 \u05d1\u05d1\u05d5\u05e8\u05d2\', \u05d9\u05e9\u05d9\u05d1\u05d4 \u05d6\u05de\u05e0\u05d9\u05ea, \u05de\u05d0\u05d5\u05ea \u05e4\u05dc\u05d9\u05d8\u05d9\u05dd \u05d9\u05d4\u05d5\u05d3\u05d9\u05dd.',
+                                 u'location': {u'lat': 10.01, u'lon': 49.5},
+                                 u'slug_en': u'place_bourges',
+                                 u'slug_he': u'\u05de\u05e7\u05d5\u05dd_\u05d1\u05d5\u05e8\u05d2',
+                                 u'source': u'clearmash',
+                                 u'source_id': u'244123',
+                                 u'title_en': u'BOURGES',
+                                 u'title_en_lc': u'bourges',
+                                 u'title_he': u"\u05d1\u05d5\u05e8\u05d2'",
+                                 u'title_he_lc': u"\u05d1\u05d5\u05e8\u05d2'"}]
+
 def test_general_search_single_result(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     # test data contains exactly 1 match for "BOURGES"
