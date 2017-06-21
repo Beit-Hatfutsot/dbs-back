@@ -138,13 +138,10 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
     collection_boosts = {
         "places": 5
     }
-    for collection in SEARCHABLE_COLLECTIONS:
-        if collection not in collection_boosts:
-            collection_boosts[collection] = 1
-    must_queries.append({"bool": {
-        "should": [{"match": {"_type": {"query": collection, "boost": boost}}}
-                   for collection, boost in collection_boosts.items()]
-    }})
+    must_queries.append({"bool": {"should": [{"match": {"collection": {"query": collection,
+                                                                       "boost": collection_boosts.get(collection,
+                                                                                                      1)}}}
+                                             for collection in collections]}})
     body = {
         "query": {
             "bool": {
@@ -163,10 +160,10 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
         # relevance sort
         body["sort"] = ["_score"]
     elif sort == "year" and collection == "photoUnits":
-        body["sort"] = [{"UnitPeriod.PeriodStartDate.keyword": "asc"}, "_score"]
+        body["sort"] = [{"period_startdate": "asc"}, "_score"]
     try:
-        current_app.logger.debug("es.search index={}, doc_type={} body={}".format(current_app.es_data_db_index_name, collections, json.dumps(body)))
-        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections, size=size, from_=from_)
+        current_app.logger.debug("es.search index={}, body={}".format(current_app.es_data_db_index_name, json.dumps(body)))
+        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
         current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e))
         raise Exception("Error connecting to Elasticsearch: {}".format(e))
@@ -479,7 +476,7 @@ def general_search():
                 return humanify({"error": e.message}, 500)
             rv = rv["hits"]
             for item in rv["hits"]:
-                enrich_item(item['_source'], collection_name=item['_type'])
+                enrich_item(item['_source'])
             rv["hits"] = list(hits_to_docs(rv["hits"]))
             return humanify(rv)
         else:

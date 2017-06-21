@@ -1,6 +1,6 @@
 from datetime import datetime
 import os
-from migration.family_trees import Gedcom2Persons, THIS_YEAR
+# from migration.family_trees import Gedcom2Persons, THIS_YEAR
 
 
 def given_mock_migrate_config():
@@ -61,7 +61,8 @@ def gedcom_2_persons(gedcom):
     return saved_data
 
 
-def test_migrate_trees(mocker):
+# irelevant with Clearmash
+def skip_test_migrate_trees(mocker):
     given_mock_migrate_environment(mocker)
     from scripts.migrate import migrate_trees, parse_doc, get_collection_id_field
     cursor = [
@@ -91,7 +92,8 @@ def test_migrate_trees(mocker):
     assert i9["death_year"] == 1965
 
 
-def test_gedcom_to_persons():
+# irelevant with Clearmash
+def skip_test_gedcom_to_persons():
     # person marked as deceased in gedcom - is deceased, regardless of other attributes
     gedcom = given_mock_gedcom_tree_with_single_person(deceased=True)
     persons_data = gedcom_2_persons(gedcom)

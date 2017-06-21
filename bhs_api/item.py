@@ -199,7 +199,8 @@ def hits_to_docs(hits):
         # TODO: remove / modify fields here
         yield doc
 
-def enrich_item(item, db=None, collection_name=None):
+def enrich_item(item, db=None):
+    collection_name = item.get("collection", None)
     if not db:
         db = current_app.data_db
     ''' and the media urls to the item '''

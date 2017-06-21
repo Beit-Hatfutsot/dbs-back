@@ -62,7 +62,7 @@ def test_images_search(client, app):
     assert_doc(app, u'clearmash_175821', **{"title_en": "Boys (jews) praying at the synagogue of Mosad Aliyah, Israel 1963",
                                             "title_he": u"נערים יהודים מתפללים בבית הכנסת במוסד עליה, ישראל 1960-1950",
                                             "period_startdate": "1950-01-01T00:00:00Z"})
-    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [u'clearmash_189948', u'clearmash_175821'])
+    assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=year", [u'clearmash_175821', u'clearmash_189948'])
     assert_search_hit_ids(client, u"q=Photo&collection=photoUnits&sort=abc", [u'clearmash_175821', u'clearmash_189948'])
     assert_search_hit_ids(client, u"q=זוננפלד&collection=photoUnits&sort=abc", [u'clearmash_189948', u'clearmash_175821'])
 
