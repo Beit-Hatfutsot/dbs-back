@@ -11,6 +11,7 @@ from bhs_api.utils import uuids_to_str
 from copy import deepcopy
 from bhs_api.fsearch import is_living_person
 import iso639
+import json
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -154,60 +155,52 @@ def _make_serializable(obj):
         obj['UpdateDate'] = str(obj['UpdateDate'])
     return obj
 
-def fetch_items(slug_list, db=None):
-
-    if not db:
-        db = current_app.data_db
-
+def fetch_items(slug_list):
     rv = []
     for slug in slug_list:
         try:
-            item = fetch_item(slug, db)
+            item = fetch_item(slug)
             rv.append(item)
         except (Forbidden, NotFound) as e:
             rv.append({'slug': slug, 'error_code': e.code, 'msg': e.description})
     return rv
 
 
-def fetch_item(slug, db=None):
+def fetch_item(slug):
     """
     Gets an item based on slug and returns it
     If slug is bad or item is not found, raises an exception.
     """
-    if not db:
-        db = current_app.data_db
-
     try:
         slug = Slug(slug)
-    except ValueError:
-        raise NotFound, "missing an underscore in item's slug"
-    except KeyError:
-        raise NotFound, "bad collection name in slug"
-
-    #TODO: handle ugc
-    if slug.collection == 'ugc':
-        item = dictify(Ugc.objects(id=_id).first())
-        if item:
-            item = enrich_item(item, db)
-            item_id = item['_id']
-            item = item['ugc'] # Getting the dict out from  mongoengine
-            item['_id'] = item_id
-            if type(item['_id']) == dict and '$oid' in item['_id']:
-                item['_id'] = item['_id']['$oid']
-            return _make_serializable(item)
-        else:
-            raise NotFound
-    else:
-        item = get_item(slug, db)
-        item = enrich_item(item, db)
-        return _make_serializable(item)
+    except ValueError as e:
+        raise NotFound, "missing an underscore in item's slug: {}".format(e)
+    except KeyError as e:
+        raise NotFound, "bad collection name in slug: {}".format(e)
+    item = get_item(slug)
+    if item:
         return item
+    else:
+        raise NotFound
+    #TODO: handle ugc
+    # if slug.collection == 'ugc':
+    #     item = dictify(Ugc.objects(id=_id).first())
+    #     if item:
+    #         item = enrich_item(item, db)
+    #         item_id = item['_id']
+    #         item = item['ugc'] # Getting the dict out from  mongoengine
+    #         item['_id'] = item_id
+    #         if type(item['_id']) == dict and '$oid' in item['_id']:
+    #             item['_id'] = item['_id']['$oid']
+    #         return _make_serializable(item)
+    #     else:
+    #         raise NotFound
+    # else:
 
 def hits_to_docs(hits):
     for hit in hits:
         doc = hit["_source"]
         enrich_item(doc)
-        # TODO: remove / modify fields here
         yield doc
 
 def html_to_text(html):
@@ -304,19 +297,27 @@ def get_item_query(slug):
     else:
         return {'Slug.He': slug.full}
 
-def get_item(slug, db=None):
-    if not db:
-        db = current_app.data_db
-    '''
-    Try to return Mongo _id for the given unit_id and collection name.
-    Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
-    and therefore Forbidden.
-    '''
-    slug_query = get_item_query(slug)
-    if slug_query:
-        return _filter_doc(slug_query, slug.collection, db)
-    else:
+def get_item(slug):
+    body = {"query": {"query_string": {"fields": ["slug_*"], "query": slug.full}}}
+    results = current_app.es.search(index=current_app.es_data_db_index_name, body=body)
+    docs = list(hits_to_docs(results["hits"]["hits"]))
+    if len(docs) == 0:
         return None
+    elif len(docs) == 1:
+        return docs[0]
+    else:
+        raise Exception("too many hits for slug {}".format(json.dumps(slug.full)))
+    # TODO: ensure all below logic is transferred to above new code
+    # '''
+    # Try to return Mongo _id for the given unit_id and collection name.
+    # Raise HTTP exception if the _id is NOTFound or doesn't pass the show filter
+    # and therefore Forbidden.
+    # '''
+    # slug_query = get_item_query(slug)
+    # if slug_query:
+    #     return _filter_doc(slug_query, slug.collection, db)
+    # else:
+    #     return None
 
 def _filter_doc(query, collection, db):
     search_query = query.copy()
