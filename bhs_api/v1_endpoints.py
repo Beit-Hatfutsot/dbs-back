@@ -573,32 +573,35 @@ def get_suggestions(collection,string):
 
 @v1_endpoints.route('/item/<slugs>')
 def get_items(slugs):
-    if slugs:
-        items_list = slugs.split(',')
-    elif request.is_json:
-        items_list = request.get_json()
-
+    try:
+        items_list = []
+        if slugs:
+            items_list = slugs.split(',')
+        items = fetch_items(items_list)
+        if len(items) == 1 and 'error_code' in items[0]:
+            error = items[0]
+            abort(error['error_code'], error['msg'])
+        else:
+            # Cast items to list
+            if type(items) != list:
+                items = [items]
+            return humanify(items)
+    except NotFound, e:
+        return humanify({"error": str(e)}, 404)
+    except Exception, e:
+        return humanify({"error": "unexpected exception getting completion data: {}".format(e), "traceback": traceback.format_exc()}, 500)
+    # TODO: check what's needed for ugc items
     # Check if there are items from ugc collection and test their access control
-    ugc_items = []
-    for item in items_list:
-        if item.startswith('ugc'):
-            ugc_items.append(item)
-    user_oid = current_user.is_authenticated and current_user.id
-
-    items = fetch_items(items_list)
-    if len(items) == 1 and 'error_code' in items[0]:
-        error = items[0]
-        abort(error['error_code'],  error['msg'])
-    else:
-        # Cast items to list
-        if type(items) != list:
-            items = [items]
-        # Check that each of the ugc_items is accessible by the logged in user
-        for ugc_item_id in [i[4:] for i in ugc_items]:
-            for item in items:
-                if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != unicode(user_oid):
-                    abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
-        return humanify(items)
+    # ugc_items = []
+    # for item in items_list:
+    #     if item.startswith('ugc'):
+    #         ugc_items.append(item)
+    # user_oid = current_user.is_authenticated and current_user.id
+    # Check that each of the ugc_items is accessible by the logged in user
+    # for ugc_item_id in [i[4:] for i in ugc_items]:
+    #     for item in items:
+    #         if item['_id'] == ugc_item_id and item.has_key('owner') and item['owner'] != unicode(user_oid):
+    #             abort(403, 'You are not authorized to access item ugc.{}'.format(str(item['_id'])))
 
 @v1_endpoints.route('/person')
 def ftree_search():

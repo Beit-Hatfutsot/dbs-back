@@ -33,14 +33,22 @@ class ElasticsearchCreateIndexCommand(object):
             },
         }
 
+    def get_collection_dynamic_templates(self, collection):
+        return [{"title": {"match_pattern": "regex",
+                           "match": "^title_..$",
+                           "mapping": self.completion_field}},
+                # currently the best option for case-insensitive search is to lower case when indexing a document
+                # keyword type allows for efficient sorting
+                # related issue in mojp-dbs-pipelines: https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/13
+                {"title_lc": {"match_pattern": "regex",
+                              "match": "^title_.._lc$",
+                              "mapping": {"type": "keyword"}}},
+                {"slug": {"match_pattern": "regex",
+                          "match": "^slug_..$",
+                          "mapping": {"type": "keyword"}}}]
+
     def get_collection_properties(self, collection):
         properties = {}
-        for lang in ["en", "he"]: # TODO: the pipeline supports more languages - should be updated here as well
-            properties["title_{}".format(lang)] = self.completion_field
-            # currently the best option for case-insensitive search is to lower case when indexing a document
-            # keyword type allows for efficient sorting
-            # related issue in mojp-dbs-pipelines: https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/13
-            properties["title_{}_lc".format(lang)] = {"type": "keyword"}
         properties["period_startdate"] = {"type": "date"}
         properties["location"] = {"type": "geo_point"}
         properties["main_thumbnail_image_url"] = {"type": "keyword"}
@@ -75,7 +83,8 @@ class ElasticsearchCreateIndexCommand(object):
 
 
     def _get_index_body(self):
-        return {"mappings": {collection: {"properties": self.get_collection_properties(collection)}
+        return {"mappings": {collection: {"properties": self.get_collection_properties(collection),
+                                          "dynamic_templates": self.get_collection_dynamic_templates(collection)}
                              for collection in SEARCHABLE_COLLECTIONS}}
 
     def create_es_index(self, es, es_index_name, delete_existing=False):

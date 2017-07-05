@@ -91,6 +91,8 @@ MOVIES_SPAIN = {
     "content_html_he": "אורחות חיים של היהודים בספרד בימי הביניים, כפי שבאים לידי ביטוי באיורים של כתבי יד מהתקופה. <br/>הופק ב – 1992.",
     "title_en": "Living Moments in Jewish Spain (English jews)",
     "title_he": "רגעים עם יהודי ספרד (אנגלית)",
+    "slug_en": "video_living-moments-in-jewish-spain",
+    "slug_he": "וידאו_רגעים-עם-יהודי-ספרד"
 }
 
 ## persons
