@@ -53,6 +53,7 @@ class ElasticsearchCreateIndexCommand(object):
         properties["location"] = {"type": "geo_point"}
         properties["main_thumbnail_image_url"] = {"type": "keyword"}
         properties["main_image_url"] = {"type": "keyword"}
+        properties["slugs"] = {"type": "keyword"}
         return properties
         # following code is for the old schema
         # TODO: fix for the new schema (will need to add the data in the pipelines)

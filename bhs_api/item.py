@@ -37,7 +37,7 @@ KNOWN_LANGS = iso639.languages.part1.keys()
 
 KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang}', 'title_{lang}_lc']
 
-KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url']
+KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url', 'slugs']
 for lang in KNOWN_LANGS:
     for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
         KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
@@ -298,7 +298,7 @@ def get_item_query(slug):
         return {'Slug.He': slug.full}
 
 def get_item(slug):
-    body = {"query": {"query_string": {"fields": ["slug_*"], "query": slug.full}}}
+    body = {"query": {"constant_score": {"filter": {"term": {"slugs": slug.full}}}}}
     results = current_app.es.search(index=current_app.es_data_db_index_name, body=body)
     docs = list(hits_to_docs(results["hits"]["hits"]))
     if len(docs) == 0:
