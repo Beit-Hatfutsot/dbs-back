@@ -289,7 +289,7 @@ def get_completion(collection, string, size=7):
             "header" : {
                 "prefix": string,
                 "completion": {
-                    "field": "title_{}.suggest".format(lang),
+                    "field": "title_{}_suggest".format(lang),
                     "size": size,
                     "contexts": {
                         "collection": collection,
