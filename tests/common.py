@@ -4,7 +4,7 @@ from copy import deepcopy
 import os
 from bhs_api.item import get_doc_id
 from mocks import *
-import logging
+from bhs_api.constants import PIPELINES_ES_DOC_TYPE
 
 
 def given_invalid_elasticsearch_client(app):
@@ -23,7 +23,7 @@ def index_doc(app, collection, doc):
     else:
         # get_doc_id detects new schema docs and sets correct doc_id
         doc_id = get_doc_id(collection, doc)
-    app.es.index(index=app.es_data_db_index_name, doc_type=collection, body=doc, id=doc_id)
+    app.es.index(index=app.es_data_db_index_name, doc_type=PIPELINES_ES_DOC_TYPE, body=doc, id=doc_id)
 
 def index_docs(app, collections, reuse_db=False):
     if not reuse_db or not app.es.indices.exists(app.es_data_db_index_name):

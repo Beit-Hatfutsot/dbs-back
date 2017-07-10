@@ -3,8 +3,7 @@
 from argparse import ArgumentParser
 from bhs_api import create_app
 import elasticsearch
-from bhs_api.utils import SEARCHABLE_COLLECTIONS
-from bhs_api.item import get_collection_id_field
+from bhs_api.constants import PIPELINES_ES_DOC_TYPE
 
 
 class ElasticsearchCreateIndexCommand(object):
@@ -27,13 +26,13 @@ class ElasticsearchCreateIndexCommand(object):
                     "contexts": [{
                         "name": "collection",
                         "type": "CATEGORY",
-                        "path": "_type"
+                        "path": "collection"
                     }]
                 }
             },
         }
 
-    def get_collection_dynamic_templates(self, collection):
+    def get_dynamic_templates(self):
         return [{"title": {"match_pattern": "regex",
                            "match": "^title_..$",
                            "mapping": self.completion_field}},
@@ -47,7 +46,7 @@ class ElasticsearchCreateIndexCommand(object):
                           "match": "^slug_..$",
                           "mapping": {"type": "keyword"}}}]
 
-    def get_collection_properties(self, collection):
+    def get_properties(self):
         properties = {}
         properties["period_startdate"] = {"type": "date"}
         properties["location"] = {"type": "geo_point"}
@@ -84,9 +83,8 @@ class ElasticsearchCreateIndexCommand(object):
 
 
     def _get_index_body(self):
-        return {"mappings": {collection: {"properties": self.get_collection_properties(collection),
-                                          "dynamic_templates": self.get_collection_dynamic_templates(collection)}
-                             for collection in SEARCHABLE_COLLECTIONS}}
+        return {"mappings": {PIPELINES_ES_DOC_TYPE: {"properties": self.get_properties(),
+                                                     "dynamic_templates": self.get_dynamic_templates()}}}
 
     def create_es_index(self, es, es_index_name, delete_existing=False):
         if es.indices.exists(es_index_name):
