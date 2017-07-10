@@ -152,6 +152,34 @@ def test_movies_suggest(client, app):
                             200, expected_json={u'phonetic': [], u'contains': [],
                                                 u'starts_with': [u'Living Moments In Jewish Spain (English Jews)']})
 
+def test_suggest_missing_for_lang(client, app):
+    bad_movie = deepcopy(MOVIES_SPAIN)
+    del bad_movie["title_he_suggest"]
+    del bad_movie["title_en_suggest"]
+    try:
+        given_local_elasticsearch_client_with_test_data(app, "test_search::test_suggest_missing_for_lang",
+                                                        additional_index_docs={"movies": [bad_movie]})
+    except Exception as e:
+        assert e.info["error"]["caused_by"]["reason"] == "value must have a length > 0"
+    bad_movie["title_he_suggest"] = None
+    bad_movie["title_en_suggest"] = None
+    try:
+        given_local_elasticsearch_client_with_test_data(app, "test_search::test_suggest_missing_for_lang",
+                                                        additional_index_docs={"movies": [bad_movie]})
+    except Exception as e:
+        assert e.info["error"]["caused_by"]["reason"] == "value must have a length > 0"
+    bad_movie["title_he_suggest"] = ""
+    bad_movie["title_en_suggest"] = ""
+    try:
+        given_local_elasticsearch_client_with_test_data(app, "test_search::test_suggest_missing_for_lang",
+                                                        additional_index_docs={"movies": [bad_movie]})
+    except Exception as e:
+        assert e.info["error"]["caused_by"]["reason"] == "value must have a length > 0"
+    bad_movie["title_he_suggest"] = "_"
+    bad_movie["title_en_suggest"] = "_"
+    given_local_elasticsearch_client_with_test_data(app, "test_search::test_suggest_missing_for_lang",
+                                                    additional_index_docs={"movies": [bad_movie]})
+
 def test_search_result_without_slug(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     assert "slug_en" not in PHOTO_BRICKS
