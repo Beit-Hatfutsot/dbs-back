@@ -92,7 +92,8 @@ MOVIES_SPAIN = {
     "title_en": "Living Moments in Jewish Spain (English jews)",
     "title_he": "רגעים עם יהודי ספרד (אנגלית)",
     "slug_en": "video_living-moments-in-jewish-spain",
-    "slug_he": "וידאו_רגעים-עם-יהודי-ספרד"
+    "slug_he": "וידאו_רגעים-עם-יהודי-ספרד",
+    "slugs": ["video_living-moments-in-jewish-spain", "וידאו_רגעים-עם-יהודי-ספרד"]
 }
 
 ## persons

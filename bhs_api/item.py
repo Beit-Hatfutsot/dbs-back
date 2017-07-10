@@ -37,7 +37,7 @@ KNOWN_LANGS = iso639.languages.part1.keys()
 
 KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang}', 'title_{lang}_lc']
 
-KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url']
+KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url', 'slugs']
 for lang in KNOWN_LANGS:
     for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
         KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
@@ -298,7 +298,7 @@ def get_item_query(slug):
         return {'Slug.He': slug.full}
 
 def get_item(slug):
-    body = {"query": {"query_string": {"fields": ["slug_*"], "query": slug.full}}}
+    body = {"query": {"constant_score": {"filter": {"term": {"slugs": slug.full}}}}}
     results = current_app.es.search(index=current_app.es_data_db_index_name, body=body)
     docs = list(hits_to_docs(results["hits"]["hits"]))
     if len(docs) == 0:
@@ -449,54 +449,3 @@ def get_doc_id(collection_name, doc):
             raise Exception("persons collection items don't have a single doc_id, you must match on multiple fields")
         id_field = get_collection_id_field(collection_name)
         return doc[id_field]
-
-def update_es(collection_name, doc, is_new, es_index_name=None, es=None, app=None):
-    app = current_app if not app else app
-    es_index_name = app.es_data_db_index_name if not es_index_name else es_index_name
-    es = app.es if not es else es
-    # index only the docs that are publicly available
-    if doc_show_filter(collection_name, doc):
-        body = deepcopy(doc)
-        # adjust attributes for elasticsearch
-        if collection_name == "persons":
-            body["person_id"] = body.get("id", body.get("ID"))
-            body["first_name_lc"] = body["name_lc"][0]
-            body["last_name_lc"] = body["name_lc"][1]
-            # maps all known SEX values to normalized gender value
-            body["gender"] = {"F": "F", "M": "M",
-                              None: "U", "": "U", "U": "U", "?": "U", "P": "U"}[body.get("SEX", "").strip()]
-        # _id field is internal to mongo
-        if '_id' in body:
-            del body['_id']
-        # id field has special meaning in elasticsearch
-        if 'id' in body:
-            del body['id']
-        if "thumbnail" in body and "data" in body["thumbnail"]:
-            # no need to have thumbnail data in elasticsearch
-            # TODO: ensure we only store and use thumbnail from filesystem
-            del body["thumbnail"]["data"]
-        # persons collection gets a fake header to support searching
-        if collection_name == "persons":
-            name = " ".join(body["name"]) if isinstance(body["name"], list) else body["name"]
-            body["Header"] = {"En": name, "He": name}
-        # elasticsearch uses the header for completion field
-        # this field does not support empty values, so we put a string with space here
-        # this is most likely wrong, but works for now
-        # TODO: figure out how to handle it properly, maybe items without header are invalid?
-        if "Header" in body:
-            for lang in ("He", "En"):
-                if body["Header"].get(lang) is None:
-                    body["Header"][lang] = '_'
-        if collection_name == "persons":
-            doc_id = "{}_{}_{}".format(body["tree_num"], body["tree_version"], body["person_id"])
-        else:
-            doc_id = get_doc_id(collection_name, body)
-        if is_new:
-            uuids_to_str(body)
-            es.index(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
-            return True, "indexed successfully (inserted)"
-        else:
-            es.update(index=es_index_name, doc_type=collection_name, id=doc_id, body=body)
-            return True, "indexed successfully (updated)"
-    else:
-        return True, "item should not be shown - so not indexed"

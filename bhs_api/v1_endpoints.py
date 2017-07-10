@@ -1,41 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-import os
-import cPickle
-from datetime import timedelta, datetime
-import re
-import urllib
-import mimetypes
+from datetime import datetime
 from uuid import UUID
 import json
 import logging
-
-from flask import Flask, Blueprint, request, abort, url_for, current_app
-from flask.ext.security import auth_token_required
-from flask.ext.security import current_user
-from itsdangerous import URLSafeSerializer, BadSignature
-from werkzeug import secure_filename, Response
-from werkzeug.exceptions import NotFound, Forbidden, BadRequest
+from flask import Blueprint, request, abort, url_for, current_app
+from itsdangerous import URLSafeSerializer
+from werkzeug.exceptions import NotFound
 import elasticsearch
 import elasticsearch.helpers
-import pymongo
-import jinja2
 import requests
 import traceback
 
 from bhs_api import SEARCH_CHUNK_SIZE
-from bhs_api.utils import (get_conf, gen_missing_keys_error, binarize_image,
-                           upload_file, send_gmail, humanify, SEARCHABLE_COLLECTIONS)
+from bhs_api.utils import (humanify, SEARCHABLE_COLLECTIONS)
 from bhs_api.user import collect_editors_items
-from bhs_api.item import (fetch_items, search_by_header, get_image_url,
-                          enrich_item, SHOW_FILTER, update_slugs, hits_to_docs)
+from bhs_api.item import (fetch_items, search_by_header, get_image_url, update_slugs, hits_to_docs)
 from bhs_api.fsearch import fsearch
 from bhs_api.user import get_user
-
 from bhs_api import phonetic
 from bhs_api.persons import (PERSONS_SEARCH_DEFAULT_PARAMETERS, PERSONS_SEARCH_REQUIRES_ONE_OF,
                              PERSONS_SEARCH_YEAR_PARAMS, PERSONS_SEARCH_TEXT_PARAMS_LOWERCASE, PERSONS_SEARCH_EXACT_PARAMS)
+from bhs_api.constants import PIPELINES_ES_DOC_TYPE
 
 v1_endpoints = Blueprint('v1', __name__)
 
@@ -176,7 +162,9 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
         body["sort"] = [{"period_startdate": "asc"}, "_score"]
     try:
         current_app.logger.debug("es.search index={}, body={}".format(current_app.es_data_db_index_name, json.dumps(body)))
-        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body, size=size, from_=from_)
+        results = current_app.es.search(index=current_app.es_data_db_index_name,
+                                        doc_type=PIPELINES_ES_DOC_TYPE,
+                                        body=body, size=size, from_=from_)
     except elasticsearch.exceptions.ConnectionError as e:
         current_app.logger.error('Error connecting to Elasticsearch: {}'.format(e))
         raise Exception("Error connecting to Elasticsearch: {}".format(e))
@@ -310,8 +298,9 @@ def get_completion(collection, string, size=7):
             },
         }
     }
-    q["suggest"]["header"]["completion"]["contexts"] = {"collection": collection}
-    results = current_app.es.search(index=current_app.es_data_db_index_name, body=q, size=0)
+    results = current_app.es.search(index=current_app.es_data_db_index_name,
+                                    doc_type=PIPELINES_ES_DOC_TYPE,
+                                    body=q, size=0)
     try:
         header_options = results['suggest']['header'][0]['options']
     except KeyError:
@@ -329,142 +318,143 @@ def get_phonetic(collection, string, limit=5):
     return retval[:limit]
 
 
-@v1_endpoints.route('/upload', methods=['POST'])
-@auth_token_required
-def save_user_content():
-    import magic
-
-    if not request.files:
-        abort(400, 'No files present!')
-
-    must_have_key_list = ['title',
-                        'description',
-                        'creator_name']
-
-    form = request.form
-    keys = form.keys()
-
-    # Check that we have a full language specific set of fields
-
-    must_have_keys = {
-        '_en': {'missing': None, 'error': None},
-        '_he': {'missing': None, 'error': None}
-    }
-    for lang in must_have_keys:
-        must_have_list = [k+lang for k in must_have_key_list]
-        must_have_set = set(must_have_list)
-        must_have_keys[lang]['missing'] = list(must_have_set.difference(set(keys)))
-        if must_have_keys[lang]['missing']:
-            missing_keys = must_have_keys[lang]['missing']
-            must_have_keys[lang]['error'] = gen_missing_keys_error(missing_keys)
-
-    if must_have_keys['_en']['missing'] and must_have_keys['_he']['missing']:
-        em_base = 'You must provide a full list of keys in English or Hebrew. '
-        em = em_base + must_have_keys['_en']['error'] + ' ' +  must_have_keys['_he']['error']
-        abort(400, em)
-
-    # Set metadata language(s) to the one(s) without missing fields
-    md_languages = []
-    for lang in must_have_keys:
-        if not must_have_keys[lang]['missing']:
-            md_languages.append(lang)
-
-    user_oid = current_user.id
-
-    file_obj = request.files['file']
-    filename = secure_filename(file_obj.filename)
-    metadata = dict(form)
-    metadata['user_id'] = str(user_oid)
-    metadata['original_filename'] = filename
-    metadata['Content-Type'] = mimetypes.guess_type(filename)[0]
-
-    # Pick the first item for all the list fields in the metadata
-    clean_md = {}
-    for key in metadata:
-        if type(metadata[key]) == list:
-            clean_md[key] = metadata[key][0]
-        else:
-            clean_md[key] = metadata[key]
-
-    # Make sure there are no empty keys for at least one of the md_languages
-    empty_keys = {'_en': [], '_he': []}
-    for lang in md_languages:
-        for key in clean_md:
-            if key.endswith(lang):
-                if not clean_md[key]:
-                    empty_keys[lang].append(key)
-
-    # Check for empty keys of the single language with the full list of fields
-    if len(md_languages) == 1 and empty_keys[md_languages[0]]:
-        abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
-    # Check for existence of empty keys in ALL the languages
-    elif len(md_languages) > 1:
-            if (empty_keys['_en'] and empty_keys['_he']):
-                abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
-
-    # Create a version of clean_md with the full fields only
-    full_md = {}
-    for key in clean_md:
-        if clean_md[key]:
-            full_md[key] = clean_md[key]
-
-    # Get the magic file info
-    file_info_str = magic.from_buffer(file_obj.stream.read())
-    if not _validate_filetype(file_info_str):
-        abort(415, "File type '{}' is not supported".format(file_info_str))
-
-    # Rewind the file object
-    file_obj.stream.seek(0)
-    # Convert user specified metadata to BHP6 format
-    bhp6_md = _convert_meta_to_bhp6(clean_md, file_info_str)
-    bhp6_md['owner'] = str(user_oid)
-    # Create a thumbnail and add it to bhp metadata
-    try:
-        binary_thumbnail = binarize_image(file_obj)
-        bhp6_md['thumbnail'] = {}
-        bhp6_md['thumbnail']['data'] = urllib.quote(binary_thumbnail.encode('base64'))
-    except IOError as e:
-        current_app.logger.debug('Thumbnail creation failed for {} with error: {}'.format(
-            file_obj.filename, e.message))
-
-    # Add ugc flag to the metadata
-    bhp6_md['ugc'] = True
-    # Insert the metadata to the ugc collection
-    new_ugc = Ugc(bhp6_md)
-    new_ugc.save()
-    file_oid = new_ugc.id
-
-    bucket = ugc_bucket
-    saved_uri = upload_file(file_obj, bucket, file_oid, full_md, make_public=True)
-    user_email = current_user.email
-    user_name = current_user.name
-    if saved_uri:
-        console_uri = 'https://console.developers.google.com/m/cloudstorage/b/{}/o/{}'
-        http_uri = console_uri.format(bucket, file_oid)
-        mjs = current_user.get_mjs()['mjs']
-        if mjs == {}:
-            current_app.logger.debug('Creating mjs for user {}'.format(user_email))
-        # Add main_image_url for images (UnitType 1)
-        if bhp6_md['UnitType'] == 1:
-            ugc_image_uri = 'https://storage.googleapis.com/' + saved_uri.split('gs://')[1]
-            new_ugc['ugc']['main_image_url'] = ugc_image_uri
-            new_ugc.save()
-        # Send an email to editor
-        subject = 'New UGC submission'
-        with open('templates/editors_email_template') as fh:
-            template = jinja2.Template(fh.read())
-        body = template.render({'uri': http_uri,
-                                'metadata': clean_md,
-                                'user_email': user_email,
-                                'user_name': user_name})
-        sent = send_gmail(subject, body, editor_address, message_mode='html')
-        if not sent:
-            current_app.logger.error('There was an error sending an email to {}'.format(editor_address))
-        clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
-
-        return humanify({'md': clean_md})
-    else:
-        abort(500, 'Failed to save {}'.format(filename))
+# TODO: fix this code, it doesn't work!
+# @v1_endpoints.route('/upload', methods=['POST'])
+# @auth_token_required
+# def save_user_content():
+#     import magic
+#
+#     if not request.files:
+#         abort(400, 'No files present!')
+#
+#     must_have_key_list = ['title',
+#                         'description',
+#                         'creator_name']
+#
+#     form = request.form
+#     keys = form.keys()
+#
+#     # Check that we have a full language specific set of fields
+#
+#     must_have_keys = {
+#         '_en': {'missing': None, 'error': None},
+#         '_he': {'missing': None, 'error': None}
+#     }
+#     for lang in must_have_keys:
+#         must_have_list = [k+lang for k in must_have_key_list]
+#         must_have_set = set(must_have_list)
+#         must_have_keys[lang]['missing'] = list(must_have_set.difference(set(keys)))
+#         if must_have_keys[lang]['missing']:
+#             missing_keys = must_have_keys[lang]['missing']
+#             must_have_keys[lang]['error'] = gen_missing_keys_error(missing_keys)
+#
+#     if must_have_keys['_en']['missing'] and must_have_keys['_he']['missing']:
+#         em_base = 'You must provide a full list of keys in English or Hebrew. '
+#         em = em_base + must_have_keys['_en']['error'] + ' ' +  must_have_keys['_he']['error']
+#         abort(400, em)
+#
+#     # Set metadata language(s) to the one(s) without missing fields
+#     md_languages = []
+#     for lang in must_have_keys:
+#         if not must_have_keys[lang]['missing']:
+#             md_languages.append(lang)
+#
+#     user_oid = current_user.id
+#
+#     file_obj = request.files['file']
+#     filename = secure_filename(file_obj.filename)
+#     metadata = dict(form)
+#     metadata['user_id'] = str(user_oid)
+#     metadata['original_filename'] = filename
+#     metadata['Content-Type'] = mimetypes.guess_type(filename)[0]
+#
+#     # Pick the first item for all the list fields in the metadata
+#     clean_md = {}
+#     for key in metadata:
+#         if type(metadata[key]) == list:
+#             clean_md[key] = metadata[key][0]
+#         else:
+#             clean_md[key] = metadata[key]
+#
+#     # Make sure there are no empty keys for at least one of the md_languages
+#     empty_keys = {'_en': [], '_he': []}
+#     for lang in md_languages:
+#         for key in clean_md:
+#             if key.endswith(lang):
+#                 if not clean_md[key]:
+#                     empty_keys[lang].append(key)
+#
+#     # Check for empty keys of the single language with the full list of fields
+#     if len(md_languages) == 1 and empty_keys[md_languages[0]]:
+#         abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
+#     # Check for existence of empty keys in ALL the languages
+#     elif len(md_languages) > 1:
+#             if (empty_keys['_en'] and empty_keys['_he']):
+#                 abort(400, "'{}' field couldn't be empty".format(empty_keys[md_languages[0]][0]))
+#
+#     # Create a version of clean_md with the full fields only
+#     full_md = {}
+#     for key in clean_md:
+#         if clean_md[key]:
+#             full_md[key] = clean_md[key]
+#
+#     # Get the magic file info
+#     file_info_str = magic.from_buffer(file_obj.stream.read())
+#     if not _validate_filetype(file_info_str):
+#         abort(415, "File type '{}' is not supported".format(file_info_str))
+#
+#     # Rewind the file object
+#     file_obj.stream.seek(0)
+#     # Convert user specified metadata to BHP6 format
+#     bhp6_md = _convert_meta_to_bhp6(clean_md, file_info_str)
+#     bhp6_md['owner'] = str(user_oid)
+#     # Create a thumbnail and add it to bhp metadata
+#     try:
+#         binary_thumbnail = binarize_image(file_obj)
+#         bhp6_md['thumbnail'] = {}
+#         bhp6_md['thumbnail']['data'] = urllib.quote(binary_thumbnail.encode('base64'))
+#     except IOError as e:
+#         current_app.logger.debug('Thumbnail creation failed for {} with error: {}'.format(
+#             file_obj.filename, e.message))
+#
+#     # Add ugc flag to the metadata
+#     bhp6_md['ugc'] = True
+#     # Insert the metadata to the ugc collection
+#     new_ugc = Ugc(bhp6_md)
+#     new_ugc.save()
+#     file_oid = new_ugc.id
+#
+#     bucket = ugc_bucket
+#     saved_uri = upload_file(file_obj, bucket, file_oid, full_md, make_public=True)
+#     user_email = current_user.email
+#     user_name = current_user.name
+#     if saved_uri:
+#         console_uri = 'https://console.developers.google.com/m/cloudstorage/b/{}/o/{}'
+#         http_uri = console_uri.format(bucket, file_oid)
+#         mjs = current_user.get_mjs()['mjs']
+#         if mjs == {}:
+#             current_app.logger.debug('Creating mjs for user {}'.format(user_email))
+#         # Add main_image_url for images (UnitType 1)
+#         if bhp6_md['UnitType'] == 1:
+#             ugc_image_uri = 'https://storage.googleapis.com/' + saved_uri.split('gs://')[1]
+#             new_ugc['ugc']['main_image_url'] = ugc_image_uri
+#             new_ugc.save()
+#         # Send an email to editor
+#         subject = 'New UGC submission'
+#         with open('templates/editors_email_template') as fh:
+#             template = jinja2.Template(fh.read())
+#         body = template.render({'uri': http_uri,
+#                                 'metadata': clean_md,
+#                                 'user_email': user_email,
+#                                 'user_name': user_name})
+#         sent = send_gmail(subject, body, editor_address, message_mode='html')
+#         if not sent:
+#             current_app.logger.error('There was an error sending an email to {}'.format(editor_address))
+#         clean_md['item_page'] = '/item/ugc.{}'.format(str(file_oid))
+#
+#         return humanify({'md': clean_md})
+#     else:
+#         abort(500, 'Failed to save {}'.format(filename))
 
 @v1_endpoints.route('/search')
 def general_search():
@@ -718,20 +708,30 @@ def get_geocoded_places():
         return humanify({"error": e.message}, 500)
     body = {
         "query": {
-            "bool" : {
-                "filter" : {
-                    "geo_bounding_box" : {
-                        "location" : {
-                            "top_left" : {"lat" : north_lat, "lon" : west_lng},
-                            "bottom_right" : {"lat" : south_lat, "lon" : east_lng}
-                        }
+            "constant_score": {
+                "filter": {
+                    "bool" : {
+                        "must": [
+                            {
+                                "geo_bounding_box": {
+                                    "location": {
+                                        "top_left": {"lat": north_lat, "lon": west_lng},
+                                        "bottom_right": {"lat": south_lat, "lon": east_lng}
+                                    }
+                                }
+                            },
+                            {
+                                "term": {
+                                    "collection": "places"
+                                }
+                            }
+                        ]
                     }
                 }
             }
         }
     }
-    collections = ["places"]
-    res = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=collections)
+    res = current_app.es.search(index=current_app.es_data_db_index_name, body=body, doc_type=PIPELINES_ES_DOC_TYPE)
     hits = res["hits"]["hits"]
     return humanify(hits_to_docs(hits))
 
