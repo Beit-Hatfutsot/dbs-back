@@ -298,11 +298,9 @@ def get_completion(collection, string, size=7):
             },
         }
     }
-    print(q)
     results = current_app.es.search(index=current_app.es_data_db_index_name,
                                     doc_type=PIPELINES_ES_DOC_TYPE,
                                     body=q, size=0)
-    print(results)
     try:
         header_options = results['suggest']['header'][0]['options']
     except KeyError:
