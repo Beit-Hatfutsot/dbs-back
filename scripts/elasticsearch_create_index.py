@@ -3,7 +3,7 @@
 from argparse import ArgumentParser
 from bhs_api import create_app
 import elasticsearch
-from bhs_api.constants import PIPELINES_ES_DOC_TYPE
+from bhs_api.constants import PIPELINES_ES_DOC_TYPE, SUPPORTED_SUGGEST_LANGS
 
 
 class ElasticsearchCreateIndexCommand(object):
@@ -18,24 +18,19 @@ class ElasticsearchCreateIndexCommand(object):
     @property
     def completion_field(self):
         return {
-            "type": "text",
-            "fields": {
-                "suggest": {
-                    "type": "completion",
-                    "max_input_length": 20,
-                    "contexts": [{
-                        "name": "collection",
-                        "type": "CATEGORY",
-                        "path": "collection"
-                    }]
-                }
-            },
+            "type": "completion",
+            "max_input_length": 20,
+            "contexts": [{
+                "name": "collection",
+                "type": "CATEGORY",
+                "path": "collection"
+            }]
         }
 
     def get_dynamic_templates(self):
         return [{"title": {"match_pattern": "regex",
                            "match": "^title_..$",
-                           "mapping": self.completion_field}},
+                           "mapping": {"type": "text"}}},
                 # currently the best option for case-insensitive search is to lower case when indexing a document
                 # keyword type allows for efficient sorting
                 # related issue in mojp-dbs-pipelines: https://github.com/Beit-Hatfutsot/mojp-dbs-pipelines/issues/13
@@ -53,6 +48,8 @@ class ElasticsearchCreateIndexCommand(object):
         properties["main_thumbnail_image_url"] = {"type": "keyword"}
         properties["main_image_url"] = {"type": "keyword"}
         properties["slugs"] = {"type": "keyword"}
+        for lang in SUPPORTED_SUGGEST_LANGS:
+            properties["title_{}_suggest".format(lang)] = self.completion_field
         return properties
         # following code is for the old schema
         # TODO: fix for the new schema (will need to add the data in the pipelines)
