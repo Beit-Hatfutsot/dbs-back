@@ -537,7 +537,7 @@ def get_items(slugs):
         items_list = []
         if slugs:
             items_list = slugs.split(',')
-        items = fetch_items(items_list)
+        items = fetch_items(items_list, full=True)
         if len(items) == 1 and 'error_code' in items[0]:
             error = items[0]
             abort(error['error_code'], error['msg'])

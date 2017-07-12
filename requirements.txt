@@ -26,3 +26,4 @@ unicodecsv==0.14.1
 pytest-cov==2.4.0
 Fabric==1.13.1
 iso-639==0.4.5
+pyquery==1.2.17

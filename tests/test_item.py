@@ -32,6 +32,12 @@ def test_from_search_to_item(client, app):
         assert item["collection"] == "movies"
         assert item["title_en"] == "Living Moments in Jewish Spain (English jews)"
 
+def test_item_embedded_google_map(client, app):
+    given_local_elasticsearch_client_with_test_data(app, "test_item::test_item_embedded_google_map",
+                                                    additional_index_docs={"places": [PLACES_GERMANY]})
+    res = assert_client_get(client, u"/v1/item/place_germany")
+    assert res[0]["google_map_embed"] == "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3639100.5693534394!2d7.6804282320147825!3d50.96213621113465!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x479a721ec2b1be6b%3A0x75e85d6b8e91e55b!2sGermany!5e0!3m2!1sen!2sil!4v1498978137451"
+
 
 # import pytest
 # from bhs_api.item import enrich_item

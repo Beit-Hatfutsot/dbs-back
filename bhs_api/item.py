@@ -12,6 +12,8 @@ from copy import deepcopy
 from bhs_api.fsearch import is_living_person
 import iso639
 import json
+from pyquery import PyQuery as pq
+import logging
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -37,7 +39,9 @@ KNOWN_LANGS = iso639.languages.part1.keys()
 
 KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang}', 'title_{lang}_lc']
 
-KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id', 'main_image_url', 'main_thumbnail_image_url', 'slugs']
+KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id',
+                         'main_image_url', 'main_thumbnail_image_url',
+                         'slugs', 'google_map_embed']
 for lang in KNOWN_LANGS:
     for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
         KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
@@ -155,18 +159,18 @@ def _make_serializable(obj):
         obj['UpdateDate'] = str(obj['UpdateDate'])
     return obj
 
-def fetch_items(slug_list):
+def fetch_items(slug_list, full=False):
     rv = []
     for slug in slug_list:
         try:
-            item = fetch_item(slug)
+            item = fetch_item(slug, full=full)
             rv.append(item)
         except (Forbidden, NotFound) as e:
             rv.append({'slug': slug, 'error_code': e.code, 'msg': e.description})
     return rv
 
 
-def fetch_item(slug):
+def fetch_item(slug, full=False):
     """
     Gets an item based on slug and returns it
     If slug is bad or item is not found, raises an exception.
@@ -177,7 +181,7 @@ def fetch_item(slug):
         raise NotFound, "missing an underscore in item's slug: {}".format(e)
     except KeyError as e:
         raise NotFound, "bad collection name in slug: {}".format(e)
-    item = get_item(slug)
+    item = get_item(slug, full=full)
     if item:
         return item
     else:
@@ -197,10 +201,10 @@ def fetch_item(slug):
     #         raise NotFound
     # else:
 
-def hits_to_docs(hits):
+def hits_to_docs(hits, full=False):
     for hit in hits:
         doc = hit["_source"]
-        enrich_item(doc)
+        enrich_item(doc, full=full)
         yield doc
 
 def html_to_text(html):
@@ -210,7 +214,7 @@ def html_to_text(html):
     else:
         return html
 
-def enrich_item(item):
+def enrich_item(item, full=False):
     """
     ensure item has all needed attributes before returning it via API
     :param item: a new ES document
@@ -218,6 +222,20 @@ def enrich_item(item):
     """
     collection_name = item.get("collection", None)  # all new ES items have collection attribute
     update_slugs(item, collection_name)
+    if item["source"] == "clearmash":
+        try:
+            clearmash_parsed_doc = json.loads(item["parsed_doc"])
+        except Exception as e:
+            logging.exception(e)
+            clearmash_parsed_doc = {}
+        if full:
+            try:
+                google_map_html = clearmash_parsed_doc.get("_c6_beit_hatfutsot_bh_place_google_maps", {}).get("en")
+                if google_map_html:
+                    item["google_map_embed"] = pq(google_map_html)("p iframe")[0].attrib["src"]
+            except Exception as e:
+                logging.exception(e)
+                pass
     for k,v in item.items():
         if k not in KNOWN_ITEM_ATTRIBUTES:
             del item[k]
@@ -297,10 +315,10 @@ def get_item_query(slug):
     else:
         return {'Slug.He': slug.full}
 
-def get_item(slug):
+def get_item(slug, full=False):
     body = {"query": {"constant_score": {"filter": {"term": {"slugs": slug.full}}}}}
     results = current_app.es.search(index=current_app.es_data_db_index_name, body=body)
-    docs = list(hits_to_docs(results["hits"]["hits"]))
+    docs = list(hits_to_docs(results["hits"]["hits"], full=full))
     if len(docs) == 0:
         return None
     elif len(docs) == 1:
