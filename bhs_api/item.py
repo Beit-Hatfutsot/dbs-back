@@ -376,34 +376,21 @@ def get_video_url(video_id, db):
         return None
 
 
-def search_by_header(string, collection, starts_with=True, db=None):
-    if not db:
-        db = current_app.data_db
+def search_by_header(string, collection, starts_with=True):
     if not string: # Support empty strings
         return {}
-    if phonetic.is_hebrew(string):
-        lang = 'He'
     else:
-        lang = 'En'
-    string_re = re.escape(string)
-    if starts_with:
-        header_regex = re.compile(u'^'+string_re, re.IGNORECASE)
-    else:
-        header_regex = re.compile(u'^{}$'.format(string_re), re.IGNORECASE)
-    lang_header = 'Header.{}'.format(lang)
-    unit_text = 'UnitText1.{}'.format(lang)
-    # Search only for non empty docs with right status
-    show_filter = SHOW_FILTER.copy()
-    show_filter[unit_text] = {"$nin": [None, '']}
-    header_search_ex = {lang_header: header_regex}
-    header_search_ex.update(show_filter)
-    item = db[collection].find_one(header_search_ex)
-
-    if item:
-        item = enrich_item(item, db)
-        return _make_serializable(item)
-    else:
-        return {}
+        lang = 'he' if phonetic.is_hebrew(string) else 'en'
+        # search for item with the specific title (lower-case)
+        body = {"query": {"constant_score": {"filter": {"term": {"title_{}_lc".format(lang): string.lower()}}}}}
+        results = current_app.es.search(index=current_app.es_data_db_index_name, body=body)
+        docs = list(hits_to_docs(results["hits"]["hits"]))
+        if len(docs) == 0:
+            return None
+        elif len(docs) == 1:
+            return docs[0]
+        else:
+            return {}
 
 def get_image_url(image_id, bucket):
     return  'https://storage.googleapis.com/{}/{}.jpg'.format(bucket, image_id)

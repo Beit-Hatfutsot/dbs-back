@@ -331,3 +331,10 @@ def skip_test_should_return_places_before_people(client, app):
                                                                            "places": [PLACES_GERMANY]})
     results = assert_search_results(client.get(u"/v1/search?with_persons=1&q=germany"), 6)
     assert next(results)["title_en"] == "GERMANY"
+
+def test_wizard_search(client, app):
+    given_local_elasticsearch_client_with_test_data(app, __file__)
+    res = assert_client_get(client, u"/v1/wsearch?name=EDREHY")
+    assert res.keys() == ["place", "name"]
+    assert res["place"] == {}
+    assert res["name"]["slug_en"] == "familyname_edrehy"

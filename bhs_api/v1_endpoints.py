@@ -172,16 +172,6 @@ def es_search(q, size, collection=None, from_=0, sort=None, with_persons=False, 
         raise Exception("Elasticsearch error: {}".format(e))
     return results
 
-def _generate_credits(fn='credits.html'):
-    try:
-        fh = open(fn)
-        credits = fh.read()
-        fh.close()
-        return credits
-    except:
-        current_app.logger.debug("Couldn't open credits file {}".format(fn))
-        return '<h1>No credits found</h1>'
-
 def _convert_meta_to_bhp6(upload_md, file_info):
     '''Convert language specific metadata fields to bhp6 format.
     Use file_info to set the unit type.
@@ -490,49 +480,29 @@ def wizard_search():
     We must have either `place` or `name` (or both) of the keywords.
     If present, the keys must not be empty.
     '''
-    args = request.args
-    must_have_keys = ['place', 'name']
-    keys = args.keys()
-    if not ('place' in keys) and not ('name' in keys):
-        em = "Either 'place' or 'name' key must be present and not empty"
-        abort(400, em)
+    try:
+        args = request.args
+        must_have_keys = ['place', 'name']
+        keys = args.keys()
+        if not ('place' in keys) and not ('name' in keys):
+            em = "Either 'place' or 'name' key must be present and not empty"
+            abort(400, em)
 
-    validated_args = {'place': None, 'name': None}
-    for k in must_have_keys:
-        if k in keys:
-            if args[k]:
-                validated_args[k] = args[k]
-            else:
-                abort(400, "{} argument couldn't be empty".format(k))
+        validated_args = {'place': None, 'name': None}
+        for k in must_have_keys:
+            if k in keys:
+                if args[k]:
+                    validated_args[k] = args[k]
+                else:
+                    abort(400, "{} argument couldn't be empty".format(k))
+        place_doc = search_by_header(validated_args['place'], 'places', starts_with=False)
+        name_doc = search_by_header(validated_args['name'], 'familyNames', starts_with=False)
+        rv = {'place': place_doc, 'name': name_doc}
+        return humanify(rv)
+    except Exception as e:
+        return humanify({"error": "unexpected exception from wsearch api: {}".format(e),
+                         "traceback": traceback.format_exc()}, 500)
 
-    place = validated_args['place']
-    name = validated_args['name']
-
-    if place == 'havat_taninim' and name == 'tick-tock':
-        return _generate_credits()
-
-    place_doc = search_by_header(place, 'places', starts_with=False)
-    name_doc = search_by_header(name, 'familyNames', starts_with=False)
-    # fsearch() expects a dictionary of lists and returns Mongo cursor
-    ftree_args = {}
-    if name:
-        ftree_args['last_name'] = [name]
-    if place:
-        ftree_args['birth_place'] = [place]
-
-    # We turn the cursor to list in order to serialize it
-    ''' TODO: restore family trees
-    tree_found = list(fsearch(max_results=1, **ftree_args))
-    if not tree_found and name and 'birth_place' in ftree_args:
-        del ftree_args['birth_place']
-        tree_found = list(fsearch(max_results=1, **ftree_args))
-    '''
-    rv = {'place': place_doc, 'name': name_doc}
-    ''' TODO: restore family trees
-    if tree_found:
-        rv['ftree_args'] = ftree_args
-    '''
-    return humanify(rv)
 
 @v1_endpoints.route('/suggest/<collection>/<string>')
 def get_suggestions(collection,string):
