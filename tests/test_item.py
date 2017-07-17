@@ -38,6 +38,32 @@ def test_item_embedded_google_map(client, app):
     res = assert_client_get(client, u"/v1/item/place_germany")
     assert res[0]["google_map_embed"] == "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3639100.5693534394!2d7.6804282320147825!3d50.96213621113465!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x479a721ec2b1be6b%3A0x75e85d6b8e91e55b!2sGermany!5e0!3m2!1sen!2sil!4v1498978137451"
 
+def test_item_related_documents(client, app):
+    movie = deepcopy(MOVIES_SPAIN)
+    movie["slug_en"] = "video_test-item-related-documents"
+    movie["slugs"] = [movie["slug_en"]]
+    movie["related_documents_places"] = ["{}_{}".format(PLACES_BOZZOLO["source"], PLACES_BOZZOLO["source_id"])]
+    movie["related_documents_foobarbaz"] = ["invalid_id"]
+    given_local_elasticsearch_client_with_test_data(app, "test_item::test_item_related_documents",
+                                                    additional_index_docs={"movies": [movie]})
+    res = client.get("/v1/item/video_test-item-related-documents")
+    assert res.status_code == 200, res.json
+    assert len(res.json) == 1
+    assert res.json[0]["related_documents"].keys() == ["places", "foobarbaz"]
+    assert len(res.json[0]["related_documents"]["places"]) == 1
+    assert res.json[0]["related_documents"]["places"][0].keys() == [u'content_text_he',
+                                                                    u'slug_en',
+                                                                    u'title_he',
+                                                                    u'content_text_en',
+                                                                    u'title_en',
+                                                                    u'collection',
+                                                                    u'source',
+                                                                    u'title_en_lc',
+                                                                    u'source_id',
+                                                                    u'slug_he',
+                                                                    u'title_he_lc']
+    assert res.json[0]["related_documents"]["places"][0]["title_en"] == "BOZZOLO"
+
 
 # import pytest
 # from bhs_api.item import enrich_item
