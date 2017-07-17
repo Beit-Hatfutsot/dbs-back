@@ -14,6 +14,7 @@ import iso639
 import json
 from pyquery import PyQuery as pq
 import logging
+from bhs_api.constants import PIPELINES_ES_DOC_TYPE
 
 
 SHOW_FILTER = {'StatusDesc': 'Completed',
@@ -41,7 +42,7 @@ KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang
 
 KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id',
                          'main_image_url', 'main_thumbnail_image_url',
-                         'slugs', 'google_map_embed']
+                         'slugs', 'google_map_embed', "related_documents"]
 for lang in KNOWN_LANGS:
     for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
         KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
@@ -214,6 +215,19 @@ def html_to_text(html):
     else:
         return html
 
+def fetch_related_item(item_id):
+    es_doc = None
+    try:
+        es_doc = current_app.es.get(index=current_app.es_data_db_index_name,
+                                              id=item_id,
+                                              doc_type=PIPELINES_ES_DOC_TYPE)
+    except Exception as e:
+        logging.exception(e)
+    if es_doc:
+        return enrich_item(es_doc["_source"])
+    else:
+        return False
+
 def enrich_item(item, full=False):
     """
     ensure item has all needed attributes before returning it via API
@@ -223,12 +237,13 @@ def enrich_item(item, full=False):
     collection_name = item.get("collection", None)  # all new ES items have collection attribute
     update_slugs(item, collection_name)
     if item["source"] == "clearmash":
-        try:
-            clearmash_parsed_doc = json.loads(item["parsed_doc"])
-        except Exception as e:
-            logging.exception(e)
-            clearmash_parsed_doc = {}
         if full:
+            clearmash_parsed_doc = {}
+            if "parsed_doc" in item:
+                try:
+                    clearmash_parsed_doc = json.loads(item["parsed_doc"])
+                except Exception as e:
+                    logging.exception(e)
             try:
                 google_map_html = clearmash_parsed_doc.get("_c6_beit_hatfutsot_bh_place_google_maps", {}).get("en")
                 if google_map_html:
@@ -236,6 +251,18 @@ def enrich_item(item, full=False):
             except Exception as e:
                 logging.exception(e)
                 pass
+            item["related_documents"] = {}
+            fetched_items = {}
+            for k, v in item.items():
+                if k.startswith("related_documents_"):
+                    field_id = k.replace("related_documents_", "")
+                    item["related_documents"][field_id] = []
+                    for item_id in v:
+                        if item_id not in fetched_items:
+                            fetched_items[item_id] = fetch_related_item(item_id)
+                        if fetched_items[item_id]:
+                            item["related_documents"][field_id].append(fetched_items[item_id])
+                    del item[k]
     for k,v in item.items():
         if k not in KNOWN_ITEM_ATTRIBUTES:
             del item[k]

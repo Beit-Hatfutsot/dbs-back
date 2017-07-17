@@ -549,7 +549,7 @@ def get_items(slugs):
     except NotFound, e:
         return humanify({"error": str(e)}, 404)
     except Exception, e:
-        return humanify({"error": "unexpected exception getting completion data: {}".format(e), "traceback": traceback.format_exc()}, 500)
+        return humanify({"error": "unexpected exception getting items from slugs {}: {}".format(slugs, str(e)), "traceback": traceback.format_exc()}, 500)
     # TODO: check what's needed for ugc items
     # Check if there are items from ugc collection and test their access control
     # ugc_items = []
