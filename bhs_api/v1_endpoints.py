@@ -707,34 +707,38 @@ def get_geocoded_places():
 
 @v1_endpoints.route("/linkify", methods=['GET', 'POST'])
 def linkify():
-    collections = ["places", "personalities", "familyNames"]
-    res = {collection: [] for collection in collections}
     try:
-        if request.method == "POST":
-            html_lower = request.form["html"].lower()
-        else:
-            html_lower = request.args["html"].lower()
+        collections = ["places", "personalities", "familyNames"]
+        res = {collection: [] for collection in collections}
+        try:
+            if request.method == "POST":
+                html_lower = request.form["html"].lower()
+            else:
+                html_lower = request.args["html"].lower()
+        except Exception as e:
+            logging.exception(e)
+            raise
+        items = elasticsearch.helpers.scan(current_app.es,
+                                           index=current_app.es_data_db_index_name,
+                                           query={"query": get_collections_es_query(collections)},
+                                           scroll=u"3h")
+        for item in items:
+            item = item["_source"]
+            collection = item["collection"]
+            update_slugs(item, collection)
+            # TODO: support more langs? it's possible from backend perspective
+            for lang in ["he", "en"]:
+                title = item.get("title_{}".format(lang))
+                if title and len(title) > 2 and title.lower() in html_lower:
+                    slug = item.get("slug_{}".format(lang))
+                    if slug:
+                        # TODO: determine better way to transform slug to URL
+                        # TODO: add the domain dynamically based on the environment
+                        slug = slug.decode("utf-8")
+                        slug = slug.replace(u"_", u"/")
+                        url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "he" else "", slug)
+                        res[collection].append({"title": title, "url": url})
+        return humanify(res)
     except Exception as e:
-        logging.exception(e)
-        raise
-    items = elasticsearch.helpers.scan(current_app.es,
-                                       index=current_app.es_data_db_index_name,
-                                       query={"query": get_collections_es_query(collections)},
-                                       scroll=u"3h")
-    for item in items:
-        item = item["_source"]
-        collection = item["collection"]
-        update_slugs(item, collection)
-        # TODO: support more langs? it's possible from backend perspective
-        for lang in ["he", "en"]:
-            title = item.get("title_{}".format(lang), "")
-            if len(title) > 2 and title.lower() in html_lower:
-                slug = item.get("slug_{}".format(lang), "")
-                if slug != "":
-                    # TODO: determine better way to transform slug to URL
-                    # TODO: add the domain dynamically based on the environment
-                    slug = slug.decode("utf-8")
-                    slug = slug.replace(u"_", u"/")
-                    url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "he" else "", slug)
-                    res[collection].append({"title": title, "url": url})
-    return humanify(res)
+        return humanify({"error": e.message, "traceback": traceback.format_exc()}, 500)
+

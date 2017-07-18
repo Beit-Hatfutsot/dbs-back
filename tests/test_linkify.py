@@ -37,3 +37,21 @@ def test_linkify_case_insensitive(client, app):
     assert res.status_code == 200, "invalid status, json response: {}".format(res.data)
     assert res.json == {"familyNames": [], "personalities": [],
                         "places": [{"url": "http://dbs.bh.org.il/place/bozzolo", "title": "BOZZOLO"}]}
+
+def test_linkify_missing_title(client, app):
+    place_ixt = {"source": "clearmash", "source_id": "2441266", "collection": "places",
+                 "title_en": "IXT", "slug_en": "place_ixt"}
+    personality_fxt = {"source": "clearmash", "source_id": "2441267", "collection": "personalities",
+                       "title_he": "פחט", "slug_he": "מקום_פחט"}
+    given_local_elasticsearch_client_with_test_data(app,
+                                                    "test_linkify::test_linkify_missing_title",
+                                                    additional_index_docs={"places": [place_ixt],
+                                                                           "personalities": [personality_fxt]})
+    res = client.get(u"/v1/linkify?html=hello from IXT!")
+    assert res.json == {"familyNames": [],
+                        "personalities": [],
+                        "places": [{u'title': u'IXT', u'url': u'http://dbs.bh.org.il/place/ixt'}]}
+    res = client.get(u"/v1/linkify?html=בדיקה פחט!")
+    assert res.json == {"familyNames": [],
+                        "personalities": [{u'title': u'פחט', u'url': u'http://dbs.bh.org.il/he/\u05d0\u05d9\u05e9\u05d9\u05d5\u05ea/\u05e4\u05d7\u05d8'}],
+                        "places": []}

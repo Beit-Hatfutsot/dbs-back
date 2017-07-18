@@ -459,10 +459,10 @@ def get_collection_id_field(collection_name):
 def update_slugs(document, collection_name):
     slugify = None
     for lang, collection_slug in SLUG_LANGUAGES_MAP[collection_name].items():
-        title = document.get("title_{}".format(lang), "")
-        if title != "":
-            slug = document.get("slug_{}".format(lang), "")
-            if slug == "":
+        title = document.get("title_{}".format(lang))
+        if title:
+            slug = document.get("slug_{}".format(lang))
+            if slug:
                 if not slugify:
                     slugify = Slugify(translate=None, safe_chars='_')
                 document["slug_{}".format(lang)] = slugify('_'.join([collection_slug, title.lower()])).encode("utf8")
