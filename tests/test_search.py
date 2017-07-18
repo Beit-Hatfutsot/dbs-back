@@ -180,21 +180,6 @@ def test_suggest_missing_for_lang(client, app):
     given_local_elasticsearch_client_with_test_data(app, "test_search::test_suggest_missing_for_lang",
                                                     additional_index_docs={"movies": [bad_movie]})
 
-def test_search_result_without_slug(client, app):
-    given_local_elasticsearch_client_with_test_data(app, __file__)
-    assert "slug_en" not in PHOTO_BRICKS
-    assert "slug_he" not in PHOTO_BRICKS
-    results = list(assert_search_results(client.get(u"/v1/search?q=Blocks&collection=photoUnits&sort=abc"), 1))
-    # slug is generated on-the-fly if it doesn't exist in source data
-    assert results[0]["slug_en"] == "image_building-blocks-for-housing-projects-israel-1950s"
-    assert results[0]["slug_he"] == u"תמונה_לבנים-למפעל-בנייה-למגורים-ישראל-שנות-1960"
-    assert "slug_en" not in PLACES_BOURGES
-    assert "slug_he" not in PLACES_BOURGES
-    results = list(assert_search_results(client.get(u"/v1/search?q=bourges&collection=places&sort=abc"), 1))
-    # slug is generated on-the-fly if it doesn't exist in source data
-    assert results[0]["slug_en"] == "place_bourges"
-    assert results[0]["slug_he"] == u"מקום_בורג"
-
 def test_search_missing_header_slug(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)
     assert PERSONALITY_WITH_MISSING_HE_HEADER_AND_SLUG["title_en"] == "Davydov, Karl Yulyevich"
@@ -337,4 +322,4 @@ def test_wizard_search(client, app):
     res = assert_client_get(client, u"/v1/wsearch?name=EDREHY")
     assert res.keys() == ["place", "name"]
     assert res["place"] == {}
-    assert res["name"]["slug_en"] == "familyname_edrehy"
+    assert res["name"]["title_en"] == "EDREHY"

@@ -17,8 +17,8 @@ def test_from_search_to_item(client, app):
     hits = {hit["source_id"]: hit for hit in res.json["hits"]}
     # these are the slugs we get from search and will be used to link to the item
     assert hits["130323"]["slugs"] == [u'video_living-moments-in-jewish-spain', u'וידאו_רגעים-עם-יהודי-ספרד']
-    assert hits["130323"]["slug_en"] == u'video_living-moments-in-jewish-spain'
-    assert hits["130323"]["slug_he"] == u'וידאו_רגעים-עם-יהודי-ספרד'
+    assert hits["130323"]["slug_en"] == u'video_living-moments-in-jewish-spain-english-jews'
+    assert hits["130323"]["slug_he"] == u'וידאו_רגעים-עם-יהודי-ספרד-אנגלית'
     for slug in hits["130323"]["slugs"]:
         items = assert_client_get(client, u"/v1/item/{}".format(slug))
         assert len(items) == 1
