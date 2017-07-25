@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from bhs_api import create_app
 import elasticsearch
 from bhs_api.constants import PIPELINES_ES_DOC_TYPE, SUPPORTED_SUGGEST_LANGS
+import time
 
 
 class ElasticsearchCreateIndexCommand(object):
@@ -13,6 +14,7 @@ class ElasticsearchCreateIndexCommand(object):
         parser.add_argument('--index', help="name of the elasticsearch index to create (defaults to index from app config)")
         parser.add_argument('--host', help="elasticsearch host to create the index in (default to host from app)")
         parser.add_argument('--force', action="store_true", help="delete existing index if exists")
+        parser.add_argument('--ensure', action="store_true", help="optimistically ensure index exists")
         return parser.parse_args()
 
     @property
@@ -83,8 +85,23 @@ class ElasticsearchCreateIndexCommand(object):
         return {"mappings": {PIPELINES_ES_DOC_TYPE: {"properties": self.get_properties(),
                                                      "dynamic_templates": self.get_dynamic_templates()}}}
 
-    def create_es_index(self, es, es_index_name, delete_existing=False):
-        if es.indices.exists(es_index_name):
+    def _is_index_exists(self, es, es_index_name, ensure, try_num=1):
+        try:
+            return es.indices.exists(es_index_name)
+        except elasticsearch.ConnectionError:
+            if ensure and try_num < 10:
+                print("elasticsearch connection error, retry {} / 10".format(try_num))
+                print("sleeping 5 seconds before retrying")
+                time.sleep(5)
+                return self._is_index_exists(es, es_index_name, ensure, try_num+1)
+            else:
+                raise
+
+    def create_es_index(self, es, es_index_name, delete_existing=False, ensure=False):
+        index_exists = self._is_index_exists(es, es_index_name, ensure)
+        if index_exists and ensure:
+            print("index already exists, goodbye")
+        elif index_exists:
             if delete_existing:
                 print("deleting existing index")
                 es.indices.delete(es_index_name)
@@ -105,7 +122,7 @@ class ElasticsearchCreateIndexCommand(object):
         es = elasticsearch.Elasticsearch(host_name) if host_name else app.es
         if not index_name:
             index_name = app.es_data_db_index_name
-        self.create_es_index(es, index_name, delete_existing=args.force)
+        self.create_es_index(es, index_name, delete_existing=args.force, ensure=args.ensure)
 
 
 if __name__ == '__main__':

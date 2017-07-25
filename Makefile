@@ -22,3 +22,8 @@ reload:
 test:
 	. $(virtual_env)/bin/activate; py.test tests bhs_api/views.py
 
+docker-build:
+	docker build -t orihoch/mojp-dbs-back .
+
+docker-run:
+	docker run -it orihoch/mojp-dbs-back $(CMD)
