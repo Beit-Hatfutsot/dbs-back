@@ -98,8 +98,11 @@ class ElasticsearchCreateIndexCommand(object):
                 raise
 
     def create_es_index(self, es, es_index_name, delete_existing=False, ensure=False):
+        if ensure:
+            print("sleeping 5 seconds to let elasticsearch start properly")
+            time.sleep(5)
         index_exists = self._is_index_exists(es, es_index_name, ensure)
-        if index_exists and ensure:
+        if index_exists and ensure and not delete_existing:
             print("index already exists, goodbye")
         elif index_exists and not delete_existing:
             raise Exception("index already exists: {}".format(es_index_name))
