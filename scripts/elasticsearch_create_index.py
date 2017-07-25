@@ -101,15 +101,15 @@ class ElasticsearchCreateIndexCommand(object):
         index_exists = self._is_index_exists(es, es_index_name, ensure)
         if index_exists and ensure:
             print("index already exists, goodbye")
-        elif index_exists:
-            if delete_existing:
+        elif index_exists and not delete_existing:
+            raise Exception("index already exists: {}".format(es_index_name))
+        else:
+            if index_exists and delete_existing:
                 print("deleting existing index")
                 es.indices.delete(es_index_name)
-            else:
-                raise Exception("index already exists: {}".format(es_index_name))
-        print("creating index..")
-        es.indices.create(es_index_name, body=self._get_index_body())
-        print("Great success!")
+            print("creating index..")
+            es.indices.create(es_index_name, body=self._get_index_body())
+            print("Great success!")
 
     def main(self):
         args = self._parse_args()
