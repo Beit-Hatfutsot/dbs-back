@@ -35,6 +35,8 @@ SLUG_LANGUAGES_MAP = {
     'movies': {'en': 'video', 'he': u'וידאו',},
 }
 
+UNKNOWN_SLUG_LANGUAGES_MAP = {"en": "item", "he": u"פריט"}
+
 # all 2 letter language codes
 KNOWN_LANGS = iso639.languages.part1.keys()
 
@@ -458,7 +460,7 @@ def get_collection_id_field(collection_name):
 
 def update_slugs(document, collection_name):
     slugify = None
-    for lang, collection_slug in SLUG_LANGUAGES_MAP[collection_name].items():
+    for lang, collection_slug in SLUG_LANGUAGES_MAP.get(collection_name, UNKNOWN_SLUG_LANGUAGES_MAP).items():
         title = document.get("title_{}".format(lang))
         if title:
             slug = document.get("slug_{}".format(lang))

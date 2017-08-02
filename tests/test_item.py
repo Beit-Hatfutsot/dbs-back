@@ -64,6 +64,23 @@ def test_item_related_documents(client, app):
                                                                     u'title_he_lc']
     assert res.json[0]["related_documents"]["places"][0]["title_en"] == "BOZZOLO"
 
+def test_item_related_document_unknown_collection(client, app):
+    movie = deepcopy(MOVIES_SPAIN)
+    place = deepcopy(PLACES_BOZZOLO)
+    movie["slug_en"] = "video_test-item-related-documents"
+    movie["slugs"] = [movie["slug_en"]]
+    place["slug_en"] = "place_test-item-related-documents"
+    place["slugs"] = [place["slug_en"]]
+    place["collection"] = "invalid"
+    movie["related_documents_places"] = ["{}_{}".format(place["source"], place["source_id"])]
+    given_local_elasticsearch_client_with_test_data(app, "test_item::test_item_related_document_unknown_collection",
+                                                    additional_index_docs={"movies": [movie], "places": [place]})
+    res = client.get("/v1/item/video_test-item-related-documents")
+    assert res.status_code == 200, res.json
+    assert res.json[0]["related_documents"]["places"][0]["collection"] == "invalid"
+    assert res.json[0]["related_documents"]["places"][0]["slug_en"] == "item_bozzolo"
+    assert res.json[0]["related_documents"]["places"][0]["slug_he"] == u"פריט_בוצולו"
+
 
 # import pytest
 # from bhs_api.item import enrich_item
