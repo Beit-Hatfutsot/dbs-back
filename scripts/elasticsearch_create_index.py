@@ -50,6 +50,7 @@ class ElasticsearchCreateIndexCommand(object):
         properties["main_thumbnail_image_url"] = {"type": "keyword"}
         properties["main_image_url"] = {"type": "keyword"}
         properties["slugs"] = {"type": "keyword"}
+        properties["images"] = {"type": "object"}
         for lang in SUPPORTED_SUGGEST_LANGS:
             properties["title_{}_suggest".format(lang)] = self.completion_field
         return properties
