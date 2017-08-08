@@ -37,7 +37,8 @@ def test_search_should_return_only_relevant_data(client, app):
                                  u'title_en': u'BOURGES',
                                  u'title_en_lc': u'bourges',
                                  u'title_he': u"\u05d1\u05d5\u05e8\u05d2'",
-                                 u'title_he_lc': u"\u05d1\u05d5\u05e8\u05d2'"}]
+                                 u'title_he_lc': u"\u05d1\u05d5\u05e8\u05d2'",
+                                 u'images': [{"url": "example.url", "thumbnail_url": "example.thumbnail.url"}]}]
 
 def test_general_search_single_result(client, app):
     given_local_elasticsearch_client_with_test_data(app, __file__)

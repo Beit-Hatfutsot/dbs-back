@@ -44,7 +44,8 @@ KNOWN_ITEM_LANG_ATTRIBUTES = ['content_html_{lang}', 'slug_{lang}', 'title_{lang
 
 KNOWN_ITEM_ATTRIBUTES = ['collection', 'location', 'source', 'source_id',
                          'main_image_url', 'main_thumbnail_image_url',
-                         'slugs', 'google_map_embed', "related_documents"]
+                         'slugs', 'google_map_embed', "related_documents",
+                         "images"]
 for lang in KNOWN_LANGS:
     for attr in KNOWN_ITEM_LANG_ATTRIBUTES:
         KNOWN_ITEM_ATTRIBUTES.append(attr.format(lang=lang))
