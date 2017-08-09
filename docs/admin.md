@@ -74,3 +74,15 @@ Here are some commands to try if a server disk space runs out
 ```
 sudo find /tmp -name 'tmp*' -exec rm -f {} \;
 ```
+
+### bhp storage is missing
+
+bhs_infra server should have all the bhp storage data mounted at /home/bhs/bhp_storage
+
+if you find that the data is missing, run this:
+
+```
+ssh bhs_infra
+sudo su -l bhs
+./mount_bhp_storage.sh
+```
