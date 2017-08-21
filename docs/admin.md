@@ -86,3 +86,10 @@ ssh bhs_infra
 sudo su -l bhs
 ./mount_bhp_storage.sh
 ```
+
+### delete an item
+
+* on bhs-prod:
+  * `bhs@bhs-prod:~$ curl -XDELETE bhs-prod-db:9200/mojp-prod/<type>/<id>`
+  * `bhs@bhs-prod:~$ mongo mongo1/mojp-live --eval 'db.<collection>.remove({"id":<id>})'`
+  
