@@ -22,4 +22,3 @@ def flaskrun(db=None):
 
 if __name__ == "__main__":
     flaskrun()
-

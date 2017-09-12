@@ -1,0 +1,14 @@
+version: '3.2'
+
+services:
+
+  app:
+    build: .
+    image: orihoch/mojp-dbs-back
+    volumes:
+      - ".data-docker/etc-bhs:/etc/bhs"
+    ports:
+      # http://localhost:18080/
+      - "18080:80"
+      # http://localhost:18081/v1/docs
+      - "18081:8081"

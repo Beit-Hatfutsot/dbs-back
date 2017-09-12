@@ -1,0 +1,8 @@
+server {
+    listen 8081;
+
+	location /v1/docs {
+        default_type text/html;
+        alias /mojp/docs/_build/index.html;
+    }
+}
