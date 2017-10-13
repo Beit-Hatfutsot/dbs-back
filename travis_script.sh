@@ -5,6 +5,9 @@ set -e
 if [ "${TRAVIS_BRANCH}" != "master" ] || [ "${K8S_DEPLOYMENT_NAME}" == "" ] || [ "${K8S_IMAGE_NAME}" == "" ]; then
     echo " > skipping deployment: not on master branch, or missing K8S environment variables"
     exit 0
+elif [ "${DEPLOYMENT_BOT_GITHUB_TOKEN}" == "" ]; then
+    echo " > Could do deployment, but missing DEPLOYMENT_BOT_GITHUB_TOKEN environment variable for your repo"
+    exit 0
 else
     echo " > updating k8s configurations with the new image - which should trigger deployment"
     cd $HOME
