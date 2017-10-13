@@ -1,0 +1,23 @@
+sitemap:
+  schedule:
+    # minute hour day_of_week day_of_month month_of_year
+    crontab: '34 2 * * *'
+  pipeline:
+  - run: load_from_es
+#    parameters:
+#      stop-after-rows: 5000
+  - run: dump_to_sitemap
+    parameters:
+      # max allowed urls per sitemap page or index file = 50000 urls
+      max-urls-per-page: 50000
+      # max allowed sitemap size = 52428800 bytes
+      max-file-size-bytes: 52428800
+      index-base-url: https://dbs.bh.org.il/sitemap/
+      paths:
+      - /
+      - /about/familyTree
+      - /about/familyNames
+      - /about/places
+      - /about/visual_documentation
+      - /about/termsOfUse
+      - /search

@@ -1,4 +1,4 @@
-version: '3.2'
+version: '2'
 
 services:
 
@@ -12,3 +12,44 @@ services:
       - "18080:80"
       # http://localhost:18081/v1/docs
       - "18081:8081"
+
+  # this allows to use volumes_from which automatically mounts all volumes on this container
+  data:
+    image: tianon/true
+    volumes:
+      - ./.data-docker:/data
+
+  minio:
+    build: docker/minio
+    ports:
+      - "9000:9000"
+    volumes_from:
+      - data
+    command:
+      - server
+      - /data/minio
+    environment:
+      - MINIO_ACCESS_KEY
+      - MINIO_SECRET_KEY
+
+  minio-nginx:
+    build: docker/minio-nginx
+    ports:
+      - "9800:80"
+
+  pipelines:
+    build: docker/pipelines
+    ports:
+      - "5000:5000"
+    command:
+      - server
+    # we need access to elasticsearch proxy started from the host
+    network_mode: host
+    environment:
+      - S3_BUCKET_PREFIX=
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      # hard-coded to be used from the host network
+      - S3_ENDPOINT_URL=http://localhost:9000
+      - SITEMAP_ES_HOST
+      - SITEMAP_ES_INDEX

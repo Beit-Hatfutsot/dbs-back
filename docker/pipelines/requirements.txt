@@ -1,0 +1,4 @@
+datapackage-pipelines[speedup]==1.2.3
+elasticsearch==5.4.0
+boto3==1.4.7
+python-dotenv==0.7.1
