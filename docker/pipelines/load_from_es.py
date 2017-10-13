@@ -2,7 +2,6 @@ from datapackage_pipelines.wrapper import ingest, spew
 from datapackage_pipelines.utilities.resources import PROP_STREAMING
 import elasticsearch.helpers
 from elasticsearch import Elasticsearch
-import os
 from temp_loglevel import temp_loglevel
 import settings
 
@@ -30,28 +29,29 @@ def filter_row(row):
 def get_resources():
     yield get_resource()
 
-
 def get_resource():
     global parameters
     es = Elasticsearch(settings.SITEMAP_ES_HOST)
     with temp_loglevel():
         for i, doc in enumerate(elasticsearch.helpers.scan(es, index=settings.SITEMAP_ES_INDEX, scroll=u"3h")):
             if not parameters.get("stop-after-rows") or i < int(parameters.get("stop-after-rows")):
-                yield from filter_row({"index": doc["_index"],
-                                       "doc_type": doc["_type"],
-                                       "doc_id": doc["_id"],
-                                       "UnitId": doc["_source"].get("UnitId"),
-                                       "RightsCode": doc["_source"].get("RightsCode"),
-                                       "RightsDesc": doc["_source"].get("RightsDesc"),
-                                       "StatusDesc": doc["_source"].get("StatusDesc"),
-                                       "DisplayStatusDesc": doc["_source"].get("DisplayStatusDesc"),
-                                       "UnitType": doc["_source"].get("UnitType"),
-                                       "Slug_En": doc["_source"].get("Slug", {}).get("En"),
-                                       "Slug_He": doc["_source"].get("Slug", {}).get("He"),
-                                       "UnitText1_En": doc["_source"].get("UnitText1", {}).get("En"),
-                                       "UnitText1_He": doc["_source"].get("UnitText1", {}).get("He"),
-                                       "Header_En": doc["_source"].get("Header", {}).get("En"),
-                                       "Header_He": doc["_source"].get("Header", {}).get("He"), })
+                filtered_row = filter_row({"index": doc["_index"],
+                                           "doc_type": doc["_type"],
+                                           "doc_id": doc["_id"],
+                                           "UnitId": doc["_source"].get("UnitId"),
+                                           "RightsCode": doc["_source"].get("RightsCode"),
+                                           "RightsDesc": doc["_source"].get("RightsDesc"),
+                                           "StatusDesc": doc["_source"].get("StatusDesc"),
+                                           "DisplayStatusDesc": doc["_source"].get("DisplayStatusDesc"),
+                                           "UnitType": doc["_source"].get("UnitType"),
+                                           "Slug_En": doc["_source"]["Slug"].get("En") if doc["_source"].get("Slug") else "",
+                                           "Slug_He": doc["_source"]["Slug"].get("He") if doc["_source"].get("Slug") else "",
+                                           "UnitText1_En": doc["_source"]["UnitText1"].get("En") if doc["_source"].get("UnitText1") else "",
+                                           "UnitText1_He": doc["_source"]["UnitText1"].get("He") if doc["_source"].get("UnitText1") else "",
+                                           "Header_En": doc["_source"]["Header"].get("En") if doc["_source"].get("Header") else "",
+                                           "Header_He": doc["_source"]["Header"].get("He") if doc["_source"].get("Header") else "",
+                                           })
+                yield from filtered_row
             else:
                 break
 
