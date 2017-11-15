@@ -17,7 +17,7 @@ from flask.ext.security import current_user
 from itsdangerous import URLSafeSerializer, BadSignature
 from werkzeug import secure_filename, Response
 from werkzeug.exceptions import NotFound, Forbidden, BadRequest
-import elasticsearch
+import elasticsearch, elasticsearch.helpers
 import pymongo
 import jinja2
 import requests
@@ -708,3 +708,39 @@ def get_geocoded_places():
         'Slug': True, 'geometry': True, 'PlaceTypeDesc': True})
     ret = humanify(list(points))
     return ret
+
+def get_linkify_items(collections, html_lower):
+    items = elasticsearch.helpers.scan(current_app.es, index=current_app.es_data_db_index_name,
+                                       doc_type=collections, scroll=u"3h")
+    for i, item in enumerate(items):
+        collection = item["_type"]
+        item = item["_source"]
+        for lang in ["He", "En"]:
+            itemHeader = item.get("Header")
+            title = itemHeader[lang] if itemHeader and lang in itemHeader else ""
+            itemSlug = item.get("Slug")
+            slug = itemSlug[lang] if itemSlug and lang in itemSlug else ""
+            if slug and title and len(title) > 2 and title.lower() in html_lower:
+                slug = slug.decode("utf-8")
+                slug = slug.replace(u"_", u"/")
+                url = u"http://dbs.bh.org.il/{}{}".format("he/" if lang == "he" else "", slug)
+                yield {"collection": collection, "item": {"title": title, "url": url}}
+
+@v1_endpoints.route("/linkify", methods=['GET', 'POST'])
+def linkify():
+    try:
+        collections = ["places", "personalities", "familyNames"]
+        res = {collection: [] for collection in collections}
+        try:
+            if request.method == "POST":
+                html_lower = request.form["html"].lower()
+            else:
+                html_lower = request.args["html"].lower()
+        except Exception as e:
+            logging.exception(e)
+            raise
+        for i, item in enumerate(get_linkify_items(collections, html_lower)):
+            res[item["collection"]].append(item["item"])
+        return humanify(res)
+    except Exception as e:
+        return humanify({"error": e.message, "traceback": traceback.format_exc()}, 500)
