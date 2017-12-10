@@ -15,6 +15,7 @@ DEPLOYMENT_SCRIPT="
                      values.${K8S_OPS_ENVIRONMENT}.auto-updated.yaml &&\
     git config user.email deployment-bot'@'k8s-ops &&\
     git config user.name deployment-bot &&\
+    git pull https://${K8S_OPS_GITHUB_REPO_TOKEN}'@'github.com/${K8S_OPS_REPO_SLUG}.git master &&\
     git add values.${K8S_OPS_ENVIRONMENT}.auto-updated.yaml &&\
     git commit -m '${SIMPLE_APP_DEPLOYMENT_NAME} image update --no-deploy' &&\
     git push https://${K8S_OPS_GITHUB_REPO_TOKEN}'@'github.com/${K8S_OPS_REPO_SLUG}.git master &&\
@@ -40,6 +41,9 @@ echo "${TRAVIS_COMMIT_MESSAGE}" | grep -- --no-deploy >/dev/null &&\
 ! $OPENSSL_CMD &&\
     echo "failed to decrypt service account secret" && exit 1
 
+! docker pull "${K8S_OPS_DOCKER_IMAGE}" &&\
+    echo "failed to pull docker image" && exit 1
+
 if [ "${K8S_OPS_REPO_SLUG}" == "${TRAVIS_REPO_SLUG}" ]; then
     echo "skipping cloning of ops repo as this is the current repo (as reported by TRAVIS_REPO_SLUG)"
     K8S_OPS_REPO_DIRECTORY="./"
@@ -48,9 +52,6 @@ else
     ! git clone --depth 1 "https://github.com/${K8S_OPS_REPO_SLUG}.git" "${K8S_OPS_REPO_DIRECTORY}" &&\
         echo "failed to clone k8s repo" && exit 1
 fi
-
-! docker pull "${K8S_OPS_DOCKER_IMAGE}" &&\
-    echo "failed to pull docker image" && exit 1
 
 ! docker run -it -v "`pwd`/k8s-ops-secret.json:/k8s-ops/secret.json" \
                  -v "`pwd`/${K8S_OPS_REPO_DIRECTORY}:/ops" \
