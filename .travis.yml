@@ -1,6 +1,8 @@
 language: bash
-cache:
-  directories:
-  - "$HOME/beit-hatfutsot-devops/"
+sudo: required
+env:
+- K8S_CONTINUOUS_DEPLOYMENT=true
+services:
+- docker
 script:
-- ./travis_script.sh
+- ./continuous_deployment.sh

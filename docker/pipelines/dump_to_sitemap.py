@@ -82,7 +82,7 @@ def filter_resource(resource):
         s3.BucketPolicy(bucket_name).put(Policy=json.dumps({"Version": str(datetime.datetime.now()).replace(" ", "-"),
                                                             "Statement": [{"Sid": "AddPerm",
                                                                            "Effect": "Allow",
-                                                                           "Principal": "*",
+                                                                           "Principal": {"AWS": ["*"]},
                                                                            "Action": ["s3:GetObject"],
                                                                            "Resource": ["arn:aws:s3:::{}/*".format(bucket_name)]}]}))
     urls_generator = get_urls(resource)
